@@ -8,7 +8,7 @@
     "npm": ">=8.0.0"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "npx kill-port 3000 && vite",
     "dev:3000": "npx kill-port 3000 && vite",
     "build": "vite build && node scripts/copy-token-redirect.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
