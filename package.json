@@ -12,7 +12,8 @@
     "dev:3000": "npx kill-port 3000 && vite",
     "build": "vite build && node scripts/copy-token-redirect.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
+    "preview": "npx kill-port 4173 && vite preview",
+    "preview:4173": "npx kill-port 4173 && vite preview",
     "vercel-build": "npm run build",
     "test": "vitest",
     "deploy": "npm run build && firebase deploy"
