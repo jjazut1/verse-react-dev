@@ -618,7 +618,7 @@ const Home = () => {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, isTeacher } = useAuth();
   const toast = useToast();
   const [modifiableTemplates, setModifiableTemplates] = useState<GameObject[]>([]);
   const [blankTemplates, setBlankTemplates] = useState<GameObject[]>([]);
@@ -762,28 +762,43 @@ const Home = () => {
           currentUser ? getDocs(query(
             collection(db, 'userGameConfigs'),
             where('userId', '==', currentUser.uid)
-          )) : Promise.resolve({ docs: [] }),
+          )).catch(err => {
+            console.error("Error fetching user games:", err);
+            return { docs: [] };
+          }) : Promise.resolve({ docs: [] }),
           
           // Get public games (we'll filter by userId in JavaScript)
           getDocs(query(
             collection(db, 'userGameConfigs'),
             where('share', '==', true)
-          )),
+          )).catch(err => {
+            console.error("Error fetching public games:", err);
+            return { docs: [] };
+          }),
           
           // Get sort-categories-egg modifiable templates
           getDocs(query(
             collection(db, 'categoryTemplates'),
             where('type', '==', 'sort-categories-egg')
-          )),
+          )).catch(err => {
+            console.error("Error fetching sort categories templates:", err);
+            return { docs: [] };
+          }),
           
           // Get whack-a-mole modifiable templates
           getDocs(query(
             collection(db, 'categoryTemplates'),
             where('type', '==', 'whack-a-mole')
-          )),
+          )).catch(err => {
+            console.error("Error fetching whack-a-mole templates:", err);
+            return { docs: [] };
+          }),
           
           // Get blank templates
-          getDocs(collection(db, 'blankGameTemplates'))
+          getDocs(collection(db, 'blankGameTemplates')).catch(err => {
+            console.error("Error fetching blank templates:", err);
+            return { docs: [] };
+          })
         ]);
 
         // Process the user's own games
@@ -861,6 +876,11 @@ const Home = () => {
         setBlankTemplates(blankTemplatesData);
       } catch (error: any) {
         console.error('Error fetching games:', error);
+        // Initialize with empty arrays to prevent UI errors
+        setPublicGames([]);
+        setModifiableTemplates([]);
+        setBlankTemplates([]);
+        
         toast({
           title: 'Error',
           description: 'Could not load games and templates.',
@@ -1162,7 +1182,7 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Three Column Section */}
+      {/* Three Column Section - show all columns for teachers/admins, only Free Games for students */}
       <div style={{ 
         padding: 'var(--spacing-16) var(--spacing-4)',
         backgroundColor: 'var(--color-gray-50)',
@@ -1172,11 +1192,12 @@ const Home = () => {
           maxWidth: '1400px',
           margin: '0 auto',
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          // Adjust grid template columns based on user role
+          gridTemplateColumns: isTeacher ? 'repeat(3, 1fr)' : '1fr',
           gap: 'var(--spacing-8)',
           width: '100%'
         }}>
-          {/* Free Games Column */}
+          {/* Free Games Column - visible to all users */}
           <div style={{ 
             padding: 'var(--spacing-6)',
             backgroundColor: 'white',
@@ -1236,48 +1257,32 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Modifiable Templates Column */}
-          <div style={{ 
-            padding: 'var(--spacing-6)',
-            backgroundColor: 'white',
-            borderRadius: 'var(--border-radius-lg)',
-            boxShadow: 'var(--shadow-md)'
-          }}>
-            <h2 style={{ 
-              fontSize: 'var(--font-size-2xl)',
-              color: 'var(--color-gray-800)',
-              marginBottom: 'var(--spacing-4)'
+          {/* Modifiable Templates Column - only visible to teachers/admins */}
+          {isTeacher && (
+            <div style={{ 
+              padding: 'var(--spacing-6)',
+              backgroundColor: 'white',
+              borderRadius: 'var(--border-radius-lg)',
+              boxShadow: 'var(--shadow-md)'
             }}>
-              Modifiable Game Templates
-            </h2>
-            <SearchBar onSearch={setModifiableSearch} />
-            <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-              {loading ? (
-                <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
-                  Loading templates...
-                </div>
-              ) : (
-                <>
-                  {/* User's own templates section */}
-                  {currentUser && userOwnedTemplates.length > 0 && (
-                    <div>
-                      <h3 style={{ 
-                        fontSize: 'var(--font-size-lg)',
-                        color: 'var(--color-gray-700)',
-                        margin: 'var(--spacing-4) 0',
-                        paddingBottom: 'var(--spacing-2)',
-                        borderBottom: '1px solid var(--color-gray-200)'
-                      }}>
-                        My Templates
-                      </h3>
-                      {renderTemplatesList(userOwnedTemplates, true, handleTemplateClick, handleDeleteClick)}
-                    </div>
-                  )}
-                  
-                  {/* Other templates section */}
-                  {otherTemplates.length > 0 && (
-                    <div>
-                      {currentUser && userOwnedTemplates.length > 0 && (
+              <h2 style={{ 
+                fontSize: 'var(--font-size-2xl)',
+                color: 'var(--color-gray-800)',
+                marginBottom: 'var(--spacing-4)'
+              }}>
+                Modifiable Game Templates
+              </h2>
+              <SearchBar onSearch={setModifiableSearch} />
+              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
+                    Loading templates...
+                  </div>
+                ) : (
+                  <>
+                    {/* User's own templates section */}
+                    {currentUser && userOwnedTemplates.length > 0 && (
+                      <div>
                         <h3 style={{ 
                           fontSize: 'var(--font-size-lg)',
                           color: 'var(--color-gray-700)',
@@ -1285,48 +1290,68 @@ const Home = () => {
                           paddingBottom: 'var(--spacing-2)',
                           borderBottom: '1px solid var(--color-gray-200)'
                         }}>
-                          Other Templates
+                          My Templates
                         </h3>
-                      )}
-                      {renderTemplatesList(otherTemplates, false, handleTemplateClick, handleDeleteClick)}
-                    </div>
-                  )}
-                  
-                  {userOwnedTemplates.length === 0 && otherTemplates.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
-                      No templates found
-                    </div>
-                  )}
-                </>
-              )}
+                        {renderTemplatesList(userOwnedTemplates, true, handleTemplateClick, handleDeleteClick)}
+                      </div>
+                    )}
+                    
+                    {/* Other templates section */}
+                    {otherTemplates.length > 0 && (
+                      <div>
+                        {currentUser && userOwnedTemplates.length > 0 && (
+                          <h3 style={{ 
+                            fontSize: 'var(--font-size-lg)',
+                            color: 'var(--color-gray-700)',
+                            margin: 'var(--spacing-4) 0',
+                            paddingBottom: 'var(--spacing-2)',
+                            borderBottom: '1px solid var(--color-gray-200)'
+                          }}>
+                            Other Templates
+                          </h3>
+                        )}
+                        {renderTemplatesList(otherTemplates, false, handleTemplateClick, handleDeleteClick)}
+                      </div>
+                    )}
+                    
+                    {userOwnedTemplates.length === 0 && otherTemplates.length === 0 && (
+                      <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
+                        No templates found
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Blank Templates Column */}
-          <div style={{ 
-            padding: 'var(--spacing-6)',
-            backgroundColor: 'white',
-            borderRadius: 'var(--border-radius-lg)',
-            boxShadow: 'var(--shadow-md)'
-          }}>
-            <h2 style={{ 
-              fontSize: 'var(--font-size-2xl)',
-              color: 'var(--color-gray-800)',
-              marginBottom: 'var(--spacing-4)'
+          {/* Blank Templates Column - only visible to teachers/admins */}
+          {isTeacher && (
+            <div style={{ 
+              padding: 'var(--spacing-6)',
+              backgroundColor: 'white',
+              borderRadius: 'var(--border-radius-lg)',
+              boxShadow: 'var(--shadow-md)'
             }}>
-              Blank Game Templates
-            </h2>
-            <SearchBar onSearch={setBlankSearch} />
-            <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-              {loading ? (
-                <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
-                  Loading templates...
-                </div>
-              ) : (
-                renderTemplatesList(filteredBlank, false, (template) => handleTemplateClick(template, true))
-              )}
+              <h2 style={{ 
+                fontSize: 'var(--font-size-2xl)',
+                color: 'var(--color-gray-800)',
+                marginBottom: 'var(--spacing-4)'
+              }}>
+                Blank Game Templates
+              </h2>
+              <SearchBar onSearch={setBlankSearch} />
+              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
+                    Loading templates...
+                  </div>
+                ) : (
+                  renderTemplatesList(filteredBlank, false, (template) => handleTemplateClick(template, true))
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

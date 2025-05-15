@@ -1,1 +1,16 @@
-{"projects":{"default":"verse-dev-e0c06","production":"verse-11f2d"}}
+{
+  "projects": {
+    "default": "verse-dev-e0c06",
+    "production": "verse-11f2d"
+  },
+  "targets": {
+    "verse-dev-e0c06": {
+      "hosting": {
+        "default": [
+          "verse-dev-e0c06"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
