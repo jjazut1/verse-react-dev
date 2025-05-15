@@ -749,57 +749,107 @@ const Home = () => {
     const fetchGames = async () => {
       try {
         setLoading(true);
+        console.log("Starting fetchGames function");
         
-        // Query for user's own games and publicly shared games by others
-        const [
-          userOwnGamesSnapshot, 
-          publicGamesSnapshot, 
-          sortCategoriesTemplatesSnapshot,
-          whackAMoleTemplatesSnapshot, 
-          blankTemplatesSnapshot
-        ] = await Promise.all([
+        // Base promises for games - these are loaded for all users
+        const promises = [
           // Get all of the current user's games (both private and public)
-          currentUser ? getDocs(query(
-            collection(db, 'userGameConfigs'),
-            where('userId', '==', currentUser.uid)
-          )).catch(err => {
-            console.error("Error fetching user games:", err);
-            return { docs: [] };
-          }) : Promise.resolve({ docs: [] }),
+          currentUser ? (async () => {
+            console.log("Attempting to fetch current user's games");
+            try {
+              const userGamesQuery = query(
+                collection(db, 'userGameConfigs'),
+                where('userId', '==', currentUser.uid)
+              );
+              console.log("User games query:", userGamesQuery);
+              const result = await getDocs(userGamesQuery);
+              console.log(`Successfully fetched ${result.docs.length} user games`);
+              return result;
+            } catch (error) {
+              console.error("Error fetching user's games:", error);
+              return { docs: [] };
+            }
+          })() : Promise.resolve({ docs: [] }),
           
           // Get public games (we'll filter by userId in JavaScript)
-          getDocs(query(
-            collection(db, 'userGameConfigs'),
-            where('share', '==', true)
-          )).catch(err => {
-            console.error("Error fetching public games:", err);
-            return { docs: [] };
-          }),
-          
-          // Get sort-categories-egg modifiable templates
-          getDocs(query(
-            collection(db, 'categoryTemplates'),
-            where('type', '==', 'sort-categories-egg')
-          )).catch(err => {
-            console.error("Error fetching sort categories templates:", err);
-            return { docs: [] };
-          }),
-          
-          // Get whack-a-mole modifiable templates
-          getDocs(query(
-            collection(db, 'categoryTemplates'),
-            where('type', '==', 'whack-a-mole')
-          )).catch(err => {
-            console.error("Error fetching whack-a-mole templates:", err);
-            return { docs: [] };
-          }),
-          
-          // Get blank templates
-          getDocs(collection(db, 'blankGameTemplates')).catch(err => {
-            console.error("Error fetching blank templates:", err);
-            return { docs: [] };
-          })
-        ]);
+          (async () => {
+            console.log("Attempting to fetch public games with share=true");
+            try {
+              const publicGamesQuery = query(
+                collection(db, 'userGameConfigs'),
+                where('share', '==', true)
+              );
+              console.log("Public games query:", publicGamesQuery);
+              const result = await getDocs(publicGamesQuery);
+              console.log(`Successfully fetched ${result.docs.length} public games`);
+              return result;
+            } catch (error) {
+              console.error("Error fetching public games:", error);
+              throw error; // Re-throw to be caught by the main try/catch
+            }
+          })()
+        ];
+        
+        // Add template queries only if the user is a teacher or admin
+        if (isTeacher) {
+          console.log("User is teacher, attempting to fetch templates");
+          // Add template queries to the promises array
+          promises.push(
+            // Get sort-categories-egg modifiable templates
+            (async () => {
+              console.log("Attempting to fetch sort-categories-egg templates");
+              try {
+                const result = await getDocs(query(
+                  collection(db, 'categoryTemplates'),
+                  where('type', '==', 'sort-categories-egg')
+                ));
+                console.log(`Successfully fetched ${result.docs.length} sort-categories-egg templates`);
+                return result;
+              } catch (error) {
+                console.error("Error fetching sort-categories-egg templates:", error);
+                return { docs: [] };
+              }
+            })(),
+            
+            // Get whack-a-mole modifiable templates
+            (async () => {
+              console.log("Attempting to fetch whack-a-mole templates");
+              try {
+                const result = await getDocs(query(
+                  collection(db, 'categoryTemplates'),
+                  where('type', '==', 'whack-a-mole')
+                ));
+                console.log(`Successfully fetched ${result.docs.length} whack-a-mole templates`);
+                return result;
+              } catch (error) {
+                console.error("Error fetching whack-a-mole templates:", error);
+                return { docs: [] };
+              }
+            })(),
+            
+            // Get blank templates
+            (async () => {
+              console.log("Attempting to fetch blank templates");
+              try {
+                const result = await getDocs(collection(db, 'blankGameTemplates'));
+                console.log(`Successfully fetched ${result.docs.length} blank templates`);
+                return result;
+              } catch (error) {
+                console.error("Error fetching blank templates:", error);
+                return { docs: [] };
+              }
+            })()
+          );
+        }
+        
+        console.log("Executing all promises");
+        // Execute all promises
+        const results = await Promise.all(promises);
+        console.log("All promises resolved successfully");
+        
+        // Always process games data
+        const userOwnGamesSnapshot = results[0];
+        const publicGamesSnapshot = results[1];
 
         // Process the user's own games
         const userGames = userOwnGamesSnapshot.docs.map(doc => ({
@@ -825,62 +875,76 @@ const Home = () => {
 
         // Combine into a single array for public games display
         setPublicGames([...userGames, ...otherGames]);
-
-        // Process sort-categories-egg templates
-        const sortCategoriesTemplates = sortCategoriesTemplatesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          title: doc.data().title || 'Untitled Template',
-          type: doc.data().type || 'sort-categories-egg',
-          thumbnail: doc.data().thumbnail,
-          userId: doc.data().userId,
-          categories: doc.data().categories || [],
-          eggQty: doc.data().eggQty || 6,
-          share: doc.data().share || false
-        }));
+        console.log(`Set publicGames with ${userGames.length} user games and ${otherGames.length} other games`);
         
-        // Process whack-a-mole templates
-        const whackAMoleTemplates = whackAMoleTemplatesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          title: doc.data().title || 'Untitled Template',
-          type: doc.data().type || 'whack-a-mole',
-          thumbnail: doc.data().thumbnail,
-          userId: doc.data().userId,
-          words: doc.data().words || [],
-          share: doc.data().share || false
-        }));
-        
-        // Combine all templates
-        setModifiableTemplates([...sortCategoriesTemplates, ...whackAMoleTemplates]);
-
-        // Process blank templates
-        const blankTemplatesData = blankTemplatesSnapshot.docs.map(doc => {
-          // Ensure blank templates have a valid game type
-          let type = doc.data().type || 'sort-categories-egg';
+        // Process templates only if the user is a teacher/admin and templates were fetched
+        if (isTeacher && promises.length > 2) {
+          const sortCategoriesTemplatesSnapshot = results[2];
+          const whackAMoleTemplatesSnapshot = results[3];
+          const blankTemplatesSnapshot = results[4];
           
-          // Make sure the type is one of our supported game types
-          if (type !== 'whack-a-mole' && type !== 'sort-categories-egg') {
-            // Default to sort-categories-egg if type is not supported
-            type = 'sort-categories-egg';
-          }
-          
-          return {
+          // Process sort-categories-egg templates
+          const sortCategoriesTemplates = sortCategoriesTemplatesSnapshot.docs.map(doc => ({
             id: doc.id,
             title: doc.data().title || 'Untitled Template',
-            type: type, // Use the validated type
+            type: doc.data().type || 'sort-categories-egg',
             thumbnail: doc.data().thumbnail,
+            userId: doc.data().userId,
             categories: doc.data().categories || [],
             eggQty: doc.data().eggQty || 6,
             share: doc.data().share || false
-          };
-        });
-        setBlankTemplates(blankTemplatesData);
+          }));
+          
+          // Process whack-a-mole templates
+          const whackAMoleTemplates = whackAMoleTemplatesSnapshot.docs.map(doc => ({
+            id: doc.id,
+            title: doc.data().title || 'Untitled Template',
+            type: doc.data().type || 'whack-a-mole',
+            thumbnail: doc.data().thumbnail,
+            userId: doc.data().userId,
+            words: doc.data().words || [],
+            share: doc.data().share || false
+          }));
+          
+          // Combine all templates
+          setModifiableTemplates([...sortCategoriesTemplates, ...whackAMoleTemplates]);
+
+          // Process blank templates
+          const blankTemplatesData = blankTemplatesSnapshot.docs.map(doc => {
+            // Ensure blank templates have a valid game type
+            let type = doc.data().type || 'sort-categories-egg';
+            
+            // Make sure the type is one of our supported game types
+            if (type !== 'whack-a-mole' && type !== 'sort-categories-egg') {
+              // Default to sort-categories-egg if type is not supported
+              type = 'sort-categories-egg';
+            }
+            
+            return {
+              id: doc.id,
+              title: doc.data().title || 'Untitled Template',
+              type: type, // Use the validated type
+              thumbnail: doc.data().thumbnail,
+              categories: doc.data().categories || [],
+              eggQty: doc.data().eggQty || 6,
+              share: doc.data().share || false
+            };
+          });
+          setBlankTemplates(blankTemplatesData);
+        } else {
+          // Set empty arrays for non-teacher users
+          setModifiableTemplates([]);
+          setBlankTemplates([]);
+        }
       } catch (error: any) {
         console.error('Error fetching games:', error);
-        // Initialize with empty arrays to prevent UI errors
-        setPublicGames([]);
-        setModifiableTemplates([]);
-        setBlankTemplates([]);
-        
+        // Log detailed error information
+        if (error.code) {
+          console.error(`Firebase error code: ${error.code}`);
+        }
+        if (error.message) {
+          console.error(`Error message: ${error.message}`);
+        }
         toast({
           title: 'Error',
           description: 'Could not load games and templates.',
@@ -889,11 +953,12 @@ const Home = () => {
         });
       } finally {
         setLoading(false);
+        console.log("Finished fetchGames function");
       }
     };
 
     fetchGames();
-  }, [toast, currentUser]);
+  }, [toast, currentUser, isTeacher]);
 
   // Filter and separate games based on ownership and search
   const userOwnedGames = publicGames.filter(game => 
@@ -1182,7 +1247,7 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Three Column Section - show all columns for teachers/admins, only Free Games for students */}
+      {/* Three Column Section */}
       <div style={{ 
         padding: 'var(--spacing-16) var(--spacing-4)',
         backgroundColor: 'var(--color-gray-50)',
@@ -1192,12 +1257,11 @@ const Home = () => {
           maxWidth: '1400px',
           margin: '0 auto',
           display: 'grid',
-          // Adjust grid template columns based on user role
-          gridTemplateColumns: isTeacher ? 'repeat(3, 1fr)' : '1fr',
+          gridTemplateColumns: 'repeat(3, 1fr)',
           gap: 'var(--spacing-8)',
           width: '100%'
         }}>
-          {/* Free Games Column - visible to all users */}
+          {/* Free Games Column */}
           <div style={{ 
             padding: 'var(--spacing-6)',
             backgroundColor: 'white',
@@ -1257,7 +1321,7 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Modifiable Templates Column - only visible to teachers/admins */}
+          {/* Modifiable Templates Column */}
           {isTeacher && (
             <div style={{ 
               padding: 'var(--spacing-6)',
@@ -1279,53 +1343,18 @@ const Home = () => {
                     Loading templates...
                   </div>
                 ) : (
-                  <>
-                    {/* User's own templates section */}
-                    {currentUser && userOwnedTemplates.length > 0 && (
-                      <div>
-                        <h3 style={{ 
-                          fontSize: 'var(--font-size-lg)',
-                          color: 'var(--color-gray-700)',
-                          margin: 'var(--spacing-4) 0',
-                          paddingBottom: 'var(--spacing-2)',
-                          borderBottom: '1px solid var(--color-gray-200)'
-                        }}>
-                          My Templates
-                        </h3>
-                        {renderTemplatesList(userOwnedTemplates, true, handleTemplateClick, handleDeleteClick)}
-                      </div>
-                    )}
-                    
-                    {/* Other templates section */}
-                    {otherTemplates.length > 0 && (
-                      <div>
-                        {currentUser && userOwnedTemplates.length > 0 && (
-                          <h3 style={{ 
-                            fontSize: 'var(--font-size-lg)',
-                            color: 'var(--color-gray-700)',
-                            margin: 'var(--spacing-4) 0',
-                            paddingBottom: 'var(--spacing-2)',
-                            borderBottom: '1px solid var(--color-gray-200)'
-                          }}>
-                            Other Templates
-                          </h3>
-                        )}
-                        {renderTemplatesList(otherTemplates, false, handleTemplateClick, handleDeleteClick)}
-                      </div>
-                    )}
-                    
-                    {userOwnedTemplates.length === 0 && otherTemplates.length === 0 && (
-                      <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
-                        No templates found
-                      </div>
-                    )}
-                  </>
+                  renderTemplatesList(
+                    modifiableTemplates.filter(template => template.title.toLowerCase().includes(modifiableSearch.toLowerCase())),
+                    false,
+                    (template) => handleTemplateClick(template),
+                    handleDeleteClick
+                  )
                 )}
               </div>
             </div>
           )}
 
-          {/* Blank Templates Column - only visible to teachers/admins */}
+          {/* Blank Templates Column */}
           {isTeacher && (
             <div style={{ 
               padding: 'var(--spacing-6)',
@@ -1347,7 +1376,11 @@ const Home = () => {
                     Loading templates...
                   </div>
                 ) : (
-                  renderTemplatesList(filteredBlank, false, (template) => handleTemplateClick(template, true))
+                  renderTemplatesList(
+                    blankTemplates.filter(template => template.title.toLowerCase().includes(blankSearch.toLowerCase())),
+                    false,
+                    (template) => handleTemplateClick(template, true)
+                  )
                 )}
               </div>
             </div>
