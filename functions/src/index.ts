@@ -20,6 +20,28 @@ if (SENDGRID_API_KEY && SENDGRID_API_KEY.startsWith('SG.')) {
   console.warn('Please set your SendGrid API key using: firebase functions:config:set sendgrid.key=SG.YOUR_API_KEY');
 }
 
+// Get environment
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Helper function to get the appropriate base URL
+function getBaseUrl(): string {
+  // Try to get from functions config first
+  const configUrl = functions.config().app?.url;
+  if (configUrl && configUrl.trim() !== '') {
+    console.log("Using base URL from functions config:", configUrl);
+    return configUrl.trim();
+  }
+  
+  // Fallback based on environment
+  if (isProduction) {
+    console.log("Fallback to production URL");
+    return 'https://r2process.com';
+  } else {
+    console.log("Fallback to development URL");
+    return 'https://verse-dev-central.web.app';
+  }
+}
+
 // Interface for Assignment data
 interface Assignment {
   id: string;
@@ -69,9 +91,9 @@ exports.sendAssignmentEmail = functions.firestore
       console.log(`Processing assignment for student: ${studentEmail}, ID: ${assignmentId}`);
       
       // Base URL and assignment link
-      const baseUrl = 'https://r2process.com';
+      const baseUrl = getBaseUrl();
       const assignmentLink = `${baseUrl}/play?token=${assignment.linkToken}`;
-      console.log("Generated assignment link", { assignmentLink });
+      console.log("Generated assignment link", { assignmentLink, baseUrl });
       
       // Format the due date
       let formattedDate = 'No due date set';
@@ -160,15 +182,15 @@ exports.sendEmailLinkWithAssignment = functions.firestore
       const studentEmail = assignment.studentEmail.toLowerCase();
       console.log(`Processing assignment with email link for student: ${studentEmail}, ID: ${assignmentId}`);
       
-      // Base URL - use Firebase Auth domain
-      const baseUrl = 'https://r2process.com';
+      // Base URL - use helper function
+      const baseUrl = getBaseUrl();
       
       // Instead of using admin.auth().generateSignInWithEmailLink, we'll manually create a sign-in link
       // This avoids the Firebase Auth Admin permission issues
       // The email parameter needs to be included in the URL so it can be retrieved on the login page
       const signInLink = `${baseUrl}/login?assignmentId=${assignmentId}&email=${encodeURIComponent(studentEmail)}&mode=signIn&oobCode=${assignment.linkToken}`;
       
-      console.log("Generated sign-in link with embedded assignment and email", { signInLink });
+      console.log("Generated sign-in link with embedded assignment and email", { signInLink, baseUrl });
       
       // Format the due date
       let formattedDate = 'No due date set';

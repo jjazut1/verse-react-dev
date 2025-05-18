@@ -5,9 +5,31 @@ import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { setupSendGrid, sendEmail } from './sendgridHelper';
 
-// Define secrets
-const SENDGRID_API_KEY = defineSecret("SENDGRID_API_KEY");
-const SENDER_EMAIL = defineSecret("SENDER_EMAIL");
+// Define the secrets
+export const SENDGRID_API_KEY = defineSecret("SENDGRID_API_KEY");
+export const SENDER_EMAIL = defineSecret("SENDER_EMAIL");
+export const APP_URL = defineSecret("APP_URL");
+
+// Get environment
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Helper function to get the appropriate base URL
+function getBaseUrl(): string {
+  // First try to get from secrets
+  if (APP_URL.value() && APP_URL.value().trim() !== '') {
+    console.log("Using base URL from APP_URL secret");
+    return APP_URL.value().trim();
+  }
+  
+  // Fallback based on environment
+  if (isProduction) {
+    console.log("Fallback to production URL");
+    return 'https://r2process.com';
+  } else {
+    console.log("Fallback to development URL");
+    return 'https://verse-dev-central.web.app';
+  }
+}
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -32,7 +54,7 @@ interface Assignment {
 export const sendAssignmentEmail = onDocumentCreated(
   {
     document: "assignments/{assignmentId}",
-    secrets: [SENDGRID_API_KEY, SENDER_EMAIL],
+    secrets: [SENDGRID_API_KEY, SENDER_EMAIL, APP_URL],
   },
   async (event) => {
     const snapshot = event.data;
@@ -50,7 +72,9 @@ export const sendAssignmentEmail = onDocumentCreated(
     }
 
     const studentEmail = assignment.studentEmail.toLowerCase();
-    const assignmentLink = `https://r2process.com/play?token=${assignment.linkToken}`;
+    const baseUrl = getBaseUrl();
+    console.log(`Using base URL: ${baseUrl}`);
+    const assignmentLink = `${baseUrl}/play?token=${assignment.linkToken}`;
 
     let formattedDate = "No due date set";
     try {
@@ -108,7 +132,7 @@ export const sendAssignmentEmail = onDocumentCreated(
 export const sendEmailLinkWithAssignment = onDocumentCreated(
   {
     document: "assignments/{assignmentId}",
-    secrets: [SENDGRID_API_KEY, SENDER_EMAIL],
+    secrets: [SENDGRID_API_KEY, SENDER_EMAIL, APP_URL],
   },
   async (event) => {
     const snapshot = event.data;
@@ -126,7 +150,9 @@ export const sendEmailLinkWithAssignment = onDocumentCreated(
     }
 
     const studentEmail = assignment.studentEmail.toLowerCase();
-    const signInLink = `https://r2process.com/login?assignmentId=${assignmentId}&email=${encodeURIComponent(studentEmail)}&mode=signIn&oobCode=${assignment.linkToken}`;
+    const baseUrl = getBaseUrl();
+    console.log(`Using base URL: ${baseUrl}`);
+    const signInLink = `${baseUrl}/login?assignmentId=${assignmentId}&email=${encodeURIComponent(studentEmail)}&mode=signIn&oobCode=${assignment.linkToken}`;
 
     let formattedDate = "No due date set";
     try {
