@@ -1,13 +1,13 @@
 {
   "projects": {
-    "default": "verse-dev-e0c06",
+    "default": "verse-dev-central",
     "production": "verse-11f2d"
   },
   "targets": {
-    "verse-dev-e0c06": {
+    "verse-dev-central": {
       "hosting": {
         "default": [
-          "verse-dev-e0c06"
+          "verse-dev-central"
         ]
       }
     }

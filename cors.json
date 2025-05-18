@@ -1,7 +1,12 @@
 [
   {
-    "origin": ["http://localhost:3000", "http://localhost:3001"],
-    "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "maxAgeSeconds": 3600
+    "maxAgeSeconds": 3600, 
+    "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
+    "origin": [
+      "http://localhost:3000", 
+      "http://localhost:3001", 
+      "https://verse-dev-central.web.app",
+      "https://verse-dev-central.firebaseapp.com"
+    ]
   }
 ]
