@@ -10,7 +10,9 @@ import {
   sendPasswordResetEmail,
   updateEmail as firebaseUpdateEmail,
   updatePassword as firebaseUpdatePassword,
-  UserCredential
+  UserCredential,
+  signInWithRedirect,
+  getRedirectResult
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -25,7 +27,7 @@ const TEACHER_EMAILS = [
 interface AuthContextType {
   currentUser: User | null;
   isTeacher: boolean;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: () => Promise<UserCredential | void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -222,9 +224,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginWithGoogle = async () => {
+    // Create the provider instance
     const provider = new GoogleAuthProvider();
+    
+    // Add scopes that you need
+    provider.addScope('profile');
+    provider.addScope('email');
+    
+    // Set custom parameters for the auth provider
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    
     try {
-      await signInWithPopup(auth, provider);
+      // Use signInWithPopup for direct feedback
+      const result = await signInWithPopup(auth, provider);
+      return result;
     } catch (error) {
       console.error('Error signing in with Google:', error);
       throw error;
