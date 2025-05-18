@@ -43,7 +43,15 @@ service cloud.firestore {
       return request.auth != null && 
              request.auth.token != null && 
              request.auth.token.email != null && 
-             request.auth.token.email.matches(".*@verse-11f2d.iam.gserviceaccount.com");
+             (
+               // Support both production and development service accounts
+               request.auth.token.email.matches(".*@verse-11f2d.iam.gserviceaccount.com") ||
+               request.auth.token.email.matches(".*@verse-dev-central.iam.gserviceaccount.com") ||
+               // Also allow compute service accounts
+               request.auth.token.email.matches(".*-compute@developer.gserviceaccount.com") ||
+               // Direct Firebase service account
+               request.auth.token.email == "firebase-adminsdk-fbsvc@verse-dev-central.iam.gserviceaccount.com"
+             );
     }
     
     // Allow anyone to read high scores
@@ -148,12 +156,18 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'completedCount', 'lastCompletedAt', 'emailSent']);
 
+      // Allow direct access updates (for students completing assignments via email links)
+      allow update: if 
+        // Even when not authenticated, allow updating only specific fields
+        request.auth == null &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'completedCount', 'lastCompletedAt']);
+
       // Allow Firebase Functions to patch specific fields
       allow update: if request.auth != null &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['emailSent', 'useEmailLinkAuth', 'beta']);
     }
-
     
     // Attempts collection - track student game attempts
     match /attempts/{attemptId} {
