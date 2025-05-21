@@ -7,12 +7,16 @@ interface SortCategoriesEggRevealAdapterProps {
   playerName: string;
   onGameComplete: (score: number) => void;
   config: GameConfig;
+  onHighScoreProcessStart?: () => void;
+  onHighScoreProcessComplete?: () => void;
 }
 
 const SortCategoriesEggRevealAdapter: React.FC<SortCategoriesEggRevealAdapterProps> = ({
   playerName,
   onGameComplete,
   config,
+  onHighScoreProcessStart,
+  onHighScoreProcessComplete,
 }) => {
   return (
     <Box width="100%" height="100%">
@@ -20,6 +24,8 @@ const SortCategoriesEggRevealAdapter: React.FC<SortCategoriesEggRevealAdapterPro
         playerName={playerName}
         onGameComplete={onGameComplete}
         config={config}
+        onHighScoreProcessStart={onHighScoreProcessStart}
+        onHighScoreProcessComplete={onHighScoreProcessComplete}
       />
     </Box>
   );

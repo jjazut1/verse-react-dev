@@ -35,12 +35,16 @@ interface SortCategoriesEggRevealProps {
   playerName: string;
   onGameComplete: (score: number) => void;
   config: GameConfigType;
+  onHighScoreProcessStart?: () => void;
+  onHighScoreProcessComplete?: () => void;
 }
 
 const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   playerName,
   onGameComplete,
   config: initialConfig,
+  onHighScoreProcessStart,
+  onHighScoreProcessComplete,
 }): JSX.Element => {
   // Game state
   const [score, setScore] = useState(0);
@@ -70,7 +74,8 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   const [highScores, setHighScores] = useState<HighScoreType[]>([]);
   const [isHighScore, setIsHighScore] = useState(false);
   const [showHighScoreModal, setShowHighScoreModal] = useState(false);
-  const [newHighScoreName, setNewHighScoreName] = useState("");
+  const [showHighScoreDisplayModal, setShowHighScoreDisplayModal] = useState(false);
+  const [newHighScoreName, setNewHighScoreName] = useState(playerName || "");
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   
   const toast = useToast();
@@ -481,6 +486,7 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     setIsGameComplete(false);
     setIsHighScore(false);
     setShowHighScoreModal(false);
+    setShowHighScoreDisplayModal(false);
     setNewHighScoreName("");
     
     // Reset baskets
@@ -539,9 +545,28 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
 
   // Check if score qualifies for high score
   const checkHighScore = (newScore: number) => {
-    if (highScores.length < 10 || newScore > highScores[highScores.length - 1].score) {
+    console.log('Checking high score:', { 
+      newScore, 
+      highScores: highScores.length, 
+      highScoreThreshold: highScores.length > 0 ? highScores[highScores.length - 1]?.score : 'none',
+      isHighScore: highScores.length < 10 || newScore > (highScores[highScores.length - 1]?.score || 0)
+    });
+    
+    if (highScores.length < 10 || newScore > (highScores[highScores.length - 1]?.score || 0)) {
+      console.log('New high score detected!');
       setIsHighScore(true);
       setShowHighScoreModal(true);
+      // Notify parent that high score process is starting
+      if (onHighScoreProcessStart) {
+        console.log('Notifying parent: high score process starting');
+        onHighScoreProcessStart();
+      }
+    } else {
+      // No high score to save, show high score display immediately
+      console.log('Not a high score, showing display modal');
+      setShowHighScoreDisplayModal(true);
+      // Don't call onHighScoreProcessComplete here
+      // We'll let the modal close handler trigger it instead
     }
   };
 
@@ -704,6 +729,8 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
       
       setShowHighScoreModal(false);
       await loadHighScores(gameConfig.id);
+      // Show high score display after saving
+      setShowHighScoreDisplayModal(true);
     } catch (error: any) {
       console.error('Error saving high score:', error);
       console.error('Error details:', {
@@ -720,8 +747,21 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
         status: 'error',
         duration: 3000,
       });
+      // Notify parent that high score process is complete (even if there was an error)
+      if (onHighScoreProcessComplete) onHighScoreProcessComplete();
     } finally {
       setIsSubmittingScore(false);
+    }
+  };
+
+  // Handle high score display modal close
+  const handleHighScoreDisplayModalClose = () => {
+    console.log('High score display modal closed');
+    setShowHighScoreDisplayModal(false);
+    // Notify parent that high score process is complete
+    if (onHighScoreProcessComplete) {
+      console.log('Notifying parent: high score process complete (after modal close)');
+      onHighScoreProcessComplete();
     }
   };
 
@@ -747,7 +787,11 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   const renderHighScoreModal = () => (
     <Modal 
       isOpen={showHighScoreModal} 
-      onClose={() => setShowHighScoreModal(false)}
+      onClose={() => {
+        setShowHighScoreModal(false);
+        // Show high score display after closing the input modal
+        setShowHighScoreDisplayModal(true);
+      }}
       closeOnOverlayClick={false}
       size="md"
     >
@@ -804,58 +848,157 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     </Modal>
   );
 
-  // Render leaderboard
-  const renderLeaderboard = () => (
-    <Box
-      position="absolute"
-      top="50px"
-      right="20px"
-      width="200px"
-      bg="white"
-      borderRadius="lg"
-      boxShadow="lg"
-      p={3}
-      zIndex={2}
+  // Render high score display modal
+  const renderHighScoreDisplayModal = () => (
+    <Modal 
+      isOpen={showHighScoreDisplayModal} 
+      onClose={handleHighScoreDisplayModalClose}
+      closeOnOverlayClick={false}
+      isCentered
+      size="md"
     >
-      <Text
-        fontSize="lg"
-        fontWeight="bold"
+      <ModalOverlay />
+      <ModalContent fontFamily="'Comic Neue', sans-serif">
+        <ModalHeader 
+          fontSize={{ base: "xl", md: "2xl" }}
         textAlign="center"
-        mb={2}
         color="blue.600"
+          borderBottom="2px solid"
+          borderColor="blue.100"
+          pb={2}
         fontFamily="'Comic Neue', sans-serif"
       >
-        Top Scores
-      </Text>
-      <VStack spacing={1} align="stretch">
+          🏆 Top Scores 🏆
+        </ModalHeader>
+        <ModalBody>
+          <VStack spacing={3} align="stretch" my={2}>
+            {highScores.length > 0 ? (
+              <>
+                <HStack justify="space-between" fontWeight="bold" color="blue.600" mb={2}>
+                  <Text fontFamily="'Comic Neue', sans-serif">Rank</Text>
+                  <Text fontFamily="'Comic Neue', sans-serif">Player</Text>
+                  <Text fontFamily="'Comic Neue', sans-serif">Score</Text>
+                </HStack>
         {highScores.map((hs, index) => (
           <HStack
             key={hs.id}
             justify="space-between"
-            bg={index === 0 ? "yellow.50" : "transparent"}
-            p={1}
+                    bg={isHighScore && score === hs.score && newHighScoreName === hs.playerName 
+                        ? "yellow.50" 
+                        : index % 2 === 0 
+                          ? "blue.50" 
+                          : "transparent"}
+                    p={2}
             borderRadius="md"
           >
             <Text
-              fontSize="sm"
-              color={index < 3 ? "blue.600" : "gray.600"}
               fontWeight={index < 3 ? "bold" : "normal"}
+                      color={index < 3 ? "blue.600" : "gray.600"}
               fontFamily="'Comic Neue', sans-serif"
             >
-              {index + 1}. {hs.playerName}
+                      {index + 1}.
             </Text>
             <Text
-              fontSize="sm"
+                      fontWeight={index < 3 ? "bold" : "normal"} 
               color={index < 3 ? "blue.600" : "gray.600"}
+                      fontFamily="'Comic Neue', sans-serif"
+                    >
+                      {hs.playerName}
+                    </Text>
+                    <Text 
               fontWeight={index < 3 ? "bold" : "normal"}
+                      color={index < 3 ? "blue.600" : "gray.600"}
               fontFamily="'Comic Neue', sans-serif"
             >
               {hs.score}
             </Text>
           </HStack>
         ))}
-      </VStack>
+              </>
+            ) : (
+              <Text 
+                textAlign="center" 
+                color="gray.600" 
+                my={4}
+                fontFamily="'Comic Neue', sans-serif"
+              >
+                No high scores yet! Be the first to set a record.
+              </Text>
+            )}
+            
+            <Box textAlign="center" mt={4} p={3} bg="blue.50" borderRadius="md">
+              <Text fontWeight="bold" color="blue.600" fontFamily="'Comic Neue', sans-serif">
+                Your Score: {score}
+              </Text>
+              {isHighScore && (
+                <Text color="green.500" fontWeight="bold" mt={1} fontFamily="'Comic Neue', sans-serif">
+                  Congratulations on your high score!
+                </Text>
+              )}
     </Box>
+          </VStack>
+        </ModalBody>
+        <ModalFooter justifyContent="center">
+          <Button 
+            colorScheme="blue" 
+            onClick={handleHighScoreDisplayModalClose}
+            size="lg"
+            fontFamily="'Comic Neue', sans-serif"
+            minW="150px"
+          >
+            Continue
+          </Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+
+  // Render leaderboard - no longer needed as we show in modal instead
+  const renderLeaderboard = () => null;
+
+  // Render game controls
+  const renderGameControls = () => (
+    <Flex 
+      position="absolute"
+      top={4}
+      right={4}
+      direction={{ base: "column", md: "row" }} 
+      justify="flex-end"
+      align="center" 
+      gap={2}
+      bg="white"
+      p={3}
+      borderRadius="lg"
+      boxShadow="md"
+      fontFamily="'Comic Neue', sans-serif"
+      width="auto"
+      zIndex={10}
+    >
+      <HStack spacing={4}>
+        <Text fontSize={{ base: "md", md: "lg" }} fontWeight="bold" color="blue.600">Score: {score}</Text>
+      </HStack>
+      
+      {isGameComplete && (
+        <HStack spacing={4} ml={4}>
+          <Button 
+            colorScheme="blue" 
+            onClick={handleResetGame}
+            size={{ base: "sm", md: "md" }}
+            fontFamily="'Comic Neue', sans-serif"
+          >
+            Play Again
+          </Button>
+          <Button 
+            colorScheme="gray" 
+            onClick={handleCloseGame}
+            size={{ base: "sm", md: "md" }}
+            fontFamily="'Comic Neue', sans-serif"
+          >
+            Close Game
+          </Button>
+        </HStack>
+      )}
+    </Flex>
   );
 
   // Render game UI
@@ -863,7 +1006,6 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     <Box 
       width="100vw" 
       maxWidth="100%" 
-      minHeight="100%" 
       position="relative"
       left="50%"
       transform="translateX(-50%)"
@@ -900,22 +1042,6 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
             backgroundImage="radial-gradient(circle at 1px 1px, gray 1px, transparent 0)"
             backgroundSize="40px 40px"
           />
-          
-          {/* Configuration Title */}
-          <Text
-            position="absolute"
-            top="10px"
-            left="50%"
-            transform="translateX(-50%)"
-            fontSize={{ base: "md", md: "lg" }}
-            fontWeight="bold"
-            color="gray.700"
-            textAlign="center"
-            zIndex={3}
-            fontFamily="'Comic Neue', sans-serif"
-          >
-            {gameConfig.title}
-          </Text>
           
           {/* Eggs */}
           {eggs.map((egg) => (
@@ -968,55 +1094,8 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
             ))}
           </Flex>
           
-          {/* Game controls */}
-          <Flex 
-            direction={{ base: "column", md: "row" }} 
-            justify="space-between" 
-            align="center" 
-            mt={2}
-            gap={2}
-            width="100%"
-            bg="white"
-            p={3}
-            borderRadius="lg"
-            boxShadow="md"
-            fontFamily="'Comic Neue', sans-serif"
-          >
-            <HStack spacing={4}>
-              <Text fontSize={{ base: "sm", md: "md" }}>Player: {playerName}</Text>
-              <Text fontSize={{ base: "sm", md: "md" }}>Score: {score}</Text>
-            </HStack>
-            
-            {isGameComplete ? (
-              <HStack spacing={4}>
-                <Button 
-                  colorScheme="blue" 
-                  onClick={handleResetGame}
-                  size={{ base: "sm", md: "md" }}
-                  fontFamily="'Comic Neue', sans-serif"
-                >
-                  Play Again
-                </Button>
-                <Button 
-                  colorScheme="gray" 
-                  onClick={handleCloseGame}
-                  size={{ base: "sm", md: "md" }}
-                  fontFamily="'Comic Neue', sans-serif"
-                >
-                  Close Game
-                </Button>
-              </HStack>
-            ) : (
-              <Button 
-                colorScheme="blue" 
-                onClick={() => setIsConfigModalOpen(true)}
-                size={{ base: "sm", md: "md" }}
-                fontFamily="'Comic Neue', sans-serif"
-              >
-                Change Configuration
-              </Button>
-            )}
-          </Flex>
+          {/* Replace game controls with the renderGameControls function */}
+          {renderGameControls()}
           
           {/* Dragged word */}
           {isWordSelected && selectedWord && (
@@ -1044,8 +1123,8 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
           )}
         </Box>
       </Box>
-      {renderLeaderboard()}
       {renderHighScoreModal()}
+      {renderHighScoreDisplayModal()}
     </Box>
   );
 
@@ -1054,7 +1133,6 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     <Box 
       width="100vw" 
       maxWidth="100%" 
-      minHeight="100%" 
       position="relative"
       left="50%"
       transform="translateX(-50%)"
@@ -1104,7 +1182,7 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   );
 
   return (
-    <Box width="100vw" maxWidth="100%" overflow="hidden">
+    <Box width="100vw" maxWidth="100%" overflow="hidden" height="auto">
       {renderConfigModal()}
       {gameStarted ? renderGameUI() : renderStartScreen()}
     </Box>
