@@ -40,3 +40,23 @@ dist-ssr
 .vercel
 **/service-account-key.json
 .env
+
+# Duplicate files (macOS often creates these)
+*\ 2.*
+*\ 2
+
+# Git rewrite directory
+.git-rewrite/
+
+# Test scripts
+create-test-*.js
+test-*.js
+test-*.cjs
+check-*.js
+deploy-*-functions.sh
+functions/test-*.js
+
+# Temporary or one-off scripts
+mark-assignments-sent.js
+mark-assignments-sent.sh
+update-*-credentials.sh
