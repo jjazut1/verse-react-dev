@@ -1187,7 +1187,7 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
     // - height multiplier (to make some patches higher or lower)
     const patches = [
       { centerU: 0.3, centerV: 0.7, radius: 0.27, color: 0xE57373, heightMult: 1.2 },  // red - increased radius
-      { centerU: 0.7, centerV: 0.6, radius: 0.25, color: 0x81C784, heightMult: 0.8 },   // green - increased radius
+      { centerU: 0.7, centerV: 0.6, radius: 0.25, color: 0x8EE492, heightMult: 0.8 },   // green - brightened from 0x81C784
       { centerU: 0.2, centerV: 0.3, radius: 0.23, color: 0x9575CD, heightMult: 1.4 },   // purple - increased radius
       { centerU: 0.6, centerV: 0.2, radius: 0.28, color: 0x4FC3F7, heightMult: 0.6 },   // blue - increased radius
       { centerU: 0.5, centerV: 0.5, radius: 0.18, color: 0xFFB74D, heightMult: 1.0 }    // orange - increased radius and moved to center
@@ -1208,7 +1208,7 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
     
     // Prepare vertex colors to color our patches
     const colorAttribute = new THREE.Float32BufferAttribute(positionAttribute.count * 3, 3);
-    const baseColor = new THREE.Color(0x4CAF50); // Base green color for areas outside patches
+    const baseColor = new THREE.Color(0x5FD160); // Base green color for areas outside patches - changed from 0x4CAF50 to brighter green
     
     // Modify vertices for height and store patch colors
     for (let i = 0; i < positionAttribute.count; i++) {
@@ -1327,10 +1327,10 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
         textureSize/2, textureSize/2, textureSize * 0.7
       );
       
-      // Deep soil colors
-      gradient.addColorStop(0, 'rgb(65, 45, 30)');
-      gradient.addColorStop(0.7, 'rgb(60, 40, 25)');
-      gradient.addColorStop(1, 'rgb(55, 35, 20)');
+      // Deep soil colors - slightly lighter
+      gradient.addColorStop(0, 'rgb(75, 52, 35)');
+      gradient.addColorStop(0.7, 'rgb(70, 47, 30)');
+      gradient.addColorStop(1, 'rgb(65, 42, 25)');
       
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, textureSize, textureSize);
@@ -1386,12 +1386,12 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
       // We'll draw more blades in areas where noise value is higher
       const bladeCount = 30000; // Many more blades for denser coverage
       
-      // Grass color variations
+      // Grass color variations - brightened all values
       const grassColors = [
         [baseR, baseG, baseB],                          // Base color
-        [Math.min(255, baseR * 1.3), Math.min(255, baseG * 1.2), Math.min(255, baseB * 0.9)],  // Lighter variant
-        [Math.min(255, baseR * 0.9), Math.min(255, baseG * 1.0), Math.min(255, baseB * 0.8)],  // Darker variant but still bright
-        [Math.min(255, baseR * 1.25), Math.min(255, baseG * 0.95), Math.min(255, baseB * 0.7)]  // Yellow-green highlight
+        [Math.min(255, baseR * 1.4), Math.min(255, baseG * 1.3), Math.min(255, baseB * 1.0)],  // Lighter variant
+        [Math.min(255, baseR * 1.0), Math.min(255, baseG * 1.1), Math.min(255, baseB * 0.9)],  // Darker variant but still bright
+        [Math.min(255, baseR * 1.35), Math.min(255, baseG * 1.05), Math.min(255, baseB * 0.8)]  // Yellow-green highlight
       ];
       
       for (let i = 0; i < bladeCount; i++) {
@@ -1527,7 +1527,7 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
     // Create material with the improved texture
     const groundMaterial = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      map: createGrassTexture('rgb(140, 200, 90)', 0.4), // Lighter, more vibrant green
+      map: createGrassTexture('rgb(150, 225, 100)', 0.4), // Lighter, more vibrant green (changed from 140, 200, 90)
       roughness: 0.9,
       metalness: 0.0,
       side: THREE.DoubleSide,
@@ -1588,10 +1588,10 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
       // Reference the same patches from createEnhancedTerrain
       const patches = [
         { centerU: 0.3, centerV: 0.7, radius: 0.27, color: 0xE57373, heightMult: 1.2 },  // red
-        { centerU: 0.7, centerV: 0.6, radius: 0.25, color: 0x81C784, heightMult: 0.8 },   // green
-        { centerU: 0.2, centerV: 0.3, radius: 0.23, color: 0x9575CD, heightMult: 1.4 },   // purple
-        { centerU: 0.6, centerV: 0.2, radius: 0.28, color: 0x4FC3F7, heightMult: 0.6 },   // blue
-        { centerU: 0.5, centerV: 0.5, radius: 0.18, color: 0xFFB74D, heightMult: 1.0 }   // orange
+        { centerU: 0.7, centerV: 0.6, radius: 0.25, color: 0x8EE492, heightMult: 0.8 },   // green - brightened from 0x81C784
+        { centerU: 0.2, centerV: 0.3, radius: 0.23, color: 0x9575CD, heightMult: 1.4 },   // purple - increased radius
+        { centerU: 0.6, centerV: 0.2, radius: 0.28, color: 0x4FC3F7, heightMult: 0.6 },   // blue - increased radius
+        { centerU: 0.5, centerV: 0.5, radius: 0.18, color: 0xFFB74D, heightMult: 1.0 }   // orange - increased radius and moved to center
       ];
       
       for (const patch of patches) {

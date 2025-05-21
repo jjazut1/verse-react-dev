@@ -29,6 +29,8 @@ interface WhackAMoleProps {
   playerName: string;
   onGameComplete: (score: number) => void;
   config: WhackAMoleConfig;
+  onHighScoreProcessStart?: () => void;
+  onHighScoreProcessComplete?: () => void;
 }
 
 interface HighScore {
@@ -44,6 +46,8 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
   playerName,
   onGameComplete,
   config,
+  onHighScoreProcessStart,
+  onHighScoreProcessComplete,
 }) => {
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(config.gameTime);
@@ -53,6 +57,7 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
   const [gameOver, setGameOver] = useState(false);
   const [isHighScore, setIsHighScore] = useState(false);
   const [showHighScoreModal, setShowHighScoreModal] = useState(false);
+  const [showHighScoreDisplayModal, setShowHighScoreDisplayModal] = useState(false);
   const [newHighScoreName, setNewHighScoreName] = useState(playerName || "");
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   const [countdown, setCountdown] = useState(0); // Countdown timer state
@@ -176,11 +181,32 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
 
   // Check if score qualifies for high score
   const checkHighScore = (newScore: number) => {
-    if (!config.share) return; // Only check for shared configs
+    console.log('Checking high score:', { 
+      newScore, 
+      highScores: highScores.length, 
+      highScoreThreshold: highScores.length > 0 ? highScores[highScores.length - 1]?.score : 'none',
+      isHighScore: highScores.length < 10 || newScore > (highScores[highScores.length - 1]?.score || 0)
+    });
     
     if (highScores.length < 10 || newScore > (highScores[highScores.length - 1]?.score || 0)) {
+      console.log('New high score detected!');
       setIsHighScore(true);
       setShowHighScoreModal(true);
+      // Notify parent that high score process is starting
+      if (onHighScoreProcessStart) {
+        console.log('Notifying parent: high score process starting');
+        onHighScoreProcessStart();
+      }
+    } else {
+      // No high score to save, show high score display immediately
+      console.log('Not a high score, showing display modal');
+      setShowHighScoreDisplayModal(true);
+      // Notify parent that high score process is complete after a delay
+      // This ensures the modal has time to display
+      setTimeout(() => {
+        console.log('Notifying parent: high score process complete (not a high score)');
+        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
+      }, 500);
     }
   };
 
@@ -193,6 +219,8 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         status: 'error',
         duration: 3000,
       });
+      // Notify parent that high score process is complete (even if there was an error)
+      if (onHighScoreProcessComplete) onHighScoreProcessComplete();
       return;
     }
 
@@ -234,6 +262,8 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
           duration: 3000,
         });
         setIsSubmittingScore(false);
+        // Notify parent that high score process is complete (even when we have too many attempts)
+        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
         return;
       }
 
@@ -249,22 +279,12 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
           duration: 3000,
         });
         setIsSubmittingScore(false);
+        // Notify parent that high score process is complete (even if there was an error)
+        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
         return;
       }
 
       const configData = configSnap.data();
-
-      // Verify that the game config is shared
-      if (!configData?.share) {
-        toast({
-          title: 'Error Saving Score',
-          description: 'High scores are not enabled for this game configuration.',
-          status: 'error',
-          duration: 3000,
-        });
-        setIsSubmittingScore(false);
-        return;
-      }
 
       // Create high score with required fields
       const highScore = {
@@ -286,7 +306,10 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
       });
       
       setShowHighScoreModal(false);
-      loadHighScores();
+      await loadHighScores();
+      console.log('High score saved, showing high score display modal');
+      // Show high score display after saving
+      setShowHighScoreDisplayModal(true);
     } catch (error: any) {
       console.error('Error saving high score:', error);
       
@@ -296,6 +319,11 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         status: 'error',
         duration: 3000,
       });
+      // Notify parent that high score process is complete (even if there was an error)
+      if (onHighScoreProcessComplete) {
+        console.log('Notifying parent: high score process complete (after error)');
+        onHighScoreProcessComplete();
+      }
     } finally {
       setIsSubmittingScore(false);
     }
@@ -331,6 +359,25 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         status: 'error',
         duration: 1000,
       });
+    }
+  };
+
+  // Modal close handler with high score process complete notification
+  const handleHighScoreModalClose = () => {
+    console.log('High score input modal closed without saving');
+    setShowHighScoreModal(false);
+    // Show high score display after closing the input modal
+    setShowHighScoreDisplayModal(true);
+  };
+  
+  // Handle high score display modal close
+  const handleHighScoreDisplayModalClose = () => {
+    console.log('High score display modal closed');
+    setShowHighScoreDisplayModal(false);
+    // Notify parent that high score process is complete
+    if (onHighScoreProcessComplete) {
+      console.log('Notifying parent: high score process complete (after modal close)');
+      onHighScoreProcessComplete();
     }
   };
 
@@ -424,73 +471,8 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         </Box>
       )}
 
-      {/* Leaderboard - only show if config.share is true and game is not active */}
-      {config.share && !gameStarted && !showCountdown && (
-        <Box
-          position="absolute"
-          top="70px"
-          right="20px"
-          width="200px"
-          bg="white"
-          borderRadius="lg"
-          p={3}
-          zIndex={2}
-          boxShadow="0 4px 6px rgba(0, 0, 0, 0.1)"
-        >
-          <Text
-            fontSize="lg"
-            fontWeight="bold"
-            textAlign="center"
-            mb={2}
-            color="#001f3f"  // Dark navy color
-            fontFamily="'Comic Neue', cursive"
-          >
-            Top Scores
-          </Text>
-          {highScores.length > 0 ? (
-            <VStack spacing={1} align="stretch">
-              {highScores.map((hs, index) => (
-                <HStack
-                  key={hs.id}
-                  justify="space-between"
-                  bg={index === 0 ? "rgba(0, 31, 63, 0.1)" : "transparent"}  // Light navy for top score
-                  p={1}
-                  borderRadius="md"
-                >
-                  <Text
-                    fontSize="sm"
-                    color="#001f3f"  // Dark navy color
-                    fontWeight={index < 3 ? "bold" : "normal"}
-                    fontFamily="'Comic Neue', cursive"
-                  >
-                    {index + 1}. {hs.playerName}
-                  </Text>
-                  <Text
-                    fontSize="sm"
-                    color="#001f3f"  // Dark navy color
-                    fontWeight={index < 3 ? "bold" : "normal"}
-                    fontFamily="'Comic Neue', cursive"
-                  >
-                    {hs.score}
-                  </Text>
-                </HStack>
-              ))}
-            </VStack>
-          ) : (
-            <Text 
-              fontSize="sm" 
-              color="#001f3f"  // Dark navy color
-              textAlign="center"
-              fontFamily="'Comic Neue', cursive"
-            >
-              No high scores yet!
-            </Text>
-          )}
-        </Box>
-      )}
-
       {/* Game Controls */}
-      {(!gameStarted && !showCountdown || gameOver) && (
+      {(!gameStarted && !showCountdown || gameOver) && !showHighScoreDisplayModal && (
         <Box
           position="absolute"
           top="50%"
@@ -539,8 +521,8 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         </Box>
       )}
 
-      {/* High Score Modal */}
-      <Modal isOpen={showHighScoreModal} onClose={() => setShowHighScoreModal(false)}>
+      {/* High Score Input Modal */}
+      <Modal isOpen={showHighScoreModal} onClose={handleHighScoreModalClose} closeOnOverlayClick={false}>
         <ModalOverlay />
         <ModalContent fontFamily="'Comic Neue', cursive">
           <ModalHeader fontFamily="'Comic Neue', cursive" fontWeight="bold">New High Score!</ModalHeader>
@@ -574,10 +556,90 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
             </Button>
             <Button 
               variant="ghost" 
-              onClick={() => setShowHighScoreModal(false)}
+              onClick={handleHighScoreModalClose}
               fontFamily="'Comic Neue', cursive"
             >
               Cancel
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+      
+      {/* High Score Display Modal */}
+      <Modal isOpen={showHighScoreDisplayModal} onClose={handleHighScoreDisplayModalClose} closeOnOverlayClick={false} isCentered size="md">
+        <ModalOverlay />
+        <ModalContent fontFamily="'Comic Neue', cursive">
+          <ModalHeader 
+            fontFamily="'Comic Neue', cursive" 
+            fontWeight="bold" 
+            textAlign="center" 
+            fontSize="2xl"
+            color="#001f3f"
+            borderBottom="2px solid rgba(0, 31, 63, 0.1)"
+            pb={2}
+          >
+            🏆 Top Scores 🏆
+          </ModalHeader>
+          <ModalBody>
+            <VStack spacing={3} align="stretch" my={2}>
+              {highScores.length > 0 ? (
+                <>
+                  <HStack justify="space-between" fontWeight="bold" color="#001f3f" mb={2}>
+                    <Text>Rank</Text>
+                    <Text>Player</Text>
+                    <Text>Score</Text>
+                  </HStack>
+                  {highScores.map((hs, index) => (
+                    <HStack
+                      key={hs.id}
+                      justify="space-between"
+                      bg={isHighScore && score === hs.score && newHighScoreName === hs.playerName 
+                          ? "rgba(255, 215, 0, 0.2)" 
+                          : index % 2 === 0 
+                            ? "rgba(0, 31, 63, 0.05)" 
+                            : "transparent"}
+                      p={2}
+                      borderRadius="md"
+                      fontFamily="'Comic Neue', cursive"
+                    >
+                      <Text fontWeight={index < 3 ? "bold" : "normal"} color={index < 3 ? "#001f3f" : "gray.700"}>
+                        {index + 1}.
+                      </Text>
+                      <Text fontWeight={index < 3 ? "bold" : "normal"} color={index < 3 ? "#001f3f" : "gray.700"}>
+                        {hs.playerName}
+                      </Text>
+                      <Text fontWeight={index < 3 ? "bold" : "normal"} color={index < 3 ? "#001f3f" : "gray.700"}>
+                        {hs.score}
+                      </Text>
+                    </HStack>
+                  ))}
+                </>
+              ) : (
+                <Text textAlign="center" color="gray.600" my={4}>
+                  No high scores yet! Be the first to set a record.
+                </Text>
+              )}
+              
+              <Box textAlign="center" mt={4} p={3} bg="rgba(0, 31, 63, 0.05)" borderRadius="md">
+                <Text fontWeight="bold" color="#001f3f">Your Score: {score}</Text>
+                {isHighScore && (
+                  <Text color="green.500" fontWeight="bold" mt={1}>
+                    Congratulations on your high score!
+                  </Text>
+                )}
+              </Box>
+            </VStack>
+          </ModalBody>
+          <ModalFooter justifyContent="center">
+            <Button 
+              colorScheme="blue" 
+              onClick={handleHighScoreDisplayModalClose}
+              size="lg"
+              fontFamily="'Comic Neue', cursive"
+              fontWeight="bold"
+              minW="150px"
+            >
+              Continue
             </Button>
           </ModalFooter>
         </ModalContent>
