@@ -650,7 +650,7 @@ const WhackAMoleConfig = () => {
     }
   }, [templateId]);
 
-  // Check if user is an admin or teacher
+  // Check if user is an admin or teacher and parse URL query parameters
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!currentUser) {
@@ -679,7 +679,20 @@ const WhackAMoleConfig = () => {
       }
     };
     
+    // Get template selection from URL if present
+    const checkForTemplateSelection = () => {
+      const queryParams = new URLSearchParams(window.location.search);
+      const templateToSelect = queryParams.get('templateSelect');
+      
+      if (templateToSelect) {
+        console.log('Auto-selecting template from URL parameter:', templateToSelect);
+        // Store the template ID to select it once templates are loaded
+        localStorage.setItem('pendingTemplateSelect', templateToSelect);
+      }
+    };
+    
     checkAdminStatus();
+    checkForTemplateSelection();
   }, [currentUser]);
 
   // Load category templates from database
@@ -866,6 +879,85 @@ const WhackAMoleConfig = () => {
     
     fetchCategoryTemplates();
   }, [toast, showOnlyBlankTemplates]);
+
+  // Effect to apply template selection from sessionStorage
+  useEffect(() => {
+    // Only run this when templates are loaded and we have templates available
+    if (!loadingTemplates && Object.keys(dbTemplates).length > 0) {
+      // Check for a template selection in sessionStorage
+      const savedTemplateId = sessionStorage.getItem('selectedTemplateId');
+      if (savedTemplateId) {
+        console.log('Found saved template ID in sessionStorage:', savedTemplateId);
+        // Clear the saved template ID
+        sessionStorage.removeItem('selectedTemplateId');
+        
+        // Apply the template
+        const templateData = dbTemplates[savedTemplateId];
+        if (templateData) {
+          console.log('Applying template from sessionStorage:', savedTemplateId);
+          setGameCategory(savedTemplateId);
+          
+          // Apply template data
+          setTitle(templateData.title || '');
+          if (templateData.gameTime) setGameTime(templateData.gameTime);
+          if (templateData.pointsPerHit) setPointsPerHit(templateData.pointsPerHit);
+          if (templateData.penaltyPoints) setPenaltyPoints(templateData.penaltyPoints);
+          if (templateData.bonusPoints) setBonusPoints(templateData.bonusPoints);
+          if (templateData.bonusThreshold) setBonusThreshold(templateData.bonusThreshold);
+          if (templateData.speed) setGameSpeed(templateData.speed);
+          if (templateData.instructions) setInstructions(templateData.instructions);
+          if (templateData.share !== undefined) setShareConfig(templateData.share);
+          
+          // Create new categories from the template
+          const newCategories: Category[] = [];
+          
+          // Check for template data in "categories" array (new format)
+          if (templateData.categories && Array.isArray(templateData.categories) && templateData.categories.length > 0) {
+            // Process each category from the template
+            templateData.categories.forEach(cat => {
+              if (cat.words && Array.isArray(cat.words)) {
+                newCategories.push({
+                  id: generateId(),
+                  title: cat.title || templateData.title,
+                  items: cat.words.map(word => ({
+                    id: generateId(),
+                    content: word // Store as simple string
+                  }))
+                });
+              }
+            });
+          }
+          
+          // If we don't have categories, or they're empty, use the words array (backward compatibility)
+          if (newCategories.length === 0 && templateData.words && Array.isArray(templateData.words)) {
+            newCategories.push({
+              id: generateId(),
+              title: templateData.title,
+              items: templateData.words.map(word => ({
+                id: generateId(),
+                content: word // Store as simple string
+              }))
+            });
+          }
+          
+          // If we still don't have any categories, create at least one empty one
+          if (newCategories.length === 0) {
+            newCategories.push({
+              id: generateId(),
+              title: templateData.title || "",
+              items: [{
+                id: generateId(),
+                content: "" // Use simple string
+              }]
+            });
+          }
+          
+          // Update the categories state with the new categories
+          setCategories(newCategories);
+        }
+      }
+    }
+  }, [loadingTemplates, dbTemplates]);
 
   // Load existing configuration if templateId is provided
   useEffect(() => {
@@ -2101,16 +2193,28 @@ const WhackAMoleConfig = () => {
 
       <Divider my={4} />
       
-      <Button 
-        colorScheme="green" 
-        size="lg" 
-        onClick={handleSaveConfig} 
-        isLoading={isLoading}
-        loadingText="Saving..."
-        className="apple-button apple-button-primary"
-      >
-        {isEditing ? "Update Configuration" : "Save Configuration"}
-      </Button>
+      <Flex justify="space-between" align="center">
+        <Button 
+          colorScheme="blue" 
+          size="lg" 
+          onClick={() => navigate('/teacher')}
+          className="apple-button apple-button-secondary"
+          mr={4}
+        >
+          Return to Dashboard
+        </Button>
+        
+        <Button 
+          colorScheme="green" 
+          size="lg" 
+          onClick={handleSaveConfig} 
+          isLoading={isLoading}
+          loadingText="Saving..."
+          className="apple-button apple-button-primary"
+        >
+          {isEditing ? "Update Configuration" : "Save Configuration"}
+        </Button>
+      </Flex>
 
       {/* Developer Utility Section - only visible in development */}
       {import.meta.env.DEV && (

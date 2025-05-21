@@ -492,7 +492,7 @@ const SortCategoriesEggConfig = () => {
   const categoryIdsRef = useRef<Record<number, string>>({});
   const nextCategoryIdRef = useRef(1);
 
-  // Check if user is an admin
+  // Check if user is an admin and parse URL query parameters
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!currentUser) {
@@ -511,17 +511,29 @@ const SortCategoriesEggConfig = () => {
           setIsAdmin(userData.role === 'admin');
           setIsTeacher(userData.role === 'teacher' || userData.role === 'admin');
         } else {
+          console.log('User is not an admin or teacher');
           setIsAdmin(false);
           setIsTeacher(false);
         }
       } catch (error) {
         console.error('Error checking admin status:', error);
-        setIsAdmin(false);
-        setIsTeacher(false);
+      }
+    };
+    
+    // Get template selection from URL if present
+    const checkForTemplateSelection = () => {
+      const queryParams = new URLSearchParams(window.location.search);
+      const templateToSelect = queryParams.get('templateSelect');
+      
+      if (templateToSelect) {
+        console.log('Auto-selecting template from URL parameter:', templateToSelect);
+        // Store the template ID to select it once templates are loaded
+        localStorage.setItem('pendingTemplateSelect', templateToSelect);
       }
     };
     
     checkAdminStatus();
+    checkForTemplateSelection();
   }, [currentUser]);
 
   // State for template sources
@@ -1992,6 +2004,53 @@ const SortCategoriesEggConfig = () => {
     setHasUnsavedChanges(true);
   };
 
+  // Effect to apply template selection from sessionStorage
+  useEffect(() => {
+    // Only run this when templates are loaded and we have templates available
+    if (!loadingTemplates && Object.keys(dbTemplates).length > 0) {
+      // Check for a template selection in sessionStorage
+      const savedTemplateId = sessionStorage.getItem('selectedTemplateId');
+      if (savedTemplateId) {
+        console.log('Found saved template ID in sessionStorage:', savedTemplateId);
+        // Clear the saved template ID
+        sessionStorage.removeItem('selectedTemplateId');
+        
+        // Apply the template
+        const templateData = dbTemplates[savedTemplateId];
+        if (templateData) {
+          console.log('Applying template from sessionStorage:', savedTemplateId);
+          setTemplateKey(savedTemplateId);
+          
+          // Apply template data directly
+          if (templateData.title) setTitle(templateData.title);
+          if (templateData.eggQty) setEggQty(templateData.eggQty);
+          
+          // Process categories
+          if (templateData.categories && Array.isArray(templateData.categories)) {
+            const newCategories = templateData.categories.map(cat => ({
+              name: cat.name || '',
+              items: Array.isArray(cat.items) ? [...cat.items] : []
+            }));
+            
+            // Ensure we have at least one category
+            if (newCategories.length === 0) {
+              newCategories.push({ name: '', items: [''] });
+            }
+            
+            // Ensure each category has at least one item
+            newCategories.forEach(cat => {
+              if (cat.items.length === 0) {
+                cat.items.push('');
+              }
+            });
+            
+            setCategories(newCategories);
+          }
+        }
+      }
+    }
+  }, [loadingTemplates, dbTemplates]);
+
   // Wrap the component with the context provider
   return (
     <EditorSelectionContext.Provider 
@@ -2427,17 +2486,29 @@ const SortCategoriesEggConfig = () => {
 
         <Divider my={4} />
         
-        <Button 
-          colorScheme="green" 
-          size="lg" 
-          onClick={handleSaveConfig} 
-          isLoading={isLoading}
-          loadingText="Saving..."
-          isDisabled={totalItems < eggQty}
-          className="apple-button apple-button-primary"
-        >
-          {isEditing ? "Update Configuration" : "Save Configuration"}
-        </Button>
+        <Flex justify="space-between" align="center">
+          <Button 
+            colorScheme="blue" 
+            size="lg" 
+            onClick={() => navigate('/teacher')}
+            className="apple-button apple-button-secondary"
+            mr={4}
+          >
+            Return to Dashboard
+          </Button>
+          
+          <Button 
+            colorScheme="green" 
+            size="lg" 
+            onClick={handleSaveConfig} 
+            isLoading={isLoading}
+            loadingText="Saving..."
+            isDisabled={totalItems < eggQty}
+            className="apple-button apple-button-primary"
+          >
+            {isEditing ? "Update Configuration" : "Save Configuration"}
+          </Button>
+        </Flex>
       </VStack>
     </EditorSelectionContext.Provider>
   );
