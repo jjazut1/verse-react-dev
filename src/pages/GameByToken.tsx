@@ -38,6 +38,11 @@ const GameByToken: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showAuthForm, setShowAuthForm] = useState(false);
   
+  // Add a state to track if reload is needed after high score modal
+  const [pendingReload, setPendingReload] = useState(false);
+  const [hasAutoStarted, setHasAutoStarted] = useState(false);
+  const [isHighScoreProcessing, setIsHighScoreProcessing] = useState(false);
+  
   // Check authentication status on component mount
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -239,7 +244,7 @@ const GameByToken: React.FC = () => {
         throw new Error("Game configuration not found");
       }
       
-      const gameConfig = gameConfigDoc.data();
+      const gameConfig = { id: gameConfigDoc.id, ...gameConfigDoc.data() };
       
       setGameConfig(gameConfig);
       setAssignment(assignment);
@@ -371,10 +376,15 @@ const GameByToken: React.FC = () => {
   
   // Add this new useEffect to automatically start game for email link users
   useEffect(() => {
-    // When isEmailLinkAccess is true, game is loaded, and the user has a student email
-    if (isEmailLinkAccess && !loading && !isPlaying && assignment && assignment.studentEmail) {
+    if (
+      isEmailLinkAccess &&
+      !loading &&
+      !isPlaying &&
+      assignment &&
+      assignment.studentEmail &&
+      !hasAutoStarted // Only auto-start once
+    ) {
       console.log('Auto starting game for email link user with email:', assignment.studentEmail);
-      // Pre-fill student name
       if (!studentName && assignment.studentName) {
         setStudentName(assignment.studentName);
       } else if (!studentName) {
@@ -382,14 +392,14 @@ const GameByToken: React.FC = () => {
       }
       setStudentNameSubmitted(true);
       
-      // Short delay to ensure state updates first
       setTimeout(() => {
         console.log('GameByToken: Auto-starting game in direct access mode');
         setIsPlaying(true);
         setStartTime(new Date());
+        setHasAutoStarted(true); // Prevent future auto-starts
       }, 500);
     }
-  }, [isEmailLinkAccess, loading, isPlaying, assignment, studentName]);
+  }, [isEmailLinkAccess, loading, isPlaying, assignment, studentName, hasAutoStarted]);
   
   // Add a new useEffect at the component top level to force bypassing authentication on direct access
   useEffect(() => {
@@ -408,7 +418,7 @@ const GameByToken: React.FC = () => {
     }
   }, []);
   
-  // Handle game completion
+  // Update handleGameComplete to NOT reload immediately after attempt save
   const handleGameComplete = async (score: number) => {
     // Clear any previous save errors
     setSaveError(null);
@@ -498,13 +508,11 @@ const GameByToken: React.FC = () => {
       sessionStorage.removeItem('pending_game_score');
       sessionStorage.removeItem('pending_start_time');
       
-      setIsPlaying(false);
-      setStartTime(null);
+      // Don't reload or change isPlaying state here - let the high score process complete first
+      // setIsPlaying(false);
+      // setStartTime(null);
       
-      // Reload game and assignment to get updated completion status
-      if (token) {
-        await loadGameAndAssignment(token);
-      }
+      // setPendingReload(true); // Set flag to reload after modal
     } catch (err) {
       console.error('Error submitting attempt:', err);
       
@@ -563,6 +571,32 @@ const GameByToken: React.FC = () => {
       }
     }
   }, [isAuthenticated, currentUser]);
+  
+  // New handlers for high score process
+  const handleHighScoreProcessStart = () => {
+    console.log('GameByToken: High score process started');
+    setIsHighScoreProcessing(true);
+  };
+
+  const handleHighScoreProcessComplete = () => {
+    console.log('GameByToken: High score process completed');
+    setIsHighScoreProcessing(false);
+    
+    // Add a delay before proceeding to give modals time to display
+    console.log('GameByToken: Waiting before cleaning up game state...');
+    setTimeout(() => {
+      console.log('GameByToken: Cleaning up game state and reloading assignment');
+      setIsPlaying(false);
+      setStartTime(null);
+      
+      // Now reload the assignment
+      if (token) {
+        setPendingReload(false);
+        setHasAutoStarted(false);
+        loadGameAndAssignment(token);
+      }
+    }, 1000);
+  };
   
   // Check if assignment is past due
   const isPastDue = () => {
@@ -700,6 +734,8 @@ const GameByToken: React.FC = () => {
               config={gameConfig}
               onGameComplete={handleGameComplete}
               playerName={studentName}
+              onHighScoreProcessStart={handleHighScoreProcessStart}
+              onHighScoreProcessComplete={handleHighScoreProcessComplete}
             />
           );
         case 'whack-a-mole':
@@ -708,6 +744,8 @@ const GameByToken: React.FC = () => {
               config={gameConfig}
               onGameComplete={handleGameComplete}
               playerName={studentName}
+              onHighScoreProcessStart={handleHighScoreProcessStart}
+              onHighScoreProcessComplete={handleHighScoreProcessComplete}
             />
           );
         default:
@@ -1144,11 +1182,73 @@ const GameByToken: React.FC = () => {
     );
   }
   
+  // Add a new function to render the assignment info footer
+  const renderAssignmentFooter = () => {
+    if (!assignment) return null;
+    
+    return (
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(5px)',
+        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.1)',
+        padding: '12px 20px',
+        zIndex: 10,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '10px',
+        fontFamily: "'Roboto', 'Helvetica', sans-serif"
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ 
+            width: '24px', 
+            height: '24px', 
+            borderRadius: '50%', 
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: '10px',
+            fontSize: '14px'
+          }}>
+            ✓
+          </div>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+              Authenticated as: {assignment.studentEmail}
+            </div>
+          </div>
+        </div>
+        
+        <div style={{ 
+          display: 'flex', 
+          gap: '20px',
+          color: '#555',
+          fontSize: '14px'
+        }}>
+          <div>
+            <span style={{ color: '#777' }}>Due Date:</span> {formatDate(assignment.deadline.toDate())}
+          </div>
+          <div>
+            <span style={{ color: '#777' }}>Attempts:</span> {assignment.completedCount || 0}/{assignment.timesRequired}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div style={{ 
       padding: 'var(--spacing-4)',
       maxWidth: '1200px',
-      margin: '0 auto'
+      margin: '0 auto',
+      paddingBottom: '60px' // Add padding to prevent content from being hidden behind the footer
     }}>
       {/* Authentication Modal - Show when needed */}
       {showAuthForm && (
@@ -1453,71 +1553,6 @@ const GameByToken: React.FC = () => {
             {gameConfig.name}
           </h1>
           
-          {/* Authentication status indicator - Now more prominent but hidden for direct access */}
-          {isAuthenticated && currentUser ? (
-            <div style={{
-              margin: 'var(--spacing-4) 0',
-              padding: 'var(--spacing-3)',
-              backgroundColor: 'var(--color-success-50)',
-              color: 'var(--color-success-700)',
-              borderRadius: 'var(--border-radius-sm)',
-              fontSize: 'var(--font-size-md)',
-              display: 'flex',
-              alignItems: 'center'
-            }}>
-              <span style={{ marginRight: 'var(--spacing-2)' }}>✓</span>
-              <strong>Authenticated as: {currentUser.email}</strong>
-            </div>
-          ) : (
-            // Only show warning if not in direct access mode
-            !isEmailLinkAccess && 
-            sessionStorage.getItem('direct_token_access') !== 'true' && 
-            searchParams.get('directAccess') !== 'true' && (
-              <div style={{
-                margin: 'var(--spacing-4) 0',
-                padding: 'var(--spacing-3)',
-                backgroundColor: 'var(--color-warning-50)',
-                color: 'var(--color-warning-700)',
-                borderRadius: 'var(--border-radius-sm)',
-                fontSize: 'var(--font-size-md)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--spacing-2)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <span style={{ marginRight: 'var(--spacing-2)' }}>⚠️</span>
-                  <strong>Not authenticated. Please authenticate before playing to ensure your progress is saved.</strong>
-                </div>
-                
-                <button
-                  onClick={() => {
-                    // Pre-fill the student's email if available
-                    if (assignment && assignment.studentEmail) {
-                      setAuthEmail(assignment.studentEmail);
-                    }
-                    // Reset email sent flag if previously shown
-                    setEmailSent(false);
-                    // Show authentication form
-                    setShowAuthForm(true);
-                  }}
-                  style={{
-                    alignSelf: 'flex-start',
-                    backgroundColor: 'var(--color-warning-600)',
-                    color: 'white',
-                    border: 'none',
-                    padding: 'var(--spacing-2) var(--spacing-4)',
-                    borderRadius: 'var(--border-radius-sm)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--font-size-md)',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Authenticate Now
-                </button>
-              </div>
-            )
-          )}
-          
           {/* Display save error if any */}
           {saveError && (
             <div style={{
@@ -1531,17 +1566,6 @@ const GameByToken: React.FC = () => {
               ⚠️ {saveError}
             </div>
           )}
-          
-          <div style={{
-            marginBottom: 'var(--spacing-6)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--spacing-2)'
-          }}>
-            <p><strong>Due Date:</strong> {formatDate(assignment.deadline.toDate())}</p>
-            <p><strong>Required Attempts:</strong> {assignment.timesRequired}</p>
-            <p><strong>Completed Attempts:</strong> {assignment.completedCount || 0}</p>
-          </div>
           
           {/* Only show the game if authenticated or after they've submitted their name */}
           {!isPlaying ? (
@@ -1568,8 +1592,8 @@ const GameByToken: React.FC = () => {
             <div style={{ 
               backgroundColor: 'white',
               borderRadius: 'var(--border-radius-md)',
-              padding: 'var(--spacing-4)',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+              overflow: 'hidden'
             }}>
               {renderGame()}
             </div>
@@ -1596,6 +1620,9 @@ const GameByToken: React.FC = () => {
           )}
         </>
       )}
+      
+      {/* Add the assignment footer */}
+      {assignment && renderAssignmentFooter()}
     </div>
   );
 };

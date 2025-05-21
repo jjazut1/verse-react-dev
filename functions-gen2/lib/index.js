@@ -1,19 +1,39 @@
 "use strict";
 // functions/index.ts
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendEmailLinkWithAssignment = exports.sendAssignmentEmail = void 0;
+exports.sendEmailLinkWithAssignment = exports.sendAssignmentEmail = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const params_1 = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const sendgridHelper_1 = require("./sendgridHelper");
-// Define secrets
-const SENDGRID_API_KEY = (0, params_1.defineSecret)("SENDGRID_API_KEY");
-const SENDER_EMAIL = (0, params_1.defineSecret)("SENDER_EMAIL");
+// Define the secrets
+exports.SENDGRID_API_KEY = (0, params_1.defineSecret)("SENDGRID_API_KEY");
+exports.SENDER_EMAIL = (0, params_1.defineSecret)("SENDER_EMAIL");
+exports.APP_URL = (0, params_1.defineSecret)("APP_URL");
+// Get environment
+const isProduction = process.env.NODE_ENV === 'production';
+// Helper function to get the appropriate base URL
+function getBaseUrl() {
+    // First try to get from secrets
+    if (exports.APP_URL.value() && exports.APP_URL.value().trim() !== '') {
+        console.log("Using base URL from APP_URL secret");
+        return exports.APP_URL.value().trim();
+    }
+    // Fallback based on environment
+    if (isProduction) {
+        console.log("Fallback to production URL");
+        return 'https://r2process.com';
+    }
+    else {
+        console.log("Fallback to development URL");
+        return 'https://verse-dev-central.web.app';
+    }
+}
 // Initialize Firebase Admin
 admin.initializeApp();
 exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
     document: "assignments/{assignmentId}",
-    secrets: [SENDGRID_API_KEY, SENDER_EMAIL],
+    secrets: [exports.SENDGRID_API_KEY, exports.SENDER_EMAIL, exports.APP_URL],
 }, async (event) => {
     var _a, _b;
     const snapshot = event.data;
@@ -28,7 +48,9 @@ exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
         return;
     }
     const studentEmail = assignment.studentEmail.toLowerCase();
-    const assignmentLink = `https://r2process.com/play?token=${assignment.linkToken}`;
+    const baseUrl = getBaseUrl();
+    console.log(`Using base URL: ${baseUrl}`);
+    const assignmentLink = `${baseUrl}/play?token=${assignment.linkToken}`;
     let formattedDate = "No due date set";
     try {
         const dueDate = ((_a = assignment.dueDate) === null || _a === void 0 ? void 0 : _a.toDate()) || ((_b = assignment.deadline) === null || _b === void 0 ? void 0 : _b.toDate());
@@ -42,7 +64,7 @@ exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
         console.error("Date formatting error", e);
     }
     // Use the helper function to set up SendGrid
-    const isSetupSuccessful = (0, sendgridHelper_1.setupSendGrid)(SENDGRID_API_KEY.value());
+    const isSetupSuccessful = (0, sendgridHelper_1.setupSendGrid)(exports.SENDGRID_API_KEY.value());
     if (!isSetupSuccessful) {
         console.error("Failed to set up SendGrid properly");
         return;
@@ -50,7 +72,7 @@ exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
     const msg = {
         to: studentEmail,
         from: {
-            email: SENDER_EMAIL.value().trim(),
+            email: exports.SENDER_EMAIL.value().trim(),
             name: "Verse Learning"
         },
         subject: `New Assignment: ${assignment.gameTitle || assignment.gameName}`,
@@ -81,7 +103,7 @@ exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
 });
 exports.sendEmailLinkWithAssignment = (0, firestore_1.onDocumentCreated)({
     document: "assignments/{assignmentId}",
-    secrets: [SENDGRID_API_KEY, SENDER_EMAIL],
+    secrets: [exports.SENDGRID_API_KEY, exports.SENDER_EMAIL, exports.APP_URL],
 }, async (event) => {
     var _a, _b;
     const snapshot = event.data;
@@ -96,7 +118,9 @@ exports.sendEmailLinkWithAssignment = (0, firestore_1.onDocumentCreated)({
         return;
     }
     const studentEmail = assignment.studentEmail.toLowerCase();
-    const signInLink = `https://r2process.com/login?assignmentId=${assignmentId}&email=${encodeURIComponent(studentEmail)}&mode=signIn&oobCode=${assignment.linkToken}`;
+    const baseUrl = getBaseUrl();
+    console.log(`Using base URL: ${baseUrl}`);
+    const signInLink = `${baseUrl}/login?assignmentId=${assignmentId}&email=${encodeURIComponent(studentEmail)}&mode=signIn&oobCode=${assignment.linkToken}`;
     let formattedDate = "No due date set";
     try {
         const dueDate = ((_a = assignment.dueDate) === null || _a === void 0 ? void 0 : _a.toDate()) || ((_b = assignment.deadline) === null || _b === void 0 ? void 0 : _b.toDate());
@@ -109,7 +133,7 @@ exports.sendEmailLinkWithAssignment = (0, firestore_1.onDocumentCreated)({
     catch (e) {
         console.error("Date formatting error", e);
     }
-    const isSetupSuccessful = (0, sendgridHelper_1.setupSendGrid)(SENDGRID_API_KEY.value());
+    const isSetupSuccessful = (0, sendgridHelper_1.setupSendGrid)(exports.SENDGRID_API_KEY.value());
     if (!isSetupSuccessful) {
         console.error("Failed to set up SendGrid properly");
         return;
@@ -117,7 +141,7 @@ exports.sendEmailLinkWithAssignment = (0, firestore_1.onDocumentCreated)({
     const msg = {
         to: studentEmail,
         from: {
-            email: SENDER_EMAIL.value().trim(),
+            email: exports.SENDER_EMAIL.value().trim(),
             name: "Verse Learning"
         },
         subject: `New Assignment: ${assignment.gameTitle || assignment.gameName}`,
