@@ -16,7 +16,18 @@
     "preview:4173": "npx kill-port 4173 && vite preview",
     "vercel-build": "npm run build",
     "test": "vitest",
-    "deploy": "npm run build && firebase deploy"
+    "deploy": "npm run build && firebase deploy",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "cy:template": "cypress run --spec 'cypress/e2e/template-selection/**/*.cy.js'",
+    "cy:assignment": "cypress run --spec 'cypress/e2e/assignment-creation/**/*.cy.js'",
+    "cy:gameplay": "cypress run --spec 'cypress/e2e/game-play/**/*.cy.js'",
+    "cy:basic-tests": "cypress run --spec 'cypress/e2e/**/*.cy.js'",
+    "test:e2e": "start-server-and-test dev http://localhost:3000 cy:run",
+    "test:template": "start-server-and-test dev http://localhost:3000 cy:template",
+    "test:assignment": "start-server-and-test dev http://localhost:3000 cy:assignment",
+    "test:gameplay": "start-server-and-test dev http://localhost:3000 cy:gameplay",
+    "test:basic": "start-server-and-test dev http://localhost:3000 cy:basic-tests"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
@@ -39,6 +50,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
+    "@testing-library/cypress": "^10.0.3",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -52,6 +64,7 @@
     "@typescript-eslint/eslint-plugin": "^6.19.1",
     "@typescript-eslint/parser": "^6.19.1",
     "@vitejs/plugin-react": "^4.4.1",
+    "cypress": "^14.4.0",
     "depcheck": "^1.4.7",
     "eslint": "^8.56.0",
     "eslint-plugin-react-hooks": "^4.6.0",
@@ -60,6 +73,7 @@
     "jsdom": "^26.1.0",
     "kill-port": "^2.0.1",
     "react-test-renderer": "^18.3.1",
+    "start-server-and-test": "^2.0.12",
     "ts-prune": "^0.10.3",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.29.1",

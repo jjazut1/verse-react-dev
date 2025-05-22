@@ -33,7 +33,17 @@ interface GameTemplate {
   createdBy?: string;
 }
 
-type TabType = 'games' | 'assignments' | 'create';
+// Student interface
+interface Student {
+  id: string;
+  name: string;
+  email: string;
+  grade?: string;
+  notes?: string;
+  createdAt: Timestamp;
+}
+
+type TabType = 'games' | 'assignments' | 'create' | 'students';
 
 // Use the proper Assignment type from types
 type Assignment = AssignmentType;
@@ -62,6 +72,14 @@ const TeacherDashboard = () => {
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [pendingDeleteTemplate, setPendingDeleteTemplate] = useState<string | null>(null);
 
+  // Student management state
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [pendingDeleteStudent, setPendingDeleteStudent] = useState<string | null>(null);
+  const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
+  
   const fetchGames = useCallback(async () => {
     setIsLoading(true);
     console.log('Fetching games from userGameConfigs collection...');
@@ -205,6 +223,13 @@ const TeacherDashboard = () => {
       fetchGameTemplates();
     }
   }, [activeTab, fetchGameTemplates]);
+
+  // Fetch students when the Students tab is selected
+  useEffect(() => {
+    if (activeTab === 'students' && currentUser) {
+      fetchStudents();
+    }
+  }, [activeTab, currentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -695,11 +720,117 @@ const TeacherDashboard = () => {
   const AssignmentCreationModal = () => {
     if (!assigningGame || !showAssignmentModal) return null;
     
-    // Would need state for the form fields in a real implementation
+    // State for the form - update for multiple student selection
+    const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+    const [selectedStudents, setSelectedStudents] = useState<Student[]>([]);
     const [studentEmail, setStudentEmail] = useState('');
     const [deadline, setDeadline] = useState('');
     const [timesRequired, setTimesRequired] = useState(1);
     const [usePasswordless, setUsePasswordless] = useState(true);
+    const [assignmentStudents, setAssignmentStudents] = useState<Student[]>([]);
+    const [loadingStudents, setLoadingStudents] = useState(false);
+    
+    // Fetch students when modal opens
+    useEffect(() => {
+      if (showAssignmentModal && currentUser) {
+        fetchAssignmentStudents();
+      }
+    }, [showAssignmentModal, currentUser]);
+    
+    // Function to fetch students for assignment
+    const fetchAssignmentStudents = async () => {
+      if (!currentUser) return;
+      
+      setLoadingStudents(true);
+      try {
+        // Fetch from users collection where role is student and teacherId matches current user
+        const usersCollection = collection(db, 'users');
+        const q = query(
+          usersCollection, 
+          where('role', '==', 'student'), 
+          where('teacherId', '==', currentUser.uid)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        const studentsList = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || '',
+            email: data.email || '',
+            grade: data.grade || '',
+            notes: data.notes || '',
+            createdAt: data.createdAt || Timestamp.now()
+          } as Student;
+        });
+        
+        setAssignmentStudents(studentsList);
+      } catch (error) {
+        console.error('Error fetching students for assignment:', error);
+        showToast({
+          title: 'Error fetching students',
+          status: 'error',
+          duration: 3000,
+        });
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+    
+    // Handle student selection - updated for multi-select
+    const handleStudentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+      setSelectedStudentIds(selectedOptions);
+      
+      // Find the selected students
+      const students = assignmentStudents.filter(student => 
+        selectedOptions.includes(student.id)
+      );
+      setSelectedStudents(students);
+    };
+    
+    // Function to remove a student from selection
+    const removeStudent = (studentId: string) => {
+      setSelectedStudentIds(selectedStudentIds.filter(id => id !== studentId));
+      setSelectedStudents(selectedStudents.filter(student => student.id !== studentId));
+    };
+    
+    // Handle assignment creation for multiple students
+    const handleAssignToMultipleStudents = () => {
+      if (selectedStudents.length === 0 || !deadline) {
+        showToast({
+          title: 'Missing required fields',
+          description: 'Please select at least one student and set a deadline',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+      
+      // Create assignments for each selected student
+      const assignmentPromises = selectedStudents.map(student => 
+        handleAssignGame(student.email, new Date(deadline), timesRequired)
+      );
+      
+      Promise.all(assignmentPromises)
+        .then(() => {
+          showToast({
+            title: 'Assignments created',
+            description: `Created assignments for ${selectedStudents.length} student(s)`,
+            status: 'success',
+            duration: 3000,
+          });
+          setShowAssignmentModal(false);
+        })
+        .catch(error => {
+          console.error('Error creating assignments:', error);
+          showToast({
+            title: 'Error creating assignments',
+            status: 'error',
+            duration: 3000,
+          });
+        });
+    };
     
     return (
       <div style={{
@@ -733,20 +864,108 @@ const TeacherDashboard = () => {
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
               Student Email *
             </label>
-            <input 
-              type="email" 
-              placeholder="student@example.com"
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #E2E8F0',
-                borderRadius: '4px'
-              }}
-              value={studentEmail}
-              onChange={(e) => setStudentEmail(e.target.value)}
-            />
+            {loadingStudents ? (
+              <div style={{ padding: '8px 0' }}>Loading students...</div>
+            ) : assignmentStudents.length > 0 ? (
+              <>
+                <select 
+                  multiple
+                  value={selectedStudentIds}
+                  onChange={handleStudentChange}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '4px',
+                    backgroundColor: '#F7FAFC',
+                    minHeight: '120px' // Taller for multiple selection
+                  }}
+                  required
+                >
+                  {assignmentStudents.map(student => (
+                    <option key={student.id} value={student.id}>
+                      {student.name} ({student.email}) {student.grade ? `- ${student.grade}` : ''}
+                    </option>
+                  ))}
+                </select>
+                
+                {/* Display selected students */}
+                {selectedStudents.length > 0 && (
+                  <div style={{ marginTop: '8px' }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                      Selected Students ({selectedStudents.length}):
+                    </div>
+                    <div style={{ 
+                      display: 'flex', 
+                      flexWrap: 'wrap', 
+                      gap: '8px',
+                      maxHeight: '100px',
+                      overflowY: 'auto',
+                      padding: '8px',
+                      backgroundColor: '#EDF2F7',
+                      borderRadius: '4px'
+                    }}>
+                      {selectedStudents.map(student => (
+                        <div key={student.id} style={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          backgroundColor: '#E2E8F0',
+                          padding: '4px 8px',
+                          borderRadius: '16px',
+                          fontSize: '14px'
+                        }}>
+                          {student.name}
+                          <button 
+                            onClick={() => removeStudent(student.id)}
+                            style={{
+                              marginLeft: '4px',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              color: '#4A5568'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div style={{ 
+                  fontSize: '14px', 
+                  color: '#666', 
+                  marginTop: '4px',
+                  fontStyle: 'italic'
+                }}>
+                  Hold Ctrl/Cmd key to select multiple students
+                </div>
+              </>
+            ) : (
+              <div>
+                <div style={{ marginBottom: '8px', color: '#E53E3E' }}>
+                  No students found. Please add students in the My Students tab first.
+                </div>
+                <input 
+                  type="email" 
+                  placeholder="student@example.com"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '4px',
+                    backgroundColor: '#F7FAFC'
+                  }}
+                  value={studentEmail}
+                  onChange={(e) => setStudentEmail(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <div style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>
-              An email notification with assignment details will be sent to this address.
+              An email notification with assignment details will be sent to each selected student.
             </div>
           </div>
           
@@ -757,13 +976,15 @@ const TeacherDashboard = () => {
             <input 
               type="date" 
               style={{
-                width: '100%',
+                width: '200px',
                 padding: '8px 12px',
                 border: '1px solid #E2E8F0',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                backgroundColor: '#F7FAFC'
               }}
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
+              required
             />
           </div>
           
@@ -773,10 +994,11 @@ const TeacherDashboard = () => {
             </label>
             <select 
               style={{
-                width: '100%',
+                width: '120px',
                 padding: '8px 12px',
                 border: '1px solid #E2E8F0',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                backgroundColor: '#F7FAFC'
               }}
               value={timesRequired}
               onChange={(e) => setTimesRequired(Number(e.target.value))}
@@ -822,7 +1044,7 @@ const TeacherDashboard = () => {
               Cancel
             </button>
             <button
-              onClick={() => handleAssignGame(studentEmail, new Date(deadline), timesRequired)}
+              onClick={handleAssignToMultipleStudents}
               style={{
                 padding: '8px 16px',
                 backgroundColor: '#3182CE',
@@ -1033,6 +1255,397 @@ const TeacherDashboard = () => {
     );
   };
 
+  // Function to fetch students for the current teacher
+  const fetchStudents = async () => {
+    if (!currentUser) return;
+    
+    setIsLoadingStudents(true);
+    try {
+      // Use the users collection instead of students
+      const usersCollection = collection(db, 'users');
+      // Query for users with role 'student' and associated with the current teacher
+      const q = query(
+        usersCollection, 
+        where('role', '==', 'student'), 
+        where('teacherId', '==', currentUser.uid)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      const studentsList = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || '',
+          email: data.email || '',
+          grade: data.grade || '',
+          notes: data.notes || '',
+          createdAt: data.createdAt || Timestamp.now()
+        } as Student;
+      });
+      
+      setStudents(studentsList);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      showToast({
+        title: 'Error fetching students',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  };
+  
+  // Function to add a new student
+  const handleAddStudent = async (studentData: Omit<Student, 'id' | 'createdAt'>) => {
+    if (!currentUser) return;
+    
+    try {
+      const newStudentData = {
+        ...studentData,
+        role: 'student', // Explicitly set role as student
+        teacherId: currentUser.uid,
+        teacherEmail: currentUser.email,
+        createdAt: serverTimestamp()
+      };
+      
+      // Add to users collection instead of students
+      const docRef = await addDoc(collection(db, 'users'), newStudentData);
+      
+      // Add the new student to the local state
+      const newStudent = {
+        id: docRef.id,
+        ...studentData,
+        createdAt: Timestamp.now()
+      } as Student;
+      
+      setStudents([...students, newStudent]);
+      
+      showToast({
+        title: 'Student added successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      
+      setShowStudentModal(false);
+    } catch (error) {
+      console.error('Error adding student:', error);
+      showToast({
+        title: 'Error adding student',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+  
+  // Function to update an existing student
+  const handleUpdateStudent = async (studentId: string, studentData: Partial<Student>) => {
+    try {
+      // Update in users collection
+      const studentRef = doc(db, 'users', studentId);
+      await updateDoc(studentRef, studentData);
+      
+      // Update the student in the local state
+      setStudents(students.map(student => 
+        student.id === studentId ? { ...student, ...studentData } : student
+      ));
+      
+      showToast({
+        title: 'Student updated successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      
+      setEditingStudent(null);
+      setShowStudentModal(false);
+    } catch (error) {
+      console.error('Error updating student:', error);
+      showToast({
+        title: 'Error updating student',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+  
+  // Function to delete a student
+  const handleDeleteStudent = async (studentId: string) => {
+    try {
+      // Delete from users collection
+      await deleteDoc(doc(db, 'users', studentId));
+      
+      // Remove the student from the local state
+      setStudents(students.filter(student => student.id !== studentId));
+      
+      showToast({
+        title: 'Student deleted',
+        status: 'success',
+        duration: 3000,
+      });
+      
+      setPendingDeleteStudent(null);
+    } catch (error) {
+      console.error('Error deleting student:', error);
+      showToast({
+        title: 'Error deleting student',
+        status: 'error',
+        duration: 3000,
+      });
+      setPendingDeleteStudent(null);
+    }
+  };
+  
+  // Function to confirm student deletion
+  const confirmDeleteStudent = (studentId: string) => {
+    setPendingDeleteStudent(studentId);
+  };
+  
+  // Function to cancel student deletion
+  const cancelDeleteStudent = () => {
+    setPendingDeleteStudent(null);
+  };
+  
+  // Function to open the add student modal
+  const openAddStudentModal = () => {
+    setEditingStudent(null);
+    setShowStudentModal(true);
+  };
+  
+  // Function to open the edit student modal
+  const openEditStudentModal = (student: Student) => {
+    setEditingStudent(student);
+    setShowStudentModal(true);
+  };
+
+  // Student Modal Component for adding/editing students
+  const StudentModal = () => {
+    if (!showStudentModal) return null;
+    
+    // State for the form
+    const [name, setName] = useState(editingStudent?.name || '');
+    const [email, setEmail] = useState(editingStudent?.email || '');
+    const [grade, setGrade] = useState(editingStudent?.grade || '');
+    const [notes, setNotes] = useState(editingStudent?.notes || '');
+    
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      const studentData = {
+        name,
+        email,
+        grade,
+        notes
+      };
+      
+      if (editingStudent) {
+        handleUpdateStudent(editingStudent.id, studentData);
+      } else {
+        handleAddStudent(studentData);
+      }
+    };
+    
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '24px',
+          borderRadius: '8px',
+          maxWidth: '500px',
+          width: '100%',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h3 style={{ marginBottom: '16px', fontSize: '20px' }}>
+            {editingStudent ? 'Edit Student' : 'Add New Student'}
+          </h3>
+          
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                Name *
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '4px'
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                Email *
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '4px'
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                Grade/Class
+              </label>
+              <input
+                type="text"
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '4px'
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '4px',
+                  minHeight: '100px',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setShowStudentModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#E2E8F0',
+                  color: '#4A5568',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#4299E1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                {editingStudent ? 'Update Student' : 'Add Student'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+  
+  // Student delete confirmation modal
+  const StudentDeleteConfirmationModal = () => {
+    if (!pendingDeleteStudent) return null;
+    
+    // Find the student info to display in the confirmation
+    const studentToDelete = students.find(student => student.id === pendingDeleteStudent);
+    
+    if (!studentToDelete) return null;
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '24px',
+          borderRadius: '8px',
+          maxWidth: '400px',
+          width: '100%',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h3 style={{ marginBottom: '16px', fontSize: '18px' }}>Delete Student?</h3>
+          <p style={{ marginBottom: '8px', color: '#4A5568' }}>
+            Are you sure you want to delete <strong>{studentToDelete.name}</strong>?
+          </p>
+          <p style={{ marginBottom: '24px', color: '#4A5568' }}>
+            This action cannot be undone. All associated assignments will remain but will no longer be linked to this student.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <button
+              onClick={cancelDeleteStudent}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#E2E8F0',
+                color: '#4A5568',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleDeleteStudent(pendingDeleteStudent)}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#F56565',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
       <ToastComponent toastMessage={toastMessage} />
@@ -1041,6 +1654,8 @@ const TeacherDashboard = () => {
       <AssignmentDetailsModal />
       <AssignmentCreationModal />
       <TemplateDeleteConfirmationModal />
+      <StudentModal />
+      <StudentDeleteConfirmationModal />
       
       <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '32px' }}>
         Create
@@ -1105,6 +1720,24 @@ const TeacherDashboard = () => {
             }}
           >
             Track Assignments
+          </div>
+          <div
+            onClick={() => setActiveTab('students')}
+            style={{
+              padding: '12px 24px',
+              position: 'relative',
+              cursor: 'pointer',
+              color: activeTab === 'students' ? '#4299E1' : '#718096',
+              fontWeight: activeTab === 'students' ? 'bold' : 'normal',
+              borderBottom: activeTab === 'students' ? '2px solid #4299E1' : 'none',
+              marginBottom: activeTab === 'students' ? '-1px' : '0',
+              transition: 'all 0.2s ease',
+              textDecoration: 'none',
+              backgroundColor: activeTab === 'students' ? '#EBF8FF' : 'transparent',
+              borderRadius: '4px 4px 0 0'
+            }}
+          >
+            My Students
           </div>
         </div>
 
@@ -1364,6 +1997,147 @@ const TeacherDashboard = () => {
                   <p style={{ color: '#718096' }}>No modifiable templates available.</p>
                 )}
               </>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'students' && (
+          <div>
+            {/* Header with Add Student button */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>Student Management</h2>
+              <button
+                onClick={openAddStudentModal}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#38A169',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span>+ Add Student</span>
+              </button>
+            </div>
+            
+            {/* Search input */}
+            <div style={{ marginBottom: '16px' }}>
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={studentSearchQuery}
+                onChange={(e) => setStudentSearchQuery(e.target.value)}
+                style={{
+                  padding: '12px 16px',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '4px',
+                  width: '100%',
+                  fontSize: '16px',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                }}
+              />
+            </div>
+            
+            {isLoadingStudents ? (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                Loading students...
+              </div>
+            ) : students.length > 0 ? (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
+                    <th style={{ padding: '12px', textAlign: 'left' }}>Name</th>
+                    <th style={{ padding: '12px', textAlign: 'left' }}>Email</th>
+                    <th style={{ padding: '12px', textAlign: 'left' }}>Grade/Class</th>
+                    <th style={{ padding: '12px', textAlign: 'left' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students
+                    .filter(student => {
+                      if (!studentSearchQuery) return true;
+                      const query = studentSearchQuery.toLowerCase();
+                      return (
+                        student.name.toLowerCase().includes(query) ||
+                        student.email.toLowerCase().includes(query) ||
+                        (student.grade && student.grade.toLowerCase().includes(query))
+                      );
+                    })
+                    .map((student) => (
+                      <tr key={student.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                        <td style={{ padding: '12px' }}>{student.name}</td>
+                        <td style={{ padding: '12px' }}>{student.email}</td>
+                        <td style={{ padding: '12px' }}>{student.grade || '-'}</td>
+                        <td style={{ padding: '12px' }}>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => openEditStudentModal(student)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#4299E1',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => confirmDeleteStudent(student.id)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#F56565',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            ) : (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '40px 0',
+                color: '#718096',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                border: '1px dashed #E2E8F0',
+                marginTop: '24px'
+              }}>
+                <p style={{ marginBottom: '16px' }}>You haven't added any students yet.</p>
+                <button
+                  onClick={openAddStudentModal}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#4299E1',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Add Your First Student
+                </button>
+              </div>
             )}
           </div>
         )}

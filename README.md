@@ -1,112 +1,158 @@
-# Educational Gaming Platform
+# Lumino Learning Platform
 
-A modern web application for educational gaming and tutoring services, built with React, TypeScript, and Firebase.
+[![React](https://img.shields.io/badge/React-18.x-blue)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.x-purple)](https://vitejs.dev/)
+[![Firebase](https://img.shields.io/badge/Firebase-10.x-orange)](https://firebase.google.com/)
+[![ChakraUI](https://img.shields.io/badge/ChakraUI-2.x-teal)](https://chakra-ui.com/)
+
+## Overview
+
+Lumino Learning is an interactive educational platform designed for K-6 teachers and students. It enables teachers to create custom educational games, assign them to students, and track progress. Students receive a personalized learning experience with engaging, age-appropriate games.
+
+**Tagline:** Create Efficiently. Spark Curiosity. Shape Minds.
 
 ## Features
 
-- Free educational games with high score tracking
-- Teacher dashboard for game management
-- Google SSO authentication
-- Assignment management system
-- Responsive design with Chakra UI
+### For Teachers
 
-## Prerequisites
+- **Student Management**
+  - Create and manage student accounts
+  - View student profiles and progress
+  - Bulk actions for managing groups/classes
 
-- Node.js (v18 or higher)
-- npm or yarn
-- Firebase account and project
-- Google Cloud Platform account (for SSO)
-- Vercel account (for deployment)
+- **Game Creation and Templates**
+  - Create custom educational games from templates
+  - Modify existing games to suit curriculum
+  - Share games with other teachers
 
-## Setup
+- **Assignment Management**
+  - Assign games to individual or multiple students
+  - Set deadlines and completion requirements
+  - Track student progress and completion
+
+- **Analytics and Reporting**
+  - View student performance metrics
+  - Track engagement and identify learning gaps
+  - Generate progress reports
+
+### For Students
+
+- **Personalized Dashboard**
+  - View assigned games and due dates
+  - Track personal progress and achievements
+  - Access previously completed games
+
+- **Game Experience**
+  - Age-appropriate interface
+  - Visual and audio feedback
+  - Accessibility features for different learning needs
+
+- **Progress Tracking**
+  - Achievement badges
+  - Performance history
+  - Personal high scores
+
+## Technology Stack
+
+- **Frontend**: React with Vite, ChakraUI
+- **Backend**: Firebase (Firestore, Authentication, Storage)
+- **Testing**: Cypress for E2E testing
+- **Deployment**: Firebase Hosting
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (version 20.x or higher)
+- npm (version 8.x or higher)
+- Firebase account
+
+### Installation
 
 1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/verse-react.git
-cd verse-react
-```
+   ```
+   git clone https://github.com/your-username/lumino-learning.git
+   cd lumino-learning
+   ```
 
 2. Install dependencies:
-```bash
-npm install
-```
+   ```
+   npm install
+   ```
 
-3. Create a `.env` file in the root directory with your Firebase configuration:
-```
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-```
+3. Set up environment variables:
+   - Create a `.env` file in the root directory
+   - Add your Firebase configuration
 
 4. Start the development server:
-```bash
-# Using npm
-npm run dev
+   ```
+   npm run dev
+   ```
 
-# Using the development script
-./scripts/dev.sh
-```
+5. Run tests:
+   ```
+   npm run test:basic
+   ```
 
 ## Project Structure
 
 ```
-src/
-  ├── components/     # Reusable UI components
-  ├── contexts/      # React contexts (auth, etc.)
-  ├── pages/         # Page components
-  ├── config/        # Configuration files
-  └── types/         # TypeScript type definitions
-scripts/
-  ├── dev.sh         # Development script
-  └── deploy.sh      # Deployment script
+/src
+  /components         # Reusable UI components
+  /contexts           # React context providers
+  /hooks              # Custom React hooks
+  /pages              # Application pages/routes
+  /services           # Service layer for API interaction
+  /types              # TypeScript type definitions
+  /utils              # Utility functions
+  /styles             # Global styles and theme
+  /config             # Application configuration
+  App.tsx             # Main application component
+  main.tsx            # Application entry point
 ```
 
-## Development
+## Testing
 
-The project uses several tools to ensure code quality and consistency:
+We use Cypress for end-to-end testing. The test suite covers:
 
-- TypeScript for type safety
-- ESLint for code linting
-- Prettier for code formatting
-- Chakra UI for component library
-- Vite for fast development and building
+- Authentication flows
+- Teacher dashboard functionality
+- Student management
+- Game creation and assignment workflows
+- Student experience
 
-To run the development server with all checks:
-```bash
-./scripts/dev.sh
+Run tests with:
+```
+npm run test:basic       # Run all tests
+npm run test:template    # Run template-related tests
+npm run test:assignment  # Run assignment-related tests
+npm run test:gameplay    # Run gameplay tests
 ```
 
-## Deployment
+## Recent Updates
 
-The application is configured for deployment on Vercel. You can deploy using either:
+### Student Management Enhancement
+- Added ability to manage students from the teacher dashboard
+- Implemented multi-student selection for batch assignments
+- Created intuitive student management interface
+- Added student data visualization
+  
+### Assignments Workflow Improvements
+- Simplified the assignment creation process
+- Added multi-student selection in assignment modal
+- Implemented deadline and completion tracking
+- Enhanced email notifications for assignments
 
-1. Automatic deployment through Vercel:
-   - Connect your GitHub repository to Vercel
-   - Configure your environment variables in the Vercel dashboard
-   - Vercel will automatically deploy your application
-
-2. Manual deployment using the deployment script:
-```bash
-./scripts/deploy.sh
-```
-
-The deployment script will:
-- Check for required environment variables
-- Install Vercel CLI if needed
-- Build the project
-- Deploy to Vercel
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### UI/UX Refinements
+- Standardized input field sizes and styles
+- Added visual feedback in forms
+- Improved modal dialogs for better user interaction
+- Enhanced accessibility for diverse user needs
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contact
+
+For questions or support, please contact [support@luminolearning.com](mailto:support@luminolearning.com).
