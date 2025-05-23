@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useUnsavedChangesContext } from '../contexts/UnsavedChangesContext';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const Navbar = () => {
-  const { currentUser, isTeacher, logout } = useAuth();
+  const { currentUser, isTeacher, isStudent, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { hasUnsavedChanges, promptBeforeLeaving } = useUnsavedChangesContext();
@@ -85,6 +85,8 @@ const Navbar = () => {
     }
     
     await logout();
+    // Navigate to home page after successful logout
+    navigate('/');
   };
 
   return (
@@ -117,30 +119,32 @@ const Navbar = () => {
               >
                 Create
               </RouterLink>
-              <RouterLink 
-                to="/assignments" 
-                style={navLinkStyle('/assignments')}
-                onClick={(e) => handleNavClick(e, '/assignments')}
-                onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
-                onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
-              >
-                Assignments
-              </RouterLink>
             </>
           )}
-              {isAdmin && (
-                <RouterLink 
-                  to="/admin" 
-                  style={{
-                    ...navLinkStyle('/admin'),
-                    color: '#FFD700' // Gold color for admin link
-                  }}
-                  onClick={(e) => handleNavClick(e, '/admin')}
-                  onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
-                  onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
-                >
-                  Admin
-                </RouterLink>
+          {isStudent && (
+            <RouterLink 
+              to="/student" 
+              style={navLinkStyle('/student')}
+              onClick={(e) => handleNavClick(e, '/student')}
+              onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+              onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+            >
+              My Dashboard
+            </RouterLink>
+          )}
+          {isAdmin && (
+            <RouterLink 
+              to="/admin" 
+              style={{
+                ...navLinkStyle('/admin'),
+                color: '#FFD700' // Gold color for admin link
+              }}
+              onClick={(e) => handleNavClick(e, '/admin')}
+              onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+              onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+            >
+              Admin
+            </RouterLink>
           )}
         </div>
         

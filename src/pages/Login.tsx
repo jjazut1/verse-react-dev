@@ -120,10 +120,32 @@ const Login = () => {
   const [emailLinkSuccess, setEmailLinkSuccess] = useState(false);
   const recaptchaRef = useRef<number | null>(null);
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-  const { login, signup, loginWithGoogle } = useAuth();
+  const { login, signup, loginWithGoogle, isTeacher, isStudent } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const assignmentId = searchParams.get('assignmentId');
+
+  // Helper function to determine redirect path based on user role
+  const getRedirectPath = () => {
+    if (isStudent) {
+      return '/student';
+    } else if (isTeacher) {
+      return '/teacher';
+    } else {
+      return '/'; // Default to home for users without specific roles
+    }
+  };
+
+  // State to track if we need to redirect after role is determined
+  const [pendingRedirect, setPendingRedirect] = useState(false);
+
+  // Effect to handle redirect once role is determined
+  useEffect(() => {
+    if (pendingRedirect && (isTeacher || isStudent)) {
+      setPendingRedirect(false);
+      navigate(getRedirectPath());
+    }
+  }, [pendingRedirect, isTeacher, isStudent, navigate]);
 
   // Handle email link authentication
   useEffect(() => {
@@ -260,9 +282,9 @@ const Login = () => {
               setIsLoading(false);
             }
           } else {
-            // No assignment ID, just go to home page
-            console.log('No assignment ID found, redirecting to home page');
-            navigate('/');
+            // No assignment ID, redirect based on user role
+            console.log('No assignment ID found, setting pending redirect');
+            setPendingRedirect(true);
           }
         } catch (error) {
           console.error('Error signing in with email link:', error);
@@ -389,8 +411,9 @@ const Login = () => {
         await signup(email, password, recaptchaToken);
       }
       
-      // Navigate to home page on success
-      navigate('/');
+      // Set pending redirect flag - the useEffect will handle the actual redirect
+      // once the user's role is determined
+      setPendingRedirect(true);
     } catch (err: any) {
       let errorMessage = 'Failed to ';
       errorMessage += mode === 'login' ? 'log in' : 'sign up';
@@ -435,7 +458,9 @@ const Login = () => {
       setIsLoading(true);
       setError('');
       await loginWithGoogle();
-      navigate('/');
+      // Set pending redirect flag - the useEffect will handle the actual redirect
+      // once the user's role is determined
+      setPendingRedirect(true);
     } catch (err: any) {
       setError('Failed to sign in with Google');
     } finally {

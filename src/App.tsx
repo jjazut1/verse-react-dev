@@ -9,10 +9,10 @@ import ForgotPassword from './pages/ForgotPassword'
 import EmailAuthFeedback from './pages/EmailAuthFeedback'
 import GamePlayer from './components/GamePlayer'
 import TeacherDashboard from './pages/TeacherDashboard'
+import StudentDashboard from './pages/StudentDashboard'
 import ConfigurationRouter from './pages/configurations/ConfigurationRouter'
 import WhackAMoleConfig from './pages/configurations/WhackAMoleConfig'
 import SortCategoriesEggConfig from './pages/configurations/SortCategoriesEggConfig'
-import Assignments from './pages/Assignments'
 import GameByToken from './pages/GameByToken'
 import AdminPage from './pages/AdminPage'
 import SetAdminPage from './pages/SetAdminPage'
@@ -335,8 +335,8 @@ const router = createBrowserRouter([
     errorElement: <ErrorBoundary />,
   },
   {
-    path: "/assignments",
-    element: <Layout><Assignments /></Layout>,
+    path: "/student",
+    element: <Layout><StudentDashboard /></Layout>,
     errorElement: <ErrorBoundary />,
   },
   {

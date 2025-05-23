@@ -6,7 +6,7 @@ import { useCustomToast, ToastComponent } from '../hooks/useCustomToast';
 import { getTeacherAssignments, deleteAssignment, getAssignmentAttempts, createAssignmentWithEmailLink } from '../services/assignmentService';
 import { Assignment as AssignmentType, Attempt } from '../types';
 import { generateAndUploadThumbnail } from '../utils/thumbnailGenerator';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
 
 interface Game {
@@ -52,6 +52,15 @@ const TeacherDashboard = () => {
   const { currentUser } = useAuth();
   const { toastMessage, showToast } = useCustomToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Check if we're returning from student view
+  useEffect(() => {
+    if (location.state && location.state.activeTab) {
+      setActiveTab(location.state.activeTab as TabType);
+    }
+  }, [location]);
+
   const [myGames, setMyGames] = useState<Game[]>([]);
   const [publicGames, setPublicGames] = useState<Game[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -80,6 +89,12 @@ const TeacherDashboard = () => {
   const [pendingDeleteStudent, setPendingDeleteStudent] = useState<string | null>(null);
   const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
   
+  // Add state to track last visited tab for returning from student view
+  const [lastTabBeforeStudentView, setLastTabBeforeStudentView] = useState<TabType>('students');
+  
+  // Add state for assignment status filter
+  const [activeStatusFilter, setActiveStatusFilter] = useState('all');
+
   const fetchGames = useCallback(async () => {
     setIsLoading(true);
     console.log('Fetching games from userGameConfigs collection...');
@@ -889,23 +904,24 @@ const TeacherDashboard = () => {
                   ))}
                 </select>
                 
-                {/* Display selected students */}
-                {selectedStudents.length > 0 && (
-                  <div style={{ marginTop: '8px' }}>
-                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                      Selected Students ({selectedStudents.length}):
-                    </div>
-                    <div style={{ 
-                      display: 'flex', 
-                      flexWrap: 'wrap', 
-                      gap: '8px',
-                      maxHeight: '100px',
-                      overflowY: 'auto',
-                      padding: '8px',
-                      backgroundColor: '#EDF2F7',
-                      borderRadius: '4px'
-                    }}>
-                      {selectedStudents.map(student => (
+                {/* Selected Students - Always visible section */}
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                    Selected Students ({selectedStudents.length}):
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap', 
+                    gap: '8px',
+                    minHeight: '40px',
+                    maxHeight: '100px',
+                    overflowY: 'auto',
+                    padding: '8px',
+                    backgroundColor: '#EDF2F7',
+                    borderRadius: '4px'
+                  }}>
+                    {selectedStudents.length > 0 ? (
+                      selectedStudents.map(student => (
                         <div key={student.id} style={{ 
                           display: 'flex',
                           alignItems: 'center',
@@ -929,10 +945,20 @@ const TeacherDashboard = () => {
                             ×
                           </button>
                         </div>
-                      ))}
-                    </div>
+                      ))
+                    ) : (
+                      <div style={{ 
+                        color: '#718096', 
+                        fontSize: '14px', 
+                        width: '100%', 
+                        textAlign: 'center',
+                        padding: '6px 0'
+                      }}>
+                        No students selected
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
                 
                 <div style={{ 
                   fontSize: '14px', 
@@ -1646,6 +1672,86 @@ const TeacherDashboard = () => {
     );
   };
 
+  // Function to handle viewing a student's dashboard
+  const handleViewStudentDashboard = (student: Student) => {
+    // Remember which tab we're coming from for navigation back
+    setLastTabBeforeStudentView(activeTab);
+    // Navigate to student dashboard with studentId parameter
+    navigate(`/student?id=${student.id}&teacherView=true`);
+  };
+
+  // Filter assignments based on status
+  const getStatusFilteredAssignments = () => {
+    if (activeStatusFilter === 'all') return filteredAssignments;
+    
+    // Calculate today's date for overdue assignments
+    const today = new Date();
+    
+    return filteredAssignments.filter(assignment => {
+      const deadlineDate = assignment.deadline?.toDate();
+      
+      switch(activeStatusFilter) {
+        case 'assigned':
+          return assignment.status === 'assigned' || assignment.status === 'started';
+        case 'overdue':
+          return (assignment.status === 'assigned' || assignment.status === 'started') && 
+                 deadlineDate && deadlineDate < today;
+        case 'completed':
+          return assignment.status === 'completed';
+        default:
+          return true;
+      }
+    });
+  };
+  
+  // Status tabs component
+  const renderStatusTabs = () => {
+    const tabs = [
+      { id: 'all', label: 'All' },
+      { id: 'assigned', label: 'Assigned' },
+      { id: 'overdue', label: 'Overdue' },
+      { id: 'completed', label: 'Completed' }
+    ];
+    
+    // Count assignments for each tab
+    const counts = {
+      assigned: filteredAssignments.filter(a => a.status === 'assigned' || a.status === 'started').length,
+      overdue: filteredAssignments.filter(a => {
+        const deadlineDate = a.deadline?.toDate();
+        return (a.status === 'assigned' || a.status === 'started') && deadlineDate && deadlineDate < new Date();
+      }).length,
+      completed: filteredAssignments.filter(a => a.status === 'completed').length
+    };
+    
+    return (
+      <div style={{ 
+        display: 'flex', 
+        marginBottom: '16px', 
+        borderBottom: '1px solid #E2E8F0'
+      }}>
+        {tabs.map(tab => (
+          <div
+            key={tab.id}
+            onClick={() => setActiveStatusFilter(tab.id)}
+            style={{
+              padding: '8px 16px',
+              cursor: 'pointer',
+              color: activeStatusFilter === tab.id ? '#4299E1' : '#718096',
+              fontWeight: activeStatusFilter === tab.id ? 'bold' : 'normal',
+              borderBottom: activeStatusFilter === tab.id ? '2px solid #4299E1' : 'none',
+              marginBottom: activeStatusFilter === tab.id ? '-1px' : '0',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {tab.label} {tab.id !== 'all' && counts[tab.id as keyof typeof counts] > 0 && 
+              `(${counts[tab.id as keyof typeof counts]})`
+            }
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
       <ToastComponent toastMessage={toastMessage} />
@@ -1903,6 +2009,9 @@ const TeacherDashboard = () => {
               />
             </div>
             
+            {/* Add assignment status tabs */}
+            {renderStatusTabs()}
+            
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
@@ -1915,13 +2024,50 @@ const TeacherDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredAssignments.map((assignment) => (
-                  <tr key={assignment.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                {getStatusFilteredAssignments().map((assignment) => (
+                  <tr key={assignment.id} style={{ 
+                    borderBottom: '1px solid #E2E8F0',
+                    backgroundColor: assignment.status === 'completed' ? '#F0FFF4' : // Light green for completed
+                      (assignment.deadline?.toDate() < new Date() && 
+                      (assignment.status === 'assigned' || assignment.status === 'started')) ? '#FFF5F5' : // Light red for overdue
+                      'transparent'
+                  }}>
                     <td style={{ padding: '12px' }}>{assignment.gameName}</td>
                     <td style={{ padding: '12px' }}>{assignment.gameType}</td>
-                    <td style={{ padding: '12px' }}>{assignment.deadline?.toDate().toLocaleDateString()}</td>
+                    <td style={{ padding: '12px' }}>
+                      {assignment.deadline?.toDate().toLocaleDateString()}
+                      {assignment.deadline?.toDate() < new Date() && 
+                       (assignment.status === 'assigned' || assignment.status === 'started') && 
+                         <span style={{ 
+                           color: '#E53E3E', 
+                           fontSize: '12px', 
+                           fontWeight: 'bold',
+                           display: 'block' 
+                         }}>
+                           Overdue
+                         </span>
+                      }
+                    </td>
                     <td style={{ padding: '12px' }}>{assignment.studentEmail}</td>
-                    <td style={{ padding: '12px' }}>{assignment.status}</td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: 'medium',
+                        backgroundColor: assignment.status === 'completed' ? '#C6F6D5' : // Green bg for completed
+                          (assignment.deadline?.toDate() < new Date() && 
+                          (assignment.status === 'assigned' || assignment.status === 'started')) ? '#FED7D7' : // Red bg for overdue
+                          '#E2E8F0', // Default gray
+                        color: assignment.status === 'completed' ? '#2F855A' : // Green text for completed
+                          (assignment.deadline?.toDate() < new Date() && 
+                          (assignment.status === 'assigned' || assignment.status === 'started')) ? '#C53030' : // Red text for overdue
+                          '#4A5568' // Default text color
+                      }}>
+                        {assignment.status === 'completed' ? 'Completed' : 
+                         (assignment.deadline?.toDate() < new Date() ? 'Overdue' : 'Assigned')}
+                      </span>
+                    </td>
                     <td style={{ padding: '12px' }}>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
@@ -1958,6 +2104,21 @@ const TeacherDashboard = () => {
                 ))}
               </tbody>
             </table>
+            
+            {/* Show message when no assignments match the filter */}
+            {getStatusFilteredAssignments().length === 0 && (
+              <div style={{ 
+                padding: '24px', 
+                textAlign: 'center',
+                backgroundColor: '#EBF8FF',
+                borderRadius: '8px',
+                marginTop: '16px'
+              }}>
+                <p style={{ color: '#4A5568', fontSize: '16px' }}>
+                  No {activeStatusFilter !== 'all' ? activeStatusFilter : ''} assignments found.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -2079,6 +2240,20 @@ const TeacherDashboard = () => {
                         <td style={{ padding: '12px' }}>{student.grade || '-'}</td>
                         <td style={{ padding: '12px' }}>
                           <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => handleViewStudentDashboard(student)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#38B2AC', // Teal color for View button
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                              }}
+                            >
+                              View
+                            </button>
                             <button
                               onClick={() => openEditStudentModal(student)}
                               style={{

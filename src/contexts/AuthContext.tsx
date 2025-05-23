@@ -27,6 +27,7 @@ const TEACHER_EMAILS = [
 interface AuthContextType {
   currentUser: User | null;
   isTeacher: boolean;
+  isStudent: boolean;
   loginWithGoogle: () => Promise<UserCredential | void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -40,6 +41,7 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({
   currentUser: null,
   isTeacher: false,
+  isStudent: false,
   loginWithGoogle: async () => {},
   login: async () => {},
   logout: async () => {},
@@ -57,23 +59,26 @@ export const useAuth = () => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isTeacher, setIsTeacher] = useState(false);
+  const [isStudent, setIsStudent] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Check if a user is a teacher
-  const checkIfTeacher = async (user: User | null) => {
+  // Check the user's role
+  const checkUserRole = async (user: User | null) => {
     if (!user) {
       setIsTeacher(false);
+      setIsStudent(false);
       return;
     }
     
     try {
-      // First check if email is in our demo list
+      // First check if email is in our demo teacher list
       if (TEACHER_EMAILS.includes(user.email || '')) {
         setIsTeacher(true);
+        setIsStudent(false);
         return;
       }
       
-      // Check if they have a teacher or admin role in their user document
+      // Check if they have a role in their user document
       try {
         console.log(`Checking user document for uid: ${user.uid}`);
         const userDoc = doc(db, 'users', user.uid);
@@ -84,25 +89,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log(`User data retrieved:`, userData);
           const role = userData.role;
           
-          // If they have either teacher OR admin role, they should have teacher capabilities
+          // Set role flags based on the user's role
           if (role === 'teacher' || role === 'admin') {
             console.log(`User has role: ${role}, setting isTeacher to true`);
             setIsTeacher(true);
-            
-            // Update lastLogin timestamp
-            try {
-              await setDoc(userDoc, {
-                lastLogin: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              }, { merge: true });
-              console.log("Updated user lastLogin timestamp");
-            } catch (updateError) {
-              console.error("Error updating lastLogin:", updateError);
-              // Non-critical error, continue
-            }
-            
-            return;
+            setIsStudent(false);
+          } else if (role === 'student') {
+            console.log(`User has role: student, setting isStudent to true`);
+            setIsTeacher(false);
+            setIsStudent(true);
+          } else {
+            setIsTeacher(false);
+            setIsStudent(false);
           }
+          
+          // Update lastLogin timestamp
+          try {
+            await setDoc(userDoc, {
+              lastLogin: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+            console.log("Updated user lastLogin timestamp");
+          } catch (updateError) {
+            console.error("Error updating lastLogin:", updateError);
+            // Non-critical error, continue
+          }
+          
+          return;
         } else {
           console.log(`User document does not exist for uid: ${user.uid}, checking by email`);
           
@@ -118,49 +131,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const existingUserData = existingUserDoc.data();
               console.log(`Found user document by email: ${existingUserDoc.id}`, existingUserData);
               
-              // If they have a teacher or admin role, set isTeacher to true
+              // Set role flags based on the user's role
               if (existingUserData.role === 'teacher' || existingUserData.role === 'admin') {
                 console.log(`User has role: ${existingUserData.role}, setting isTeacher to true`);
                 setIsTeacher(true);
+                setIsStudent(false);
+              } else if (existingUserData.role === 'student') {
+                console.log(`User has role: student, setting isStudent to true`);
+                setIsTeacher(false);
+                setIsStudent(true);
+              } else {
+                setIsTeacher(false);
+                setIsStudent(false);
+              }
+              
+              // Create a new document with the user's actual UID
+              try {
+                console.log(`Creating new user document with correct UID: ${user.uid}`);
+                await setDoc(doc(db, 'users', user.uid), {
+                  ...existingUserData,
+                  userId: user.uid,
+                  updatedAt: new Date().toISOString(),
+                  lastLogin: new Date().toISOString(),
+                  displayName: user.displayName || existingUserData.displayName || user.email.split('@')[0],
+                  email: user.email,
+                  emailVerified: user.emailVerified,
+                  role: existingUserData.role  // Preserve their original role
+                });
                 
-                // Create a new document with the user's actual UID
+                console.log("Successfully created user document with correct UID");
+                
+                // Now check if we have permission to update the original document
+                // This would be nice to have but not critical since we now have the new document
                 try {
-                  console.log(`Creating new user document with correct UID: ${user.uid}`);
-                  await setDoc(doc(db, 'users', user.uid), {
-                    ...existingUserData,
-                    userId: user.uid,
-                    updatedAt: new Date().toISOString(),
+                  await updateDoc(doc(db, 'users', existingUserDoc.id), {
+                    linkedToAuth: true,
+                    authUid: user.uid,
                     lastLogin: new Date().toISOString(),
-                    displayName: user.displayName || existingUserData.displayName || user.email.split('@')[0],
-                    email: user.email,
-                    emailVerified: user.emailVerified,
-                    role: existingUserData.role  // Preserve their original role
+                    updatedAt: new Date().toISOString()
                   });
-                  
-                  console.log("Successfully created user document with correct UID");
-                  
-                  // Now check if we have permission to update the original document
-                  // This would be nice to have but not critical since we now have the new document
-                  try {
-                    await updateDoc(doc(db, 'users', existingUserDoc.id), {
-                      linkedToAuth: true,
-                      authUid: user.uid,
-                      lastLogin: new Date().toISOString(),
-                      updatedAt: new Date().toISOString()
-                    });
-                    console.log("Updated original user document with authUid reference");
-                  } catch (linkError) {
-                    console.warn("Could not update original document with authUid reference:", linkError);
-                    // This is not critical, we can continue
-                  }
-                } catch (createError) {
-                  console.error("Error creating user document with correct UID:", createError);
-                  // Even though document creation failed, we still know they're a teacher
-                  // So we can continue with the current isTeacher state
+                  console.log("Updated original user document with authUid reference");
+                } catch (linkError) {
+                  console.warn("Could not update original document with authUid reference:", linkError);
+                  // This is not critical, we can continue
                 }
                 
                 return;
+              } catch (createError) {
+                console.error("Error creating user document with correct UID:", createError);
+                // We can continue with the current role state
               }
+              
+              return;
             }
           }
         }
@@ -169,18 +191,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Continue execution - don't throw the error
       }
       
-      // If we've made it this far, user is not a teacher
+      // If we've made it this far, user has no specific role
       setIsTeacher(false);
+      setIsStudent(false);
     } catch (error) {
-      console.error('Error checking teacher status:', error);
+      console.error('Error checking user role:', error);
       setIsTeacher(false);
+      setIsStudent(false);
     }
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
-      checkIfTeacher(user);
+      checkUserRole(user);
       setLoading(false);
     });
 
@@ -318,6 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     currentUser,
     isTeacher,
+    isStudent,
     loginWithGoogle,
     login,
     logout,

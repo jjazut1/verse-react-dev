@@ -646,13 +646,13 @@ const GameByToken: React.FC = () => {
         return renderAuthenticationForm();
       }
       
-      // If we're past the deadline, show past due message
+      // If we're past the deadline, show past due message but allow access
       if (isPastDue()) {
         return (
           <div className="max-w-lg mx-auto my-8 p-6 bg-yellow-50 border border-yellow-300 rounded-lg">
             <h2 className="text-xl font-bold text-yellow-700 mb-2">Assignment Past Due</h2>
             <p className="text-yellow-700">
-              This assignment was due on {new Date(assignment.deadline.seconds * 1000).toLocaleDateString()}.
+              This assignment was due on {assignment && formatDate(assignment.deadline.toDate())}.
               You can still complete it, but it will be marked as late.
             </p>
             {!studentNameSubmitted ? (
@@ -1123,33 +1123,6 @@ const GameByToken: React.FC = () => {
             Go Home
           </button>
         )}
-      </div>
-    );
-  }
-  
-  if (isPastDue()) {
-    return (
-      <div style={{ 
-        textAlign: 'center', 
-        padding: 'var(--spacing-8)',
-        color: 'var(--color-error-600)'
-      }}>
-        <p>This assignment is past due.</p>
-        <p>Due date: {assignment && formatDate(assignment.deadline.toDate())}</p>
-        <button
-          onClick={() => navigate('/')}
-          style={{
-            marginTop: 'var(--spacing-4)',
-            padding: 'var(--spacing-2) var(--spacing-4)',
-            backgroundColor: 'var(--color-primary-600)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 'var(--border-radius-sm)',
-            cursor: 'pointer'
-          }}
-        >
-          Go Home
-        </button>
       </div>
     );
   }
