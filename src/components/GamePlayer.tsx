@@ -5,6 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import SortCategoriesEggRevealAdapter from './games/sort-categories-egg-reveal/SortCategoriesEggRevealAdapter';
 import WhackAMole from './games/whack-a-mole/WhackAMole';
+import SpinnerWheel from './games/spinner-wheel/SpinnerWheel';
 import { useCustomToast } from '../hooks/useCustomToast';
 import { GameConfig } from '../types/game';
 
@@ -94,6 +95,14 @@ const GamePlayer = () => {
       case 'sort-categories-egg':
         return (
           <SortCategoriesEggRevealAdapter
+            playerName="Player"
+            onGameComplete={handleGameComplete}
+            config={gameConfig}
+          />
+        );
+      case 'spinner-wheel':
+        return (
+          <SpinnerWheel
             playerName="Player"
             onGameComplete={handleGameComplete}
             config={gameConfig}

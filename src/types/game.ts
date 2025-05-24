@@ -37,7 +37,24 @@ interface SortCategoriesConfig extends BaseGameConfig {
   }>;
 }
 
-export type GameConfig = WhackAMoleConfig | SortCategoriesConfig;
+interface SpinnerWheelConfig extends BaseGameConfig {
+  type: 'spinner-wheel';
+  items: Array<{
+    id: string;
+    text: string;
+    color?: string;
+  }>;
+  removeOnSelect: boolean;
+  wheelTheme: 'rainbow' | 'pastel' | 'bright' | 'custom';
+  customColors: string[];
+  soundEnabled: boolean;
+  showMascot: boolean;
+  maxSpins?: number;
+  instructions: string;
+  gameCategory: string;
+}
+
+export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig;
 
 export interface Word {
   text: string;

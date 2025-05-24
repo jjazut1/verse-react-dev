@@ -24,6 +24,7 @@ const ConfigurationRouter = () => {
     const path = location.pathname;
     if (path.includes('whack-a-mole')) return 'whack-a-mole';
     if (path.includes('sort-categories-egg')) return 'sort-categories-egg';
+    if (path.includes('spinner-wheel')) return 'spinner-wheel';
     return null;
   };
 
@@ -96,6 +97,7 @@ const ConfigurationRouter = () => {
     if (!gameType) return 0;
     if (gameType === 'whack-a-mole') return 0;
     if (gameType === 'sort-categories-egg') return 1;
+    if (gameType === 'spinner-wheel') return 2;
     return 0;
   };
 
@@ -103,6 +105,7 @@ const ConfigurationRouter = () => {
   const handleTabChange = (index: number) => {
     if (index === 0) navigate('/configure/whack-a-mole');
     if (index === 1) navigate('/configure/sort-categories-egg');
+    if (index === 2) navigate('/configure/spinner-wheel');
   };
 
   // Display configuration page title and content
@@ -115,6 +118,7 @@ const ConfigurationRouter = () => {
           <TabList>
             <Tab>Whack-a-Mole</Tab>
             <Tab>Sort Categories Egg</Tab>
+            <Tab>Spinner Wheel</Tab>
           </TabList>
         </Tabs>
       </Box>

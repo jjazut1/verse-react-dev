@@ -16,6 +16,7 @@ import SortCategoriesEggConfig from './pages/configurations/SortCategoriesEggCon
 import GameByToken from './pages/GameByToken'
 import AdminPage from './pages/AdminPage'
 import SetAdminPage from './pages/SetAdminPage'
+import SpinnerWheelConfig from './pages/configurations/SpinnerWheelConfig'
 import { useEffect } from 'react'
 
 // Create a layout component that includes the Navbar
@@ -379,6 +380,14 @@ const router = createBrowserRouter([
       {
         path: "sort-categories-egg/:templateId",
         element: <SortCategoriesEggConfig />
+      },
+      {
+        path: "spinner-wheel",
+        element: <SpinnerWheelConfig />
+      },
+      {
+        path: "spinner-wheel/:templateId",
+        element: <SpinnerWheelConfig />
       }
       // Additional game configuration routes will be added here
     ]
