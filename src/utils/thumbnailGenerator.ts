@@ -1,10 +1,11 @@
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 
 interface ThumbnailGenerationOptions {
-  type: 'sort-categories-egg' | 'whack-a-mole';
+  type: 'sort-categories-egg' | 'whack-a-mole' | 'spinner-wheel';
   title: string;
   categories?: Array<{ name: string; items: string[] }>;
   wordCategories?: Array<{ title: string; words: string[] }>;
+  spinnerItems?: Array<{ text: string; color?: string }>;
 }
 
 /**
@@ -23,7 +24,8 @@ export function generateThumbnailDataUrl(options: ThumbnailGenerationOptions): s
   // Set background color based on game type
   const backgroundColors = {
     'sort-categories-egg': '#e1c3ff', // More vibrant purple
-    'whack-a-mole': '#b8ffcc'  // More vibrant green
+    'whack-a-mole': '#b8ffcc',  // More vibrant green
+    'spinner-wheel': '#ffe1b3'  // Light orange for spinner wheel
   };
   
   // Fill background
@@ -35,6 +37,8 @@ export function generateThumbnailDataUrl(options: ThumbnailGenerationOptions): s
     drawSortCategoriesPreview(ctx, options, canvas.width, canvas.height);
   } else if (options.type === 'whack-a-mole') {
     drawWhackAMolePreview(ctx, options, canvas.width, canvas.height);
+  } else if (options.type === 'spinner-wheel') {
+    drawSpinnerWheelPreview(ctx, options, canvas.width, canvas.height);
   }
   
   // Add title text
@@ -105,6 +109,74 @@ function drawWhackAMolePreview(
   if (options.wordCategories && options.wordCategories.length > 0) {
     const wordList = options.wordCategories.flatMap(cat => cat.words).slice(0, 8);
     drawWordCloud(ctx, wordList, width, height);
+  }
+}
+
+/**
+ * Creates a thumbnail for the Spinner Wheel game
+ */
+function drawSpinnerWheelPreview(
+  ctx: CanvasRenderingContext2D,
+  options: ThumbnailGenerationOptions,
+  width: number, 
+  height: number
+) {
+  // Draw spinner wheel
+  const centerX = width * 0.5;
+  const centerY = height * 0.6;
+  const radius = 60;
+  
+  // Draw wheel segments
+  const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFD93D', '#DDA0DD'];
+  const segments = options.spinnerItems?.length || 6;
+  const anglePerSegment = (2 * Math.PI) / segments;
+  
+  for (let i = 0; i < segments; i++) {
+    const startAngle = i * anglePerSegment;
+    const endAngle = (i + 1) * anglePerSegment;
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.closePath();
+    
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  
+  // Draw center circle
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
+  ctx.fillStyle = '#333';
+  ctx.fill();
+  
+  // Draw pointer
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY - radius - 20);
+  ctx.lineTo(centerX - 8, centerY - radius - 5);
+  ctx.lineTo(centerX + 8, centerY - radius - 5);
+  ctx.closePath();
+  ctx.fillStyle = '#333';
+  ctx.fill();
+  
+  // Draw sample items if available
+  if (options.spinnerItems && options.spinnerItems.length > 0) {
+    const displayItems = options.spinnerItems.slice(0, 4);
+    ctx.fillStyle = '#555555';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    
+    displayItems.forEach((item, index) => {
+      const angle = (index * anglePerSegment) + (anglePerSegment / 2);
+      const textRadius = radius * 0.7;
+      const textX = centerX + textRadius * Math.cos(angle);
+      const textY = centerY + textRadius * Math.sin(angle);
+      
+      ctx.fillText(shortenText(item.text, 6), textX, textY);
+    });
   }
 }
 
@@ -269,6 +341,7 @@ function getDefaultThumbnail(type: string): string {
   const defaults: Record<string, string> = {
     'sort-categories-egg': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFdwI2QM1kHwAAAABJRU5ErkJggg==',
     'whack-a-mole': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFdwI2QM1kHwAAAABJRU5ErkJggg==',
+    'spinner-wheel': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFdwI2QM1kHwAAAABJRU5ErkJggg==',
   };
   
   return defaults[type] || defaults['sort-categories-egg'];
@@ -284,7 +357,7 @@ export async function generateAndUploadThumbnail(
   try {
     // Extract relevant data based on game type
     const options: ThumbnailGenerationOptions = {
-      type: gameData.type as 'sort-categories-egg' | 'whack-a-mole',
+      type: gameData.type as 'sort-categories-egg' | 'whack-a-mole' | 'spinner-wheel',
       title: gameData.title || 'Game',
     };
     
@@ -293,6 +366,8 @@ export async function generateAndUploadThumbnail(
       options.categories = gameData.categories;
     } else if (options.type === 'whack-a-mole' && gameData.categories) {
       options.wordCategories = gameData.categories;
+    } else if (options.type === 'spinner-wheel' && gameData.items) {
+      options.spinnerItems = gameData.items;
     }
     
     // Generate thumbnail

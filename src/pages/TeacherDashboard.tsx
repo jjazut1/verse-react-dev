@@ -39,6 +39,7 @@ interface Student {
   name: string;
   email: string;
   grade?: string;
+  age?: number;
   notes?: string;
   createdAt: Timestamp;
 }
@@ -425,6 +426,13 @@ const TeacherDashboard = () => {
       } else {
         navigate('/configure/sort-categories-egg');
       }
+    } else if (template.type === 'spinner-wheel') {
+      // If there's a template ID for editing, include it in the path
+      if (template.id) {
+        navigate(`/configure/spinner-wheel/${template.id}`);
+      } else {
+        navigate('/configure/spinner-wheel');
+      }
     } else {
       // Default to the configuration router for unknown types
       navigate('/configure');
@@ -774,6 +782,7 @@ const TeacherDashboard = () => {
             name: data.name || '',
             email: data.email || '',
             grade: data.grade || '',
+            age: data.age || 0,
             notes: data.notes || '',
             createdAt: data.createdAt || Timestamp.now()
           } as Student;
@@ -899,7 +908,7 @@ const TeacherDashboard = () => {
                 >
                   {assignmentStudents.map(student => (
                     <option key={student.id} value={student.id}>
-                      {student.name} ({student.email}) {student.grade ? `- ${student.grade}` : ''}
+                      {student.name} ({student.email}) {student.grade ? `- ${student.grade}` : ''} {student.age ? `- Age ${student.age}` : ''}
                     </option>
                   ))}
                 </select>
@@ -1090,8 +1099,20 @@ const TeacherDashboard = () => {
 
   // Template item component
   const TemplateItem = ({ template, onClick }: { template: GameTemplate, onClick: () => void }) => {
-    const bgColor = template.type === 'whack-a-mole' ? '#e6fff0' : '#f0e6ff';
-    const icon = template.type === 'whack-a-mole' ? '🔨' : '🥚';
+    const getItemStyle = () => {
+      switch(template.type) {
+        case 'whack-a-mole':
+          return { bgColor: '#e6fff0', icon: '🔨' };
+        case 'sort-categories-egg':
+          return { bgColor: '#f0e6ff', icon: '🥚' };
+        case 'spinner-wheel':
+          return { bgColor: '#fff5e6', icon: '🎡' };
+        default:
+          return { bgColor: '#f0f0f0', icon: '🎮' };
+      }
+    };
+    
+    const { bgColor, icon } = getItemStyle();
     
     // Check if this template is in the categoryTemplates array (modifiable template)
     const isModifiableTemplate = categoryTemplates.some(t => t.id === template.id);
@@ -1304,6 +1325,7 @@ const TeacherDashboard = () => {
           name: data.name || '',
           email: data.email || '',
           grade: data.grade || '',
+          age: data.age || 0,
           notes: data.notes || '',
           createdAt: data.createdAt || Timestamp.now()
         } as Student;
@@ -1451,6 +1473,7 @@ const TeacherDashboard = () => {
     const [name, setName] = useState(editingStudent?.name || '');
     const [email, setEmail] = useState(editingStudent?.email || '');
     const [grade, setGrade] = useState(editingStudent?.grade || '');
+    const [age, setAge] = useState(editingStudent?.age || 0);
     const [notes, setNotes] = useState(editingStudent?.notes || '');
     
     const handleSubmit = (e: React.FormEvent) => {
@@ -1460,6 +1483,7 @@ const TeacherDashboard = () => {
         name,
         email,
         grade,
+        age,
         notes
       };
       
@@ -1509,7 +1533,8 @@ const TeacherDashboard = () => {
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #E2E8F0',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
+                  backgroundColor: '#F8FAFC'
                 }}
               />
             </div>
@@ -1527,7 +1552,8 @@ const TeacherDashboard = () => {
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #E2E8F0',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
+                  backgroundColor: '#F8FAFC'
                 }}
               />
             </div>
@@ -1544,7 +1570,28 @@ const TeacherDashboard = () => {
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #E2E8F0',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
+                  backgroundColor: '#F8FAFC'
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                Age
+              </label>
+              <input
+                type="number"
+                value={age}
+                onChange={(e) => setAge(Number(e.target.value))}
+                min="0"
+                max="100"
+                style={{
+                  width: '120px',
+                  padding: '8px 12px',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '4px',
+                  backgroundColor: '#F8FAFC'
                 }}
               />
             </div>
@@ -1561,6 +1608,7 @@ const TeacherDashboard = () => {
                   padding: '8px 12px',
                   border: '1px solid #E2E8F0',
                   borderRadius: '4px',
+                  backgroundColor: '#F8FAFC',
                   minHeight: '100px',
                   resize: 'vertical'
                 }}
@@ -2219,6 +2267,7 @@ const TeacherDashboard = () => {
                     <th style={{ padding: '12px', textAlign: 'left' }}>Name</th>
                     <th style={{ padding: '12px', textAlign: 'left' }}>Email</th>
                     <th style={{ padding: '12px', textAlign: 'left' }}>Grade/Class</th>
+                    <th style={{ padding: '12px', textAlign: 'left' }}>Age</th>
                     <th style={{ padding: '12px', textAlign: 'left' }}>Actions</th>
                   </tr>
                 </thead>
@@ -2238,6 +2287,7 @@ const TeacherDashboard = () => {
                         <td style={{ padding: '12px' }}>{student.name}</td>
                         <td style={{ padding: '12px' }}>{student.email}</td>
                         <td style={{ padding: '12px' }}>{student.grade || '-'}</td>
+                        <td style={{ padding: '12px' }}>{student.age}</td>
                         <td style={{ padding: '12px' }}>
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button
