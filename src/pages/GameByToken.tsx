@@ -10,6 +10,7 @@ import { auth } from '../config/firebase';
 // Game components (import as needed)
 import SortCategoriesEggRevealAdapter from '../components/games/sort-categories-egg-reveal/SortCategoriesEggRevealAdapter';
 import WhackAMoleAdapter from '../components/games/whack-a-mole/WhackAMoleAdapter';
+import SpinnerWheel from '../components/games/spinner-wheel/SpinnerWheel';
 
 const GameByToken: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -746,6 +747,14 @@ const GameByToken: React.FC = () => {
               playerName={studentName}
               onHighScoreProcessStart={handleHighScoreProcessStart}
               onHighScoreProcessComplete={handleHighScoreProcessComplete}
+            />
+          );
+        case 'spinner-wheel':
+          return (
+            <SpinnerWheel
+              config={gameConfig}
+              onGameComplete={handleGameComplete}
+              playerName={studentName}
             />
           );
         default:
