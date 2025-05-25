@@ -45,13 +45,11 @@ interface SpinnerWheelConfig extends BaseGameConfig {
     color?: string;
   }>;
   removeOnSelect: boolean;
-  wheelTheme: 'rainbow' | 'pastel' | 'bright' | 'custom';
+  wheelTheme: 'primaryColors' | 'pastel' | 'bright' | 'patriotic' | 'greenShades' | 'desert' | 'ocean' | 'sunset' | 'custom';
   customColors: string[];
   soundEnabled: boolean;
-  showMascot: boolean;
   maxSpins?: number;
   instructions: string;
-  gameCategory: string;
 }
 
 export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig;

@@ -25,6 +25,10 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   const [gameComplete, setGameComplete] = useState(false);
   const [selectionHistory, setSelectionHistory] = useState<string[]>([]);
   
+  // Zoom state for dramatic winner reveal
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomTarget, setZoomTarget] = useState({ x: 0, y: 0, segmentIndex: 0 });
+  
   // Add audio context and click generation
   const audioContextRef = useRef<AudioContext | null>(null);
   const clickIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -58,14 +62,19 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
 
   // Color themes
   const colorThemes = {
-    rainbow: ['#FF6B6B', '#FFD93D', '#6BCF7F', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'],
+    primaryColors: ['#FF6B6B', '#FFD93D', '#6BCF7F', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'],
     pastel: ['#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF', '#E1BAFF', '#FFBADB', '#C9BAFF'],
     bright: ['#FF0000', '#FF8800', '#FFFF00', '#88FF00', '#00FF00', '#00FF88', '#00FFFF', '#0088FF'],
+    patriotic: ['#DC143C', '#FFFFFF', '#000080', '#FF0000', '#87CEEB', '#4169E1', '#C0C0C0', '#191970'],
+    greenShades: ['#90EE90', '#32CD32', '#228B22', '#006400', '#2E8B57', '#6B8E23', '#00FF7F', '#ADFF2F'],
+    desert: ['#F4A460', '#D2B48C', '#F5F5DC', '#A0522D', '#B7410E', '#FF8C00', '#E2725B', '#C3B091'],
+    ocean: ['#ADD8E6', '#87CEEB', '#00BFFF', '#40E0D0', '#008080', '#000080', '#00FFFF', '#4682B4'],
+    sunset: ['#FFC0CB', '#FF7F50', '#FFA500', '#FFD700', '#FFFF00', '#FF6347', '#DDA0DD', '#E6E6FA'],
     custom: (config as any).customColors || ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']
   };
 
   const getItemColors = () => {
-    const theme = (config as any).wheelTheme || 'rainbow';
+    const theme = (config as any).wheelTheme || 'primaryColors';
     const themeColors = colorThemes[theme as keyof typeof colorThemes];
     return items.map((item, index) => ({
       ...item,
@@ -200,10 +209,18 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
         console.log(`Final rotation: ${endRotation.toFixed(1)}°`);
         console.log('=====================');
         
+        // Instead of immediately showing winner, trigger zoom effect
+        const zoomCoords = calculateZoomTarget(actualSegmentAtPointer);
+        setZoomTarget(zoomCoords);
         setSelected(winner.text);
         setSelectionHistory(prev => [...prev, winner.text]);
         setSpinCount(prev => prev + 1);
         setSpinning(false);
+        
+        // Trigger zoom after a brief pause for dramatic effect
+        setTimeout(() => {
+          setIsZoomed(true);
+        }, 500);
       }
     };
 
@@ -294,11 +311,35 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     scheduleNextClick();
   };
 
+  // Calculate zoom target coordinates for winning segment
+  const calculateZoomTarget = (segmentIndex: number) => {
+    const radius = 220;
+    const center = 240;
+    
+    // Always focus on 9 o'clock position (180 degrees) where the winning segment lands
+    // This is where our pointer is positioned and where the winning segment stops
+    const targetX = center - (radius * 0.5); // 9 o'clock position (left side)
+    const targetY = center; // Center vertically
+    
+    return { x: targetX, y: targetY, segmentIndex };
+  };
+
+  // Zoom out function
+  const handleZoomOut = () => {
+    setIsZoomed(false);
+    setZoomTarget({ x: 0, y: 0, segmentIndex: 0 });
+  };
+
   const renderWheel = () => {
     const radius = 220;
     const center = 240;
     const angle = 360 / items.length;
     const coloredItems = getItemColors();
+
+    // Calculate zoom transform - reduced by 20%
+    const zoomScale = isZoomed ? 2.4 : 1;
+    const zoomTranslateX = isZoomed ? (240 - zoomTarget.x) : 0;
+    const zoomTranslateY = isZoomed ? (240 - zoomTarget.y) : 0;
 
     return (
       <Box 
@@ -309,6 +350,11 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
         justifyContent="center" 
         alignItems="center" 
         mx="auto"
+        overflow="visible"
+        style={{
+          transform: `scale(${zoomScale}) translate(${zoomTranslateX}px, ${zoomTranslateY}px)`,
+          transition: isZoomed ? 'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'transform 0.6s ease-out'
+        }}
       >
         <svg 
           width={480}
@@ -340,13 +386,17 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
               // Text only readable at 9 o'clock position (where pointer is)
               const transformText = `rotate(${textAngle + 180}, ${textX}, ${textY})`;
               
+              // Check if this is the winning segment for special highlighting
+              const isWinningSegment = isZoomed && i === zoomTarget.segmentIndex;
+              
               return (
                 <g key={item.id}>
                   <path
                     d={path}
                     fill={item.color}
-                    stroke="#fff"
-                    strokeWidth="2"
+                    stroke={isWinningSegment ? "#FFD700" : "#fff"}
+                    strokeWidth={isWinningSegment ? "4" : "2"}
+                    filter={isWinningSegment ? "drop-shadow(0 0 10px rgba(255, 215, 0, 0.8))" : "none"}
                   />
                   <text
                     x={textX}
@@ -425,6 +475,9 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     setGameComplete(false);
     setSelectionHistory([]);
     setRotation(0);
+    // Reset zoom state
+    setIsZoomed(false);
+    setZoomTarget({ x: 0, y: 0, segmentIndex: 0 });
   };
 
   if (items.length === 0) {
@@ -460,22 +513,105 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
         marginBottom="auto"
       >
         <VStack spacing={6}>
-          {/* Header */}
-          <VStack spacing={2} textAlign="center">
-            <Heading size="lg" color="blue.600">
-              🎡 {config.title || 'Spinner Wheel'}
-            </Heading>
-          </VStack>
+          {/* Header - Only show when NOT zoomed */}
+          {!isZoomed && (
+            <VStack spacing={2} textAlign="center">
+              <Heading size="lg" color="blue.600">
+                🎡 {config.title || 'Spinner Wheel'}
+              </Heading>
+            </VStack>
+          )}
 
           {/* Wheel */}
-          <Box bg="#E6F3FF" p={6} borderRadius="xl" shadow="lg">
+          <Box bg="#E6F3FF" p={6} borderRadius="xl" shadow={isZoomed ? "none" : "lg"} position="relative">
             {renderWheel()}
+            
+            {/* Floating buttons when zoomed - positioned above pointer area */}
+            {isZoomed && (
+              <VStack 
+                position="absolute" 
+                top="80px" 
+                left="-155px" 
+                spacing={3}
+                zIndex={1000}
+              >
+                <Button
+                  onClick={handleZoomOut}
+                  bg="#4ECDC4"
+                  color="white"
+                  _hover={{ bg: "#45B7D1" }}
+                  _active={{ bg: "#3A9BC1" }}
+                  size="md"
+                  fontSize="lg"
+                  px={6}
+                  py={4}
+                  borderRadius="full"
+                  shadow="lg"
+                >
+                  🔍 ZOOM OUT
+                </Button>
+                
+                {((config as any).removeOnSelect) && selected && (
+                  <Button
+                    onClick={() => {
+                      if (selected) {
+                        // Find and remove the selected item
+                        setItems(prev => prev.filter(item => item.text !== selected));
+                        // Clear the selection
+                        setSelected(null);
+                        // Add to history before clearing
+                        if (!selectionHistory.includes(selected)) {
+                          setSelectionHistory(prev => [...prev, selected]);
+                        }
+                        // Reset wheel rotation to avoid state confusion
+                        setRotation(0);
+                        // Reset zoom state
+                        setIsZoomed(false);
+                        setZoomTarget({ x: 0, y: 0, segmentIndex: 0 });
+                      }
+                    }}
+                    bg="#F5F5DC"
+                    color="#8B4513"
+                    _hover={{ bg: "#F0E68C" }}
+                    _active={{ bg: "#DDD6C1" }}
+                    size="md"
+                    fontSize="lg"
+                    px={6}
+                    py={4}
+                    borderRadius="full"
+                    shadow="lg"
+                    leftIcon={<span>🗑️</span>}
+                  >
+                    REMOVE
+                  </Button>
+                )}
+              </VStack>
+            )}
           </Box>
 
-          {/* Controls and Results - Side by Side Layout */}
-          <HStack spacing={6} align="flex-start" justify="center" w="100%">
-            {/* Spin Button Column */}
-            <VStack spacing={4} flex="0 0 auto">
+          {/* Winner Display - Show when zoomed */}
+          {isZoomed && selected && (
+            <Box 
+              bg="rgba(255, 215, 0, 0.95)" 
+              p={4} 
+              borderRadius="xl" 
+              shadow="xl" 
+              border="3px solid #FFD700"
+              textAlign="center"
+            >
+              <Text fontSize="2xl" fontWeight="bold" color="#8B4513" mb={2}>
+                🎉 WINNER! 🎉
+              </Text>
+              <Text fontSize="xl" fontWeight="bold" color="#2D3748">
+                {selected}
+              </Text>
+            </Box>
+          )}
+
+          {/* Controls and Results - Only show when NOT zoomed */}
+          {!isZoomed && (
+            <VStack spacing={4} align="center" justify="center" w="100%">
+              {/* Spin Button */}
               <Button
                 onClick={spin}
                 isDisabled={spinning || items.length < 2 || gameComplete}
@@ -505,39 +641,7 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
                 </VStack>
               )}
             </VStack>
-
-            {/* Remove Button Column */}
-            <Box flex="0 0 auto">
-              <Button
-                onClick={() => {
-                  if (selected) {
-                    // Find and remove the selected item
-                    setItems(prev => prev.filter(item => item.text !== selected));
-                    // Clear the selection
-                    setSelected(null);
-                    // Add to history before clearing
-                    if (!selectionHistory.includes(selected)) {
-                      setSelectionHistory(prev => [...prev, selected]);
-                    }
-                    // Reset wheel rotation to avoid state confusion
-                    setRotation(0);
-                  }
-                }}
-                bg="#F5F5DC"
-                color="#8B4513"
-                _hover={{ bg: "#F0E68C" }}
-                _active={{ bg: "#DDD6C1" }}
-                size="lg"
-                fontSize="xl"
-                px={8}
-                py={6}
-                leftIcon={<span>🗑️</span>}
-                isDisabled={!selected || !((config as any).removeOnSelect)}
-              >
-                {selected ? `Remove "${selected}" from Wheel` : "Remove Selected Item"}
-              </Button>
-            </Box>
-          </HStack>
+          )}
         </VStack>
       </Box>
     </Box>

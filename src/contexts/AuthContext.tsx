@@ -102,20 +102,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsTeacher(false);
             setIsStudent(false);
           }
-          
-          // Update lastLogin timestamp
-          try {
-            await setDoc(userDoc, {
-              lastLogin: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            }, { merge: true });
-            console.log("Updated user lastLogin timestamp");
-          } catch (updateError) {
-            console.error("Error updating lastLogin:", updateError);
-            // Non-critical error, continue
-          }
-          
-          return;
+            
+            // Update lastLogin timestamp
+            try {
+              await setDoc(userDoc, {
+                lastLogin: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+              console.log("Updated user lastLogin timestamp");
+            } catch (updateError) {
+              console.error("Error updating lastLogin:", updateError);
+              // Non-critical error, continue
+            }
+            
+            return;
         } else {
           console.log(`User document does not exist for uid: ${user.uid}, checking by email`);
           
@@ -144,36 +144,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setIsTeacher(false);
                 setIsStudent(false);
               }
-              
-              // Create a new document with the user's actual UID
-              try {
-                console.log(`Creating new user document with correct UID: ${user.uid}`);
-                await setDoc(doc(db, 'users', user.uid), {
-                  ...existingUserData,
-                  userId: user.uid,
-                  updatedAt: new Date().toISOString(),
-                  lastLogin: new Date().toISOString(),
-                  displayName: user.displayName || existingUserData.displayName || user.email.split('@')[0],
-                  email: user.email,
-                  emailVerified: user.emailVerified,
-                  role: existingUserData.role  // Preserve their original role
-                });
                 
-                console.log("Successfully created user document with correct UID");
-                
-                // Now check if we have permission to update the original document
-                // This would be nice to have but not critical since we now have the new document
+                // Create a new document with the user's actual UID
                 try {
-                  await updateDoc(doc(db, 'users', existingUserDoc.id), {
-                    linkedToAuth: true,
-                    authUid: user.uid,
+                  console.log(`Creating new user document with correct UID: ${user.uid}`);
+                  await setDoc(doc(db, 'users', user.uid), {
+                    ...existingUserData,
+                    userId: user.uid,
+                    updatedAt: new Date().toISOString(),
                     lastLogin: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
+                    displayName: user.displayName || existingUserData.displayName || user.email.split('@')[0],
+                    email: user.email,
+                    emailVerified: user.emailVerified,
+                    role: existingUserData.role  // Preserve their original role
                   });
-                  console.log("Updated original user document with authUid reference");
-                } catch (linkError) {
-                  console.warn("Could not update original document with authUid reference:", linkError);
-                  // This is not critical, we can continue
+                  
+                  console.log("Successfully created user document with correct UID");
+                  
+                  // Now check if we have permission to update the original document
+                  // This would be nice to have but not critical since we now have the new document
+                  try {
+                    await updateDoc(doc(db, 'users', existingUserDoc.id), {
+                      linkedToAuth: true,
+                      authUid: user.uid,
+                      lastLogin: new Date().toISOString(),
+                      updatedAt: new Date().toISOString()
+                    });
+                    console.log("Updated original user document with authUid reference");
+                  } catch (linkError) {
+                    console.warn("Could not update original document with authUid reference:", linkError);
+                    // This is not critical, we can continue
                 }
                 
                 return;

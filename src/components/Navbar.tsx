@@ -122,29 +122,29 @@ const Navbar = () => {
             </>
           )}
           {isStudent && (
-            <RouterLink 
+              <RouterLink 
               to="/student" 
               style={navLinkStyle('/student')}
               onClick={(e) => handleNavClick(e, '/student')}
-              onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
-              onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
-            >
+                onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+                onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+              >
               My Dashboard
-            </RouterLink>
+              </RouterLink>
           )}
-          {isAdmin && (
-            <RouterLink 
-              to="/admin" 
-              style={{
-                ...navLinkStyle('/admin'),
-                color: '#FFD700' // Gold color for admin link
-              }}
-              onClick={(e) => handleNavClick(e, '/admin')}
-              onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
-              onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
-            >
-              Admin
-            </RouterLink>
+              {isAdmin && (
+                <RouterLink 
+                  to="/admin" 
+                  style={{
+                    ...navLinkStyle('/admin'),
+                    color: '#FFD700' // Gold color for admin link
+                  }}
+                  onClick={(e) => handleNavClick(e, '/admin')}
+                  onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+                  onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+                >
+                  Admin
+                </RouterLink>
           )}
         </div>
         

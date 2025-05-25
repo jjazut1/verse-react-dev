@@ -76,6 +76,29 @@ Lumino Learning is a comprehensive educational platform designed for K-12 teache
 
 ## 🚀 Recent Major Updates
 
+### Rich Text Formatting System
+- **Advanced Text Editor**: Implemented sophisticated rich text editing across all game configurations
+- **Formatting Tools**: Bold, italic, underline, subscript, and superscript support for educational content
+- **SlateEditor Integration**: Professional-grade text editing with toolbar and keyboard shortcuts
+- **Cross-Game Compatibility**: Consistent rich text experience across Whack-A-Mole, Sort Categories, and Spinner Wheel
+- **Content Migration**: Seamless backward compatibility with existing plain text content
+
+### Spinner Wheel Enhancements
+- **Rich Text Items**: Full formatting support for wheel items with visual toolbar
+- **Enhanced Color Themes**: Added Patriotic, Green Shades, Desert, Ocean, and Sunset color schemes
+- **Improved UI/UX**: Apple-style design with smooth animations and hover effects
+- **Item Management**: Drag-and-drop reordering, move up/down controls, and visual indicators
+- **Zoom Functionality**: Dramatic winner reveal with zoom effects and clean interface
+- **Audio Integration**: Click sounds during spinning with speed-based timing
+- **Template System**: Database-driven blank templates for consistent game creation
+
+### Game Configuration Improvements
+- **Unsaved Changes Detection**: Smart tracking prevents data loss with proper comparison logic
+- **Template Loading**: Enhanced database integration for blank game templates
+- **Category Management**: Removed unnecessary fields, streamlined configuration process
+- **Focus Management**: Automatic focus on newly added items for better user experience
+- **Apple-Style Design**: Consistent design language across all configuration interfaces
+
 ### Student Experience Overhaul
 - **New Student Dashboard**: Complete redesign with intuitive assignment organization
 - **Assignment Status Visualization**: Color-coded sections for overdue, current, and completed work
@@ -131,28 +154,28 @@ Lumino Learning is a comprehensive educational platform designed for K-12 teache
 ### Installation
 
 1. **Clone the repository:**
-   ```bash
+```bash
    git clone https://github.com/your-username/lumino-learning.git
    cd lumino-learning
-   ```
+```
 
 2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
 3. **Configure Firebase:**
    - Create a `.env` file in the root directory
    - Add your Firebase configuration:
-     ```
-     VITE_FIREBASE_API_KEY=your_api_key
+```
+VITE_FIREBASE_API_KEY=your_api_key
      VITE_FIREBASE_AUTH_DOMAIN=your_domain
-     VITE_FIREBASE_PROJECT_ID=your_project_id
-     ```
+VITE_FIREBASE_PROJECT_ID=your_project_id
+```
 
 4. **Start development server:**
-   ```bash
-   npm run dev
+```bash
+npm run dev
    ```
 
 5. **Access the application:**

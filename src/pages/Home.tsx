@@ -1300,15 +1300,76 @@ const Home = () => {
             </p>
           </div>
         ) : (
-          <div style={{ 
-            maxWidth: '1400px',
-            margin: '0 auto',
-            display: 'grid',
+        <div style={{ 
+          maxWidth: '1400px',
+          margin: '0 auto',
+          display: 'grid',
             gridTemplateColumns: isTeacher ? 'repeat(3, 1fr)' : '1fr',
-            gap: 'var(--spacing-8)',
-            width: '100%'
+          gap: 'var(--spacing-8)',
+          width: '100%'
+        }}>
+          {/* Free Games Column */}
+          <div style={{ 
+            padding: 'var(--spacing-6)',
+            backgroundColor: 'white',
+            borderRadius: 'var(--border-radius-lg)',
+            boxShadow: 'var(--shadow-md)'
           }}>
-            {/* Free Games Column */}
+            <h2 style={{ 
+              fontSize: 'var(--font-size-2xl)',
+              color: 'var(--color-gray-800)',
+              marginBottom: 'var(--spacing-4)'
+            }}>
+              Free Games
+            </h2>
+            <SearchBar onSearch={setFreeGamesSearch} />
+            <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
+                  Loading games...
+                </div>
+              ) : (
+                <>
+                  {/* User's own games section */}
+                  {currentUser && userOwnedGames.length > 0 && (
+                    <div>
+                      <h3 style={{ 
+                        fontSize: 'var(--font-size-lg)',
+                        color: 'var(--color-gray-700)',
+                        margin: 'var(--spacing-4) 0',
+                        paddingBottom: 'var(--spacing-2)',
+                        borderBottom: '1px solid var(--color-gray-200)'
+                      }}>
+                        My Games
+                      </h3>
+                      {renderGamesList(userOwnedGames, true, handleDeleteClick)}
+                    </div>
+                  )}
+                  
+                  {/* Other public games section */}
+                  {otherPublicGames.length > 0 && (
+                    <div>
+                      {currentUser && userOwnedGames.length > 0 && (
+                        <h3 style={{ 
+                          fontSize: 'var(--font-size-lg)',
+                          color: 'var(--color-gray-700)',
+                          margin: 'var(--spacing-4) 0',
+                          paddingBottom: 'var(--spacing-2)',
+                          borderBottom: '1px solid var(--color-gray-200)'
+                        }}>
+                          Other Public Games
+                        </h3>
+                      )}
+                      {renderGamesList(otherPublicGames, false, handleDeleteClick)}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Modifiable Templates Column */}
+          {isTeacher && (
             <div style={{ 
               padding: 'var(--spacing-6)',
               backgroundColor: 'white',
@@ -1320,119 +1381,58 @@ const Home = () => {
                 color: 'var(--color-gray-800)',
                 marginBottom: 'var(--spacing-4)'
               }}>
-                Free Games
+                Modifiable Game Templates
               </h2>
-              <SearchBar onSearch={setFreeGamesSearch} />
+              <SearchBar onSearch={setModifiableSearch} />
               <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
                 {loading ? (
                   <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
-                    Loading games...
+                    Loading templates...
                   </div>
                 ) : (
-                  <>
-                    {/* User's own games section */}
-                    {currentUser && userOwnedGames.length > 0 && (
-                      <div>
-                        <h3 style={{ 
-                          fontSize: 'var(--font-size-lg)',
-                          color: 'var(--color-gray-700)',
-                          margin: 'var(--spacing-4) 0',
-                          paddingBottom: 'var(--spacing-2)',
-                          borderBottom: '1px solid var(--color-gray-200)'
-                        }}>
-                          My Games
-                        </h3>
-                        {renderGamesList(userOwnedGames, true, handleDeleteClick)}
-                      </div>
-                    )}
-                    
-                    {/* Other public games section */}
-                    {otherPublicGames.length > 0 && (
-                      <div>
-                        {currentUser && userOwnedGames.length > 0 && (
-                          <h3 style={{ 
-                            fontSize: 'var(--font-size-lg)',
-                            color: 'var(--color-gray-700)',
-                            margin: 'var(--spacing-4) 0',
-                            paddingBottom: 'var(--spacing-2)',
-                            borderBottom: '1px solid var(--color-gray-200)'
-                          }}>
-                            Other Public Games
-                          </h3>
-                        )}
-                        {renderGamesList(otherPublicGames, false, handleDeleteClick)}
-                      </div>
-                    )}
-                  </>
+                  renderTemplatesList(
+                    modifiableTemplates.filter(template => template.title.toLowerCase().includes(modifiableSearch.toLowerCase())),
+                    false,
+                    (template) => handleTemplateClick(template),
+                    handleDeleteClick
+                  )
                 )}
               </div>
             </div>
+          )}
 
-            {/* Modifiable Templates Column */}
-            {isTeacher && (
-              <div style={{ 
-                padding: 'var(--spacing-6)',
-                backgroundColor: 'white',
-                borderRadius: 'var(--border-radius-lg)',
-                boxShadow: 'var(--shadow-md)'
+          {/* Blank Templates Column */}
+          {isTeacher && (
+            <div style={{ 
+              padding: 'var(--spacing-6)',
+              backgroundColor: 'white',
+              borderRadius: 'var(--border-radius-lg)',
+              boxShadow: 'var(--shadow-md)'
+            }}>
+              <h2 style={{ 
+                fontSize: 'var(--font-size-2xl)',
+                color: 'var(--color-gray-800)',
+                marginBottom: 'var(--spacing-4)'
               }}>
-                <h2 style={{ 
-                  fontSize: 'var(--font-size-2xl)',
-                  color: 'var(--color-gray-800)',
-                  marginBottom: 'var(--spacing-4)'
-                }}>
-                  Modifiable Game Templates
-                </h2>
-                <SearchBar onSearch={setModifiableSearch} />
-                <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                  {loading ? (
-                    <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
-                      Loading templates...
-                    </div>
-                  ) : (
-                    renderTemplatesList(
-                      modifiableTemplates.filter(template => template.title.toLowerCase().includes(modifiableSearch.toLowerCase())),
-                      false,
-                      (template) => handleTemplateClick(template),
-                      handleDeleteClick
-                    )
-                  )}
-                </div>
+                Blank Game Templates
+              </h2>
+              <SearchBar onSearch={setBlankSearch} />
+              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
+                    Loading templates...
+                  </div>
+                ) : (
+                  renderTemplatesList(
+                    blankTemplates.filter(template => template.title.toLowerCase().includes(blankSearch.toLowerCase())),
+                    false,
+                    (template) => handleTemplateClick(template, true)
+                  )
+                )}
               </div>
-            )}
-
-            {/* Blank Templates Column */}
-            {isTeacher && (
-              <div style={{ 
-                padding: 'var(--spacing-6)',
-                backgroundColor: 'white',
-                borderRadius: 'var(--border-radius-lg)',
-                boxShadow: 'var(--shadow-md)'
-              }}>
-                <h2 style={{ 
-                  fontSize: 'var(--font-size-2xl)',
-                  color: 'var(--color-gray-800)',
-                  marginBottom: 'var(--spacing-4)'
-                }}>
-                  Blank Game Templates
-                </h2>
-                <SearchBar onSearch={setBlankSearch} />
-                <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                  {loading ? (
-                    <div style={{ textAlign: 'center', padding: 'var(--spacing-4)' }}>
-                      Loading templates...
-                    </div>
-                  ) : (
-                    renderTemplatesList(
-                      blankTemplates.filter(template => template.title.toLowerCase().includes(blankSearch.toLowerCase())),
-                      false,
-                      (template) => handleTemplateClick(template, true)
-                    )
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
         )}
       </div>
 
