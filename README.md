@@ -73,15 +73,50 @@ Lumino Learning is a comprehensive educational platform designed for K-12 teache
 - **Storage**: Firebase Storage for game assets and thumbnails
 - **Routing**: React Router for navigation and deep linking
 - **State Management**: React Context API with custom hooks
+- **Rich Text Engine**: SlateJS for advanced text editing with custom formatting
+
+## 🛠️ Rich Text Architecture
+
+### Cross-Platform Rendering Engine
+Our rich text system supports multiple rendering environments:
+
+- **SVG Rendering (Spinner Wheel)**: Custom `renderRichTextSVG()` function with `tspan` positioning
+  - Solved cumulative `dy` offset issues for proper super/subscript character spacing
+  - Handles mid-word scripts like "H₂O" and "Option⁵" with precise positioning
+  
+- **3D Canvas Rendering (Whack-a-Mole)**: Direct canvas text rendering with rich formatting
+  - HTML parsing with styled canvas text drawing
+  - Dynamic font sizing and positioning for scripts
+  - Character spacing calculations for complex formulas
+
+- **CSS/HTML Rendering (Sort Categories)**: Native browser rendering with React components
+  - `RichText` components with CSS `verticalAlign` for super/subscript
+  - Preserved formatting through drag-and-drop operations
+
+### Data Storage Strategy
+```typescript
+interface CategoryItem {
+  content: string;  // Rich HTML: "<em>italicize</em>"
+  text: string;     // Plain text: "italicize"
+}
+```
+- **Dual Storage**: Rich HTML content + extracted plain text for game compatibility
+- **Backward Compatibility**: Seamless migration from legacy plain text format
+- **Rich Categories**: New `richCategories` format with fallback to legacy `categories`
 
 ## 🚀 Recent Major Updates
 
-### Rich Text Formatting System
-- **Advanced Text Editor**: Implemented sophisticated rich text editing across all game configurations
-- **Formatting Tools**: Bold, italic, underline, subscript, and superscript support for educational content
-- **SlateEditor Integration**: Professional-grade text editing with toolbar and keyboard shortcuts
-- **Cross-Game Compatibility**: Consistent rich text experience across Whack-A-Mole, Sort Categories, and Spinner Wheel
-- **Content Migration**: Seamless backward compatibility with existing plain text content
+### Rich Text Formatting System ✨
+- **Comprehensive Rich Text Support**: Full formatting capabilities across all three games (Spinner Wheel, Whack-a-Mole, Sort Categories Egg Reveal)
+- **Universal Formatting**: Bold, italic, underline, superscript, and subscript support for educational content like chemical formulas (H₂O), mathematical expressions (x²), and styled text
+- **Cross-Platform Rendering**: Advanced implementation supporting SVG (Spinner Wheel), 3D Canvas (Whack-a-Mole), and CSS/HTML (Sort Categories) environments
+- **SlateEditor Integration**: Professional-grade rich text editing with intuitive toolbar and keyboard shortcuts
+- **Technical Innovations**: 
+  - Fixed SVG `tspan` cumulative dy offset issues for proper mid-word super/subscript positioning
+  - Enhanced HTML parsing for complex formatting combinations
+  - Dual storage system (rich HTML content + plain text) for backward compatibility
+- **Seamless Experience**: Rich text preserved throughout entire game flow including drag-and-drop operations
+- **Production Ready**: Comprehensive testing and deployment across all game types with fallback mechanisms
 
 ### Spinner Wheel Enhancements
 - **Rich Text Items**: Full formatting support for wheel items with visual toolbar
