@@ -1117,6 +1117,9 @@ const TeacherDashboard = () => {
     // Check if this template is in the categoryTemplates array (modifiable template)
     const isModifiableTemplate = categoryTemplates.some(t => t.id === template.id);
     
+    // Check if this template is in the blankTemplates array (blank template)
+    const isBlankTemplate = blankTemplates.some(t => t.id === template.id);
+    
     // Check if the current user is the template owner
     const isTemplateOwner = 
       (template.userId && template.userId === currentUser?.uid) ||
@@ -1125,12 +1128,23 @@ const TeacherDashboard = () => {
     // Only show delete button for modifiable templates that user owns
     const showDeleteButton = isModifiableTemplate && isTemplateOwner;
     
+    // Show edit button for blank templates
+    const showEditButton = isBlankTemplate;
+    
     const handleDeleteClick = (e: React.MouseEvent) => {
       // Stop propagation to prevent template click handler from firing
       e.stopPropagation();
       
       // Confirm deletion
       confirmDeleteTemplate(template.id);
+    };
+    
+    const handleEditClick = (e: React.MouseEvent) => {
+      // Stop propagation to prevent template click handler from firing
+      e.stopPropagation();
+      
+      // Use the same logic as handleTemplateClick to navigate to config page
+      handleTemplateClick(template);
     };
     
     return (
@@ -1174,8 +1188,29 @@ const TeacherDashboard = () => {
           </div>
         </div>
         
-        {showDeleteButton && (
-          <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {showEditButton && (
+            <button
+              onClick={handleEditClick}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#4299E1',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="Edit template (creates a copy)"
+            >
+              ✏️ Edit
+            </button>
+          )}
+          
+          {showDeleteButton && (
             <button
               onClick={handleDeleteClick}
               style={{
@@ -1190,8 +1225,8 @@ const TeacherDashboard = () => {
             >
               Delete
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   };

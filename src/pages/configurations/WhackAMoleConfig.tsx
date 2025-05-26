@@ -289,6 +289,7 @@ interface WordCategory {
 interface CategoryItem {
   id: string;
   content: any; // Rich text content for SlateEditor
+  text?: string; // Plain text for game compatibility
 }
 
 interface Category {
@@ -354,8 +355,16 @@ const convertCategoryToWordCategory = (category: Category): WordCategory => {
   return {
     title: category.title,
     words: category.items.map(item => {
+      // First try to use the plain text field
+      if (item.text) return item.text;
+      
       // Extract plain text from the rich text content
-      if (typeof item.content === 'string') return item.content;
+      if (typeof item.content === 'string') {
+        // Extract from HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = item.content;
+        return tempDiv.textContent || tempDiv.innerText || '';
+      }
       
       try {
         // Extract text from Slate structure
@@ -374,8 +383,8 @@ const convertCategoryToWordCategory = (category: Category): WordCategory => {
         return text.trim();
       } catch (e) {
         console.error('Error extracting text from rich content:', e);
-    return '';
-  }
+        return '';
+      }
     }).filter(Boolean)
   };
 };
@@ -1008,10 +1017,25 @@ const WhackAMoleConfig = () => {
           setInstructions(loadedInstructions);
           setShareConfig(loadedShareConfig);
           
-          // Handle categories
-          let loadedWordCategories = [{ title: '', words: [] }];
-          if (data.categories && Array.isArray(data.categories)) {
-            loadedWordCategories = data.categories.map((cat: any) => ({
+          // Handle categories - prioritize rich text format if available
+          let loadedCategories: Category[] = [];
+          
+          // Try to load rich text categories first
+          if (data.richCategories && Array.isArray(data.richCategories)) {
+            console.log("Loading rich text categories from database:", data.richCategories);
+            loadedCategories = data.richCategories.map((richCat: any) => ({
+              id: richCat.id || generateId(),
+              title: richCat.title || '',
+              items: Array.isArray(richCat.items) ? richCat.items.map((item: any) => ({
+                id: item.id || generateId(),
+                content: item.content || '',
+                text: item.text || '' // Plain text for compatibility
+              })) : []
+            }));
+          } else if (data.categories && Array.isArray(data.categories)) {
+            // Fall back to legacy word categories format
+            console.log("Loading legacy categories from database:", data.categories);
+            const loadedWordCategories = data.categories.map((cat: any) => ({
               title: cat.title || '',
               words: Array.isArray(cat.words) ? cat.words : [],
               gameTime: cat.gameTime,
@@ -1024,22 +1048,29 @@ const WhackAMoleConfig = () => {
               share: cat.share
             }));
             
-            console.log("Loaded template with multiple categories:", loadedWordCategories);
-            
-            if (loadedWordCategories.length === 0) {
-              loadedWordCategories = [{ title: '', words: [] }];
-            }
+            // Convert word categories to our rich text format
+            loadedCategories = loadedWordCategories.map(wordCategory => 
+              convertWordCategoryToCategory({
+                title: wordCategory.title,
+                words: wordCategory.words
+              })
+            );
           }
           
-          // Convert word categories to our rich text format
-          const loadedCategories = loadedWordCategories.map(wordCategory => 
-            convertWordCategoryToCategory({
-              title: wordCategory.title,
-              words: wordCategory.words
-            })
-          );
+          // Ensure we have at least one category
+          if (loadedCategories.length === 0) {
+            loadedCategories = [{
+              id: generateId(),
+              title: '',
+              items: [{
+                id: generateId(),
+                content: '',
+                text: ''
+              }]
+            }];
+          }
           
-          console.log("Converted to rich text categories:", loadedCategories);
+          console.log("Final loaded categories:", loadedCategories);
           setCategories(loadedCategories);
           
           // Store initial values for unsaved changes detection
@@ -1369,14 +1400,56 @@ const WhackAMoleConfig = () => {
 
   // Handler functions for item management
   const handleItemContentChange = (categoryIndex: number, itemIndex: number, content: any) => {
-    console.log(`Updating item content at category ${categoryIndex}, item ${itemIndex} with:`, content);
-    
-    const newCategories = [...categories];
-    if (newCategories[categoryIndex] && newCategories[categoryIndex].items[itemIndex]) {
-      // Store content as a simple string instead of a complex Slate object
-      newCategories[categoryIndex].items[itemIndex].content = content;
-      setCategories(newCategories);
-    }
+    console.log('Item content change:', { categoryIndex, itemIndex, content, contentType: typeof content });
+    setCategories(prevCategories => {
+      const newCategories = [...prevCategories];
+      
+      // Handle rich text content
+      let plainText = '';
+      let richContent = content;
+      
+      // If content is HTML string, extract plain text and keep rich content
+      if (typeof content === 'string') {
+        // Extract plain text from HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = content;
+        plainText = tempDiv.textContent || tempDiv.innerText || '';
+        richContent = content; // Keep the HTML for rich text
+      } else if (Array.isArray(content)) {
+        // If it's Slate structure, extract plain text and keep structure
+        const traverse = (nodes: any[]) => {
+          for (const node of nodes) {
+            if (typeof node.text === 'string') {
+              plainText += node.text;
+            } else if (node.children) {
+              traverse(node.children);
+            }
+          }
+        };
+        traverse(content);
+        richContent = content; // Keep the Slate structure
+      } else {
+        // Fallback for other types
+        plainText = String(content || '');
+        richContent = plainText;
+      }
+
+      console.log('Processed content:', { 
+        plainText, 
+        richContent: typeof richContent === 'string' ? richContent : 'Rich structure',
+        contentType: typeof richContent
+      });
+
+      // Update the item with both plain text and rich content
+      newCategories[categoryIndex].items[itemIndex] = {
+        ...newCategories[categoryIndex].items[itemIndex],
+        content: richContent, // Rich content for editor
+        text: plainText // Plain text for game compatibility (add this field)
+      };
+      
+      return newCategories;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const handleAddItem = (categoryIndex: number) => {
@@ -1550,7 +1623,11 @@ const WhackAMoleConfig = () => {
       // Convert our rich text categories to the format expected by the database
       const wordCategoriesForDb = validCategories.map(convertCategoryToWordCategory);
 
-      // Prepare the configuration data
+      console.log('=== WHACK-A-MOLE SAVE DEBUG ===');
+      console.log('Valid categories:', validCategories);
+      console.log('Word categories for DB:', wordCategoriesForDb);
+
+      // Prepare the configuration data with both formats
       const configData = {
         type: 'whack-a-mole',
         title: title.trim(),
@@ -1561,12 +1638,63 @@ const WhackAMoleConfig = () => {
         bonusThreshold,
         speed: gameSpeed,
         instructions,
-        categories: wordCategoriesForDb,
+        categories: wordCategoriesForDb, // Legacy format for backward compatibility
+        richCategories: validCategories.map(category => {
+          const richCategory = {
+            id: category.id,
+            title: category.title,
+            items: category.items.map(item => {
+              // Ensure we extract plain text properly for the text field
+              let plainText = item.text || '';
+              
+              // If we don't have plain text, extract it from content
+              if (!plainText && item.content) {
+                if (typeof item.content === 'string') {
+                  // Extract from HTML
+                  const tempDiv = document.createElement('div');
+                  tempDiv.innerHTML = item.content;
+                  plainText = tempDiv.textContent || tempDiv.innerText || '';
+                } else if (Array.isArray(item.content)) {
+                  // Extract from Slate structure
+                  const traverse = (nodes: any[]) => {
+                    for (const node of nodes) {
+                      if (typeof node.text === 'string') {
+                        plainText += node.text;
+                      } else if (node.children) {
+                        traverse(node.children);
+                      }
+                    }
+                  };
+                  traverse(item.content);
+                }
+              }
+              
+              const processedItem = {
+                id: item.id,
+                content: item.content, // Rich text content
+                text: plainText // Plain text for game
+              };
+              
+              console.log(`Processing item: ${JSON.stringify(processedItem)}`);
+              return processedItem;
+            })
+          };
+          console.log(`Rich category: ${JSON.stringify(richCategory)}`);
+          return richCategory;
+        }), // New rich text format
         share: shareConfig,
         userId: currentUser.uid,
         email: currentUser.email,
         createdAt: serverTimestamp()
       };
+
+      console.log('=== FINAL CONFIG DATA ===');
+      console.log('Config data:', JSON.stringify(configData, null, 2));
+      console.log('Rich categories count:', configData.richCategories.length);
+      configData.richCategories.forEach((cat, i) => {
+        console.log(`Rich category ${i}:`, JSON.stringify(cat, null, 2));
+      });
+      console.log('=== END DEBUG ===');
 
       let configId;
 

@@ -11,6 +11,7 @@ interface SpinnerWheelItem {
   id: string;
   text: string;
   color: string;
+  content?: string; // Add content field for rich text
 }
 
 const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
@@ -330,6 +331,135 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     setZoomTarget({ x: 0, y: 0, segmentIndex: 0 });
   };
 
+  // Function to parse HTML and render as SVG text with formatting
+  const renderRichTextSVG = (htmlContent: string, x: number, y: number, transform: string, fontSize: number = 18) => {
+    // If no rich content, fall back to plain text
+    if (!htmlContent || typeof htmlContent !== 'string') {
+      return null;
+    }
+
+    // Parse HTML content into segments with formatting
+    const parseHTML = (html: string): Array<{text: string, bold?: boolean, italic?: boolean, underline?: boolean, superscript?: boolean, subscript?: boolean}> => {
+      const segments: Array<{text: string, bold?: boolean, italic?: boolean, underline?: boolean, superscript?: boolean, subscript?: boolean}> = [];
+      
+      // Create a temporary div to parse HTML
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+      
+      const processNode = (node: Node, formatting: any = {}) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          if (node.textContent) {
+            segments.push({ text: node.textContent, ...formatting });
+          }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          const element = node as HTMLElement;
+          const newFormatting = { ...formatting };
+          
+          // Apply formatting based on tag
+          switch (element.tagName.toLowerCase()) {
+            case 'strong':
+            case 'b':
+              newFormatting.bold = true;
+              break;
+            case 'em':
+            case 'i':
+              newFormatting.italic = true;
+              break;
+            case 'u':
+              newFormatting.underline = true;
+              break;
+            case 'sup':
+              newFormatting.superscript = true;
+              break;
+            case 'sub':
+              newFormatting.subscript = true;
+              break;
+          }
+          
+          // Process children
+          for (let child of Array.from(element.childNodes)) {
+            processNode(child, newFormatting);
+          }
+        }
+      };
+      
+      // Process all nodes
+      for (let child of Array.from(tempDiv.childNodes)) {
+        processNode(child);
+      }
+      
+      return segments;
+    };
+
+    const segments = parseHTML(htmlContent);
+    
+    // Render segments as tspan elements
+    return (
+      <text
+        x={x}
+        y={y}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={fontSize}
+        fontWeight="normal"
+        fontFamily="'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        fill="#333"
+        transform={transform}
+      >
+        {segments.map((segment, index) => {
+          const style: any = {};
+          let fontWeight = 'normal'; // Start with normal weight
+          let fontStyle = 'normal';
+          let fontFamily = "'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+          
+          // Apply SVG-specific formatting
+          if (segment.bold) fontWeight = 'bold';
+          if (segment.italic) {
+            fontStyle = 'italic';
+            // Use CSS style for better browser support
+            style.fontStyle = 'italic';
+            // Use a font family that definitely supports italics
+            fontFamily = "Arial, Helvetica, sans-serif";
+          }
+          if (segment.underline) style.textDecoration = 'underline';
+          
+          // Calculate font size and position for super/subscript
+          let segmentFontSize = fontSize;
+          let dy = 0;
+          
+          // Check if previous segment was script to reset position
+          const prevSegment = index > 0 ? segments[index - 1] : null;
+          const wasScript = prevSegment && (prevSegment.superscript || prevSegment.subscript);
+          
+          if (segment.superscript) {
+            segmentFontSize = fontSize * 0.75;
+            dy = wasScript ? (-fontSize * 0.3) - (fontSize * 0.2) : -fontSize * 0.3; // Reset from subscript if needed
+          } else if (segment.subscript) {
+            segmentFontSize = fontSize * 0.75;
+            dy = wasScript ? (fontSize * 0.2) + (fontSize * 0.3) : fontSize * 0.2; // Reset from superscript if needed
+          } else if (wasScript) {
+            // Reset position after script
+            dy = prevSegment.superscript ? fontSize * 0.3 : -fontSize * 0.2;
+          }
+          
+          return (
+            <tspan
+              key={index}
+              fontSize={segmentFontSize}
+              fontWeight={fontWeight}
+              fontStyle={fontStyle}
+              fontFamily={fontFamily}
+              dy={dy}
+              style={style}
+            >
+              {segment.text}
+            </tspan>
+          );
+        })}
+      </text>
+    );
+  };
+
   const renderWheel = () => {
     const radius = 220;
     const center = 240;
@@ -398,19 +528,26 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
                     strokeWidth={isWinningSegment ? "4" : "2"}
                     filter={isWinningSegment ? "drop-shadow(0 0 10px rgba(255, 215, 0, 0.8))" : "none"}
                   />
-                  <text
-                    x={textX}
-                    y={textY}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontSize="18"
-                    fontWeight="bold"
-                    fontFamily="'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-                    fill="#333"
-                    transform={transformText}
-                  >
-                    {item.text.length > 10 ? item.text.substring(0, 10) + '...' : item.text}
-                  </text>
+                  {item.content && (
+                    <g>
+                      {renderRichTextSVG(item.content, textX, textY, transformText)}
+                    </g>
+                  )}
+                  {!item.content && (
+                    <text
+                      x={textX}
+                      y={textY}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontSize="18"
+                      fontWeight="normal"
+                      fontFamily="'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                      fill="#333"
+                      transform={transformText}
+                    >
+                      {item.text.length > 10 ? item.text.substring(0, 10) + '...' : item.text}
+                    </text>
+                  )}
                 </g>
               );
             })}
@@ -602,9 +739,21 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
               <Text fontSize="2xl" fontWeight="bold" color="#8B4513" mb={2}>
                 🎉 WINNER! 🎉
               </Text>
-              <Text fontSize="xl" fontWeight="bold" color="#2D3748">
-                {selected}
-              </Text>
+              <Box fontSize="xl" fontWeight="bold" color="#2D3748">
+                {/* Render rich text or fallback to plain text */}
+                {(() => {
+                  const winnerItem = items.find(item => item.text === selected);
+                  if (winnerItem?.content) {
+                    return (
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: winnerItem.content }}
+                        style={{ display: 'inline' }}
+                      />
+                    );
+                  }
+                  return <Text as="span">{selected}</Text>;
+                })()}
+              </Box>
             </Box>
           )}
 

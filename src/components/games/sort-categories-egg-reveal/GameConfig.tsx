@@ -13,12 +13,17 @@ import {
   Heading,
   Text,
   Divider,
+  IconButton,
+  HStack,
 } from '@chakra-ui/react';
+import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db, auth } from '../../../config/firebase';
 import { serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../../contexts/AuthContext';
 import { MAX_ITEMS_PER_CATEGORY, MIN_ITEMS_PER_CATEGORY, MAX_CATEGORIES, MIN_CATEGORIES } from '../../../constants/game';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 interface GameConfigProps {
   isOpen: boolean;
@@ -26,14 +31,19 @@ interface GameConfigProps {
   onConfigSelect: (config: any) => void;
 }
 
+interface CategoryItem {
+  content: string; // Rich text content (HTML)
+  text: string;    // Plain text for game compatibility
+}
+
 interface Category {
   name: string;
-  items: string;  // Keep as string since we're using textarea input
+  items: CategoryItem[];  // Changed from string to CategoryItem array
 }
 
 interface SavedCategory {
   name: string;
-  items: string[];  // Must be array when saving to Firestore
+  items: CategoryItem[];  // Support both rich text and legacy formats
 }
 
 interface GameConfig {
@@ -41,7 +51,8 @@ interface GameConfig {
   type: string;
   title: string;
   eggQty: number;
-  categories: Category[];
+  categories: SavedCategory[];
+  richCategories?: SavedCategory[];  // New rich text format
   share: boolean;
   email?: string;
   createdAt?: Date;
@@ -51,7 +62,7 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
   const [title, setTitle] = useState('');
   const [eggQty, setEggQty] = useState(6);
   const [categories, setCategories] = useState<Category[]>([
-    { name: '', items: '' }
+    { name: '', items: [] }
   ]);
   const [shareConfig, setShareConfig] = useState(false);
   const [savedConfigs, setSavedConfigs] = useState<any[]>([]);
@@ -138,12 +149,44 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
   };
 
   const handleAddCategory = () => {
-    setCategories([...categories, { name: '', items: '' }]);
+    setCategories([...categories, { name: '', items: [] }]);
   };
 
-  const handleCategoryChange = (index: number, field: keyof Category, value: string) => {
+  const handleCategoryChange = (categoryIndex: number, field: 'name', value: string) => {
     const newCategories = [...categories];
-    newCategories[index][field] = value;
+    if (field === 'name') {
+      newCategories[categoryIndex].name = value;
+    }
+    setCategories(newCategories);
+  };
+
+  // Add individual item management functions
+  const handleAddItem = (categoryIndex: number) => {
+    const newCategories = [...categories];
+    newCategories[categoryIndex].items.push({ content: '', text: '' });
+    setCategories(newCategories);
+  };
+
+  const handleRemoveItem = (categoryIndex: number, itemIndex: number) => {
+    const newCategories = [...categories];
+    newCategories[categoryIndex].items.splice(itemIndex, 1);
+    setCategories(newCategories);
+  };
+
+  const handleItemContentChange = (categoryIndex: number, itemIndex: number, content: string) => {
+    const newCategories = [...categories];
+    
+    // Extract plain text from rich content for game compatibility
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+    const plainText = tempDiv.textContent || tempDiv.innerText || '';
+    
+    // Update both rich content and plain text
+    newCategories[categoryIndex].items[itemIndex] = {
+      content: content,
+      text: plainText.trim()
+    };
+    
     setCategories(newCategories);
   };
 
@@ -177,7 +220,7 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
       return;
     }
 
-    if (categories.some(cat => !cat.name.trim() || !cat.items.trim())) {
+    if (categories.some(cat => !cat.name.trim() || !cat.items.length)) {
       toast({
         title: 'Error',
         description: 'Please fill in all category names and items.',
@@ -188,12 +231,19 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
     }
 
     try {
-      // Transform categories to ensure items is always an array
+      // Transform categories to ensure proper format for saving
       const transformedCategories: SavedCategory[] = categories.map(cat => ({
         name: cat.name.trim(),
-        items: cat.items.split(',')
-          .map(item => item.trim())
-          .filter(item => item.length > 0)
+        items: cat.items.map(item => ({
+          content: item.content,
+          text: item.text
+        }))
+      }));
+
+      // Also create legacy format for backward compatibility
+      const legacyCategories = categories.map(cat => ({
+        name: cat.name.trim(),
+        items: cat.items.map(item => item.text).filter(text => text.length > 0)
       }));
 
       // Check if each category has at least MIN_ITEMS_PER_CATEGORY items
@@ -224,7 +274,8 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
         type: 'sort-categories-egg',
         title: title.trim(),
         eggQty: Number(eggQty),
-        categories: transformedCategories,
+        categories: legacyCategories, // Legacy format for backward compatibility
+        richCategories: transformedCategories, // New rich text format
         share: shareConfig,
         userId: auth.currentUser.uid,
         email: auth.currentUser.email || undefined,
@@ -276,6 +327,62 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
     }
   };
 
+  // Add loadTemplate function
+  const loadTemplate = (config: any) => {
+    setTitle(config.title || '');
+    setEggQty(config.eggQty || 6);
+    setShareConfig(config.share || false);
+    
+    // Load rich text categories if available, otherwise convert from legacy format
+    let categoriesToLoad: Category[] = [];
+    
+    if (config.richCategories && Array.isArray(config.richCategories)) {
+      // Load rich text format
+      categoriesToLoad = config.richCategories.map((cat: any) => ({
+        name: cat.name,
+        items: cat.items.map((item: any) => ({
+          content: item.content || '',
+          text: item.text || ''
+        }))
+      }));
+    } else if (config.categories && Array.isArray(config.categories)) {
+      // Convert legacy format to rich text format
+      categoriesToLoad = config.categories.map((cat: any) => ({
+        name: cat.name,
+        items: (Array.isArray(cat.items) ? cat.items : []).map((item: string) => ({
+          content: item, // Use plain text as content for legacy items
+          text: item
+        }))
+      }));
+    }
+    
+    // Ensure we have at least one category with at least one item
+    if (categoriesToLoad.length === 0) {
+      categoriesToLoad = [{ name: '', items: [{ content: '', text: '' }] }];
+    } else {
+      // Ensure each category has at least one item
+      categoriesToLoad = categoriesToLoad.map(cat => ({
+        ...cat,
+        items: cat.items.length > 0 ? cat.items : [{ content: '', text: '' }]
+      }));
+    }
+    
+    setCategories(categoriesToLoad);
+  };
+
+  // Configure ReactQuill toolbar (same as WhackAMole)
+  const quillModules = {
+    toolbar: [
+      ['bold', 'italic', 'underline'],
+      [{ 'script': 'sub'}, { 'script': 'super' }],
+      ['clean']
+    ],
+  };
+
+  const quillFormats = [
+    'bold', 'italic', 'underline', 'script'
+  ];
+
   return (
     <VStack spacing={4} pb={6}>
       <Box w="100%">
@@ -284,7 +391,10 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
           placeholder="Select a saved configuration"
           onChange={(e) => {
             const config = savedConfigs.find(c => c.id === e.target.value);
-            if (config) onConfigSelect(config);
+            if (config) {
+              loadTemplate(config);
+              onConfigSelect(config);
+            }
           }}
           isDisabled={isLoading || savedConfigs.length === 0}
         >
@@ -326,24 +436,58 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
         </FormControl>
 
         <Heading size="sm" mb={2}>Categories</Heading>
-        {categories.map((category, index) => (
-          <VStack key={index} w="100%" spacing={2} mb={4}>
+        {categories.map((category, categoryIndex) => (
+          <VStack key={categoryIndex} w="100%" spacing={2} mb={4} p={4} border="1px" borderColor="gray.200" borderRadius="md">
             <FormControl>
-              <FormLabel>Category {index + 1} Name</FormLabel>
+              <FormLabel>Category {categoryIndex + 1} Name</FormLabel>
               <Input
                 value={category.name}
-                onChange={(e) => handleCategoryChange(index, 'name', e.target.value)}
+                onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
                 placeholder="Category name"
               />
             </FormControl>
-            <FormControl>
-              <FormLabel>Items (comma-separated)</FormLabel>
-              <Textarea
-                value={category.items}
-                onChange={(e) => handleCategoryChange(index, 'items', e.target.value)}
-                placeholder="Item1, Item2, Item3"
-              />
-            </FormControl>
+            
+            <FormLabel alignSelf="flex-start">Items</FormLabel>
+            {category.items.map((item, itemIndex) => (
+              <Box key={itemIndex} w="100%" p={3} border="1px" borderColor="gray.100" borderRadius="md">
+                <HStack mb={2} justify="space-between">
+                  <Text fontSize="sm" fontWeight="medium">Item {itemIndex + 1}</Text>
+                  {category.items.length > 1 && (
+                    <IconButton
+                      aria-label="Remove item"
+                      icon={<DeleteIcon />}
+                      size="sm"
+                      colorScheme="red"
+                      variant="ghost"
+                      onClick={() => handleRemoveItem(categoryIndex, itemIndex)}
+                    />
+                  )}
+                </HStack>
+                
+                <ReactQuill
+                  value={item.content}
+                  onChange={(content) => handleItemContentChange(categoryIndex, itemIndex, content)}
+                  modules={quillModules}
+                  formats={quillFormats}
+                  placeholder="Enter item text (supports bold, italic, underline, superscript, subscript)"
+                  style={{
+                    minHeight: '60px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </Box>
+            ))}
+            
+            <Button
+              leftIcon={<AddIcon />}
+              onClick={() => handleAddItem(categoryIndex)}
+              colorScheme="blue"
+              variant="outline"
+              size="sm"
+              alignSelf="flex-start"
+            >
+              Add Item
+            </Button>
           </VStack>
         ))}
 

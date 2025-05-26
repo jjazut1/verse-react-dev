@@ -325,31 +325,78 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
 
   // Function to get a random word and determine if it should be correct
   const getRandomWord = () => {
-    // Get the current category's words (first category is always point-generating)
-    const pointGeneratingCategory = config.categories[0];
-    const pointGeneratingWords = pointGeneratingCategory.words;
+    // Check if we have rich text categories available
+    const hasRichCategories = (config as any).richCategories && Array.isArray((config as any).richCategories);
+    
+    let pointGeneratingWords: string[] = [];
+    let otherWords: string[] = [];
+    let pointGeneratingCategoryTitle = '';
+    
+    if (hasRichCategories) {
+      // Use rich text categories
+      const richCategories = (config as any).richCategories;
+      console.log('Using rich text categories:', richCategories);
+      
+      // Get the first category's words (first category is always point-generating)
+      const pointGeneratingCategory = richCategories[0];
+      pointGeneratingCategoryTitle = pointGeneratingCategory.title;
+    
+      // Extract content from rich text items, prefer rich content over plain text
+      pointGeneratingWords = pointGeneratingCategory.items.map((item: any) => {
+        // Prefer rich content if available, otherwise use plain text
+        return item.content || item.text || '';
+      }).filter((word: string) => word.trim().length > 0);
+      
+      // Get words from other categories for incorrect options
+      otherWords = richCategories
+        .slice(1) // Skip the first (point-generating) category
+        .flatMap((cat: any) => {
+          console.log('Getting words from other rich category:', cat.title);
+          return cat.items.map((item: any) => item.content || item.text || '').filter((word: string) => word.trim().length > 0);
+        });
+        
+      console.log('Rich text words - Point generating:', pointGeneratingWords);
+      console.log('Rich text words - Other categories:', otherWords);
+    } else {
+      // Fall back to legacy categories format
+      console.log('Using legacy categories format');
+      const pointGeneratingCategory = config.categories[0];
+      pointGeneratingWords = pointGeneratingCategory.words;
+      pointGeneratingCategoryTitle = pointGeneratingCategory.title;
+      
+      // Get words from other categories for incorrect options
+      otherWords = config.categories
+        .slice(1) // Skip the first (point-generating) category
+        .flatMap(cat => {
+          console.log('Getting words from other legacy category:', cat.title);
+          return cat.words;
+        });
+    }
     
     // 70% chance to show a point-generating word
     const shouldShowPointGeneratingWord = Math.random() < 0.7;
     
-    if (shouldShowPointGeneratingWord) {
+    if (shouldShowPointGeneratingWord && pointGeneratingWords.length > 0) {
       // Pick a random word from the point-generating category
       const word = pointGeneratingWords[Math.floor(Math.random() * pointGeneratingWords.length)];
-      console.log('Selected point-generating word:', word, 'from category:', pointGeneratingCategory.title);
+      console.log('Selected point-generating word:', word, 'from category:', pointGeneratingCategoryTitle);
       return { word, isCorrect: true };
-    } else {
-      // Get words from other categories for incorrect options
-      const otherWords = config.categories
-        .slice(1)  // Skip the first (point-generating) category
-        .flatMap(cat => {
-          console.log('Getting words from other category:', cat.title);
-          return cat.words;
-        });
-      
+    } else if (otherWords.length > 0) {
       // Pick a random word from other categories
       const word = otherWords[Math.floor(Math.random() * otherWords.length)];
       console.log('Selected non-point-generating word:', word);
       return { word, isCorrect: false };
+    } else {
+      // Fallback - if no other categories, use a point-generating word but mark as incorrect
+      if (pointGeneratingWords.length > 0) {
+        const word = pointGeneratingWords[Math.floor(Math.random() * pointGeneratingWords.length)];
+        console.log('Fallback: using point-generating word as incorrect:', word);
+        return { word, isCorrect: false };
+      } else {
+        // Ultimate fallback
+        console.log('No words available, using fallback');
+        return { word: 'word', isCorrect: true };
+      }
     }
   };
 
@@ -358,6 +405,103 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
     const textPlane = mole.children.find(child => child.userData && child.userData.isTextPlane) as THREE.Mesh;
     
     if (textPlane && textPlane.material instanceof THREE.MeshBasicMaterial) {
+      // Parse rich text and create styled display
+      let displayText = word;
+      let isRichText = false;
+      let textStyles = {
+        bold: false,
+        italic: false,
+        underline: false,
+        superscript: false,
+        subscript: false
+      };
+      
+      // For super/subscript, we need to track the parts separately
+      let mainText = '';
+      let superText = '';
+      let subText = '';
+      let beforeScript = '';
+      let scriptText = '';
+      let afterScript = '';
+      
+      // Check if this is rich text (contains HTML tags)
+      if (typeof word === 'string' && word.includes('<')) {
+        isRichText = true;
+        console.log('Processing rich text for mole display:', word);
+        
+        // Detect formatting by checking for HTML tags - more specific detection
+        textStyles.bold = word.includes('<strong>') || word.includes('<b>');
+        textStyles.italic = word.includes('<em>') || word.includes('<i>');
+        textStyles.underline = word.includes('<u>') && word.includes('</u>'); // More specific check
+        textStyles.superscript = word.includes('<sup>') && word.includes('</sup>');
+        textStyles.subscript = word.includes('<sub>') && word.includes('</sub>');
+        
+        console.log('Detected text styles:', textStyles, 'Display text:', displayText);
+        console.log('Raw HTML being processed:', word);
+        
+        // Parse super/subscript separately
+        if (textStyles.superscript || textStyles.subscript) {
+          // For positioning, we need to parse the HTML more carefully to find exact positions
+          
+          console.log('Processing super/subscript text:', word);
+          
+          if (textStyles.superscript) {
+            // Parse: "hat<sup>2</sup>" -> beforeScript="hat", scriptText="2", afterScript=""
+            // Or: "H<sup>2</sup>O" -> beforeScript="H", scriptText="2", afterScript="O"
+            const supMatch = word.match(/^(.*?)<sup>(.*?)<\/sup>(.*)$/);
+            console.log('Superscript regex match:', supMatch);
+            if (supMatch) {
+              beforeScript = supMatch[1].replace(/<[^>]*>/g, ''); // Remove any other tags
+              scriptText = supMatch[2];
+              afterScript = supMatch[3].replace(/<[^>]*>/g, ''); // Remove any other tags
+              
+              // Main text is everything except the script tags
+              mainText = beforeScript + afterScript;
+              superText = scriptText;
+              displayText = mainText;
+              
+              console.log('Extracted superscript parts:', { beforeScript, scriptText, afterScript, mainText });
+            } else {
+              console.log('Superscript regex failed, falling back to plain text extraction');
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = word;
+              displayText = tempDiv.textContent || tempDiv.innerText || word;
+            }
+          }
+          
+          if (textStyles.subscript) {
+            // Parse: "man<sub>2</sub>" -> beforeScript="man", scriptText="2", afterScript=""
+            // Or: "H<sub>2</sub>O" -> beforeScript="H", scriptText="2", afterScript="O"
+            const subMatch = word.match(/^(.*?)<sub>(.*?)<\/sub>(.*)$/);
+            console.log('Subscript regex match:', subMatch);
+            if (subMatch) {
+              beforeScript = subMatch[1].replace(/<[^>]*>/g, ''); // Remove any other tags
+              scriptText = subMatch[2];
+              afterScript = subMatch[3].replace(/<[^>]*>/g, ''); // Remove any other tags
+              
+              // Main text is everything except the script tags
+              mainText = beforeScript + afterScript;
+              subText = scriptText;
+              displayText = mainText;
+              
+              console.log('Extracted subscript parts:', { beforeScript, scriptText, afterScript, mainText });
+            } else {
+              console.log('Subscript regex failed, falling back to plain text extraction');
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = word;
+              displayText = tempDiv.textContent || tempDiv.innerText || word;
+            }
+          }
+          
+          console.log('Final parsed text parts:', { beforeScript, scriptText, afterScript, mainText, superText, subText, displayText });
+        } else {
+          // For other formatting, extract plain text normally
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = word;
+          displayText = tempDiv.textContent || tempDiv.innerText || word;
+        }
+      }
+      
       // Create a more legible and high-contrast text
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
@@ -375,30 +519,207 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
       if (!document.querySelector('link[href*="Comic+Neue"]')) {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = 'https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap';
+        link.href = 'https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap';
         document.head.appendChild(link);
       }
       
-      // Set text properties for better legibility
-      const fontSize = Math.min(240, 1000 / word.length); // Adjust size based on word length
-      context.font = `bold ${fontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
+      // Calculate font size based on text length and formatting
+      let baseFontSize = Math.min(240, 1000 / displayText.length);
       
       // Enable text smoothing
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = 'high';
       
-      // Draw text with black color
+      // Set font weight and style based on formatting
+      let fontWeight = textStyles.bold ? 'bold' : 'normal';
+      let fontStyle = textStyles.italic ? 'italic' : 'normal';
+      
+      context.font = `${fontStyle} ${fontWeight} ${baseFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      
+      // Draw main text
       context.fillStyle = '#000000';
-      context.fillText(word, canvas.width/2, canvas.height/2);
+      let textY = canvas.height / 2;
+      
+      // For super/subscript, we need to render parts separately
+      if (textStyles.superscript && superText) {
+        console.log('RENDER CHECK - Superscript variables:', { beforeScript, scriptText, afterScript, superText });
+        
+        // Reset font to main text settings
+        context.font = `${fontStyle} ${fontWeight} ${baseFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        context.fillStyle = '#000000';
+        
+        // Calculate widths for positioning
+        const beforeWidth = context.measureText(beforeScript || '').width;
+        const afterWidth = context.measureText(afterScript || '').width;
+        
+        // Calculate script width to determine spacing
+        const scriptFontSize = baseFontSize * 0.5;
+        context.font = `${fontStyle} ${fontWeight} ${scriptFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        const scriptWidth = context.measureText(superText).width;
+        
+        // Add extra spacing for the script (script width + padding)
+        const scriptSpacing = scriptWidth + 10; // 10px padding around script
+        const totalMainWidth = beforeWidth + afterWidth + scriptSpacing;
+        
+        // Reset to main font
+        context.font = `${fontStyle} ${fontWeight} ${baseFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        
+        // Calculate starting position (center the entire word including script space)
+        const startX = canvas.width / 2 - totalMainWidth / 2;
+        
+        console.log('Superscript rendering - beforeScript:', beforeScript, 'afterScript:', afterScript);
+        console.log('Width calculations - before:', beforeWidth, 'after:', afterWidth, 'script:', scriptWidth, 'spacing:', scriptSpacing, 'total:', totalMainWidth, 'startX:', startX);
+        
+        // Set text alignment to left for continuous text
+        context.textAlign = 'left';
+        context.textBaseline = 'middle';
+        
+        // Draw the before text
+        if (beforeScript) {
+          console.log('Drawing beforeScript:', beforeScript, 'at position:', startX, textY);
+          context.fillText(beforeScript, startX, textY);
+        }
+        
+        // Draw the after text with spacing for the script
+        if (afterScript) {
+          const afterX = startX + beforeWidth + scriptSpacing;
+          console.log('Drawing afterScript:', afterScript, 'at position:', afterX, textY);
+          context.fillText(afterScript, afterX, textY);
+        }
+        
+        // Draw superscript positioned between the beforeScript and afterScript
+        context.font = `${fontStyle} ${fontWeight} ${scriptFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        
+        const superX = startX + beforeWidth + (scriptSpacing / 2) - (scriptWidth / 2); // Center the script in the spacing
+        const superY = textY - baseFontSize * 0.5; // Higher up
+        
+        console.log('Drawing superscript:', superText, 'at position:', superX, superY);
+        context.fillText(superText, superX, superY);
+        
+        // Reset text alignment and font
+        context.textAlign = 'center';
+        context.font = `${fontStyle} ${fontWeight} ${baseFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        
+      } else if (textStyles.subscript && subText) {
+        console.log('RENDER CHECK - Subscript variables:', { beforeScript, scriptText, afterScript, subText });
+        
+        // Reset font to main text settings
+        context.font = `${fontStyle} ${fontWeight} ${baseFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        context.fillStyle = '#000000';
+        
+        // Calculate widths for positioning
+        const beforeWidth = context.measureText(beforeScript || '').width;
+        const afterWidth = context.measureText(afterScript || '').width;
+        
+        // Calculate script width to determine spacing
+        const scriptFontSize = baseFontSize * 0.5;
+        context.font = `${fontStyle} ${fontWeight} ${scriptFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        const scriptWidth = context.measureText(subText).width;
+        
+        // Add extra spacing for the script (script width + padding)
+        const scriptSpacing = scriptWidth + 10; // 10px padding around script
+        const totalMainWidth = beforeWidth + afterWidth + scriptSpacing;
+        
+        // Reset to main font
+        context.font = `${fontStyle} ${fontWeight} ${baseFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        
+        // Calculate starting position (center the entire word including script space)
+        const startX = canvas.width / 2 - totalMainWidth / 2;
+        
+        console.log('Subscript rendering - beforeScript:', beforeScript, 'afterScript:', afterScript);
+        console.log('Width calculations - before:', beforeWidth, 'after:', afterWidth, 'script:', scriptWidth, 'spacing:', scriptSpacing, 'total:', totalMainWidth, 'startX:', startX);
+        
+        // Set text alignment to left for continuous text
+        context.textAlign = 'left';
+        context.textBaseline = 'middle';
+        
+        // Draw the before text
+        if (beforeScript) {
+          console.log('Drawing beforeScript:', beforeScript, 'at position:', startX, textY);
+          context.fillText(beforeScript, startX, textY);
+        }
+        
+        // Draw the after text with spacing for the script
+        if (afterScript) {
+          const afterX = startX + beforeWidth + scriptSpacing;
+          console.log('Drawing afterScript:', afterScript, 'at position:', afterX, textY);
+          context.fillText(afterScript, afterX, textY);
+        }
+        
+        // Draw subscript positioned between the beforeScript and afterScript
+        context.font = `${fontStyle} ${fontWeight} ${scriptFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        
+        const subX = startX + beforeWidth + (scriptSpacing / 2) - (scriptWidth / 2); // Center the script in the spacing
+        const subY = textY + baseFontSize * 0.4; // Lower down
+        
+        console.log('Drawing subscript:', subText, 'at position:', subX, subY);
+        context.fillText(subText, subX, subY);
+        
+        // Reset text alignment and font
+        context.textAlign = 'center';
+        context.font = `${fontStyle} ${fontWeight} ${baseFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        
+      } else {
+        // Normal text rendering (including underlined text)
+        console.log('Drawing normal text:', displayText, 'at position:', canvas.width / 2, textY);
+        context.fillText(displayText, canvas.width / 2, textY);
+      }
+      
+      // Reset font for underline measurement if needed
+      context.font = `${fontStyle} ${fontWeight} ${baseFontSize}px "Comic Neue", "Comic Sans MS", sans-serif`;
+      
+      // Add underline if needed - make sure it's positioned correctly below the text
+      if (textStyles.underline) {
+        let textWidth;
+        let underlineX;
+        
+        if (textStyles.superscript && superText) {
+          // For superscript text, calculate underline for the main text parts
+          const beforeWidth = context.measureText(beforeScript || '').width;
+          const afterWidth = context.measureText(afterScript || '').width;
+          textWidth = beforeWidth + afterWidth;
+          underlineX = (canvas.width - textWidth) / 2;
+        } else if (textStyles.subscript && subText) {
+          // For subscript text, calculate underline for the main text parts
+          const beforeWidth = context.measureText(beforeScript || '').width;
+          const afterWidth = context.measureText(afterScript || '').width;
+          textWidth = beforeWidth + afterWidth;
+          underlineX = (canvas.width - textWidth) / 2;
+        } else {
+          // For normal text, use the display text width
+          textWidth = context.measureText(displayText).width;
+          underlineX = (canvas.width - textWidth) / 2;
+        }
+        
+        const underlineY = textY + baseFontSize * 0.32; // Moved down further (was 0.28, now 0.32)
+        const underlineThickness = Math.max(3, baseFontSize * 0.03);
+        
+        context.fillRect(
+          underlineX,
+          underlineY,
+          textWidth,
+          underlineThickness
+        );
+        
+        console.log('Drew underline at Y:', underlineY, 'thickness:', underlineThickness);
+      }
+      
+      // Add rich text indicator if this was formatted text
+      if (isRichText) {
+        // Draw a small sparkle or indicator to show this text had formatting
+        context.fillStyle = '#FFD700'; // Gold color
+        context.font = '24px Arial';
+        context.fillText('✨', canvas.width - 50, 50);
+      }
       
       // Update the texture
       if (textPlane.material.map) textPlane.material.map.dispose();
       
       // Create and apply new texture with better filtering
       const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearMipmapLinearFilter; // Use mipmapping for better quality at distance
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.anisotropy = rendererRef.current ? rendererRef.current.capabilities.getMaxAnisotropy() : 1;
       texture.needsUpdate = true;
@@ -904,19 +1225,6 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
     moleGroup.rotation.x = -Math.PI * 5 / 180;
     
     return moleGroup;
-  };
-  
-  // Update the showRandomMole function - this is a stub that won't be used
-  const showRandomMole = () => {
-    console.log('WARNING: Stub showRandomMole function called outside of game loop - this should not happen');
-    
-    // Log the call stack to identify where this is being called from
-    console.trace('Stack trace for unwanted showRandomMole call:');
-  };
-  
-  // Update the scheduleNextMole function - this is a stub that won't be used
-  const scheduleNextMole = () => {
-    console.log('WARNING: Stub scheduleNextMole function called outside of game loop - this should not happen');
   };
 
   // Update handleClick to change expression when hit
@@ -3071,24 +3379,8 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
     return cleanup;
   }, []);
   
-  // Control moles based on game state
-  useEffect(() => {
-    // Start showing moles when gameActive is true
-    let moleInterval: NodeJS.Timeout | null = null;
-    
-    if (gameActive) {
-      moleInterval = setInterval(() => {
-        showRandomMole();
-      }, 1000); // Show a new mole every second
-    }
-    
-    // Clean up on unmount
-    return () => {
-      if (moleInterval) {
-        clearInterval(moleInterval);
-      }
-    };
-  }, [gameActive]); // Re-initialize when gameActive changes
+  // Remove the problematic mole control useEffect that was causing duplicate calls
+  // The main game loop in the earlier useEffect handles all mole scheduling properly
 
   return (
     <Box

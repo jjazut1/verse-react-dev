@@ -33,7 +33,11 @@ interface SortCategoriesConfig extends BaseGameConfig {
   eggQty: number;
   categories: Array<{
     name: string;
-    items: string[];
+    items: string[] | Array<{ content: string; text: string; }>;
+  }>;
+  richCategories?: Array<{
+    name: string;
+    items: Array<{ content: string; text: string; }>;
   }>;
 }
 

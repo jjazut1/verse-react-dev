@@ -31,10 +31,127 @@ import { GameConfig as GameConfigType, Word, Egg as EggType, Basket as BasketTyp
 import { motion } from 'framer-motion';
 import { sanitizeName, isValidPlayerName } from '../../../utils/profanityFilter';
 
+// Rich text rendering component (same as in Egg.tsx)
+const RichText: React.FC<{ content: string; fontSize: any; noPadding?: boolean }> = ({ content, fontSize, noPadding = false }) => {
+  // Check if this is rich text (contains HTML tags)
+  const isRichText = typeof content === 'string' && content.includes('<');
+  
+  if (!isRichText) {
+    // Plain text
+    return (
+      <Text
+        fontSize={fontSize}
+        color="gray.700"
+        letterSpacing="0.5px"
+        fontWeight="medium"
+        px={noPadding ? 0 : 2}
+        py={noPadding ? 0 : 1}
+        borderRadius="md"
+        fontFamily="'Comic Neue', sans-serif"
+      >
+        {content}
+      </Text>
+    );
+  }
+  
+  // Rich text - parse HTML and render with styling
+  const parseRichText = (htmlContent: string) => {
+    // Detect formatting styles
+    const textStyles = {
+      bold: htmlContent.includes('<strong>') || htmlContent.includes('<b>'),
+      italic: htmlContent.includes('<em>') || htmlContent.includes('<i>'),
+      underline: htmlContent.includes('<u>') && htmlContent.includes('</u>'),
+      superscript: htmlContent.includes('<sup>') && htmlContent.includes('</sup>'),
+      subscript: htmlContent.includes('<sub>') && htmlContent.includes('</sub>')
+    };
+    
+    // Extract plain text for simple formatting
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    let displayText = tempDiv.textContent || tempDiv.innerText || htmlContent;
+    
+    // For super/subscript, we need special handling
+    if (textStyles.superscript || textStyles.subscript) {
+      // Parse super/subscript text
+      let beforeScript = '';
+      let scriptText = '';
+      let afterScript = '';
+      
+      if (textStyles.superscript) {
+        const supMatch = htmlContent.match(/^(.*?)<sup>(.*?)<\/sup>(.*)$/);
+        if (supMatch) {
+          beforeScript = supMatch[1].replace(/<[^>]*>/g, '');
+          scriptText = supMatch[2];
+          afterScript = supMatch[3].replace(/<[^>]*>/g, '');
+        }
+      } else if (textStyles.subscript) {
+        const subMatch = htmlContent.match(/^(.*?)<sub>(.*?)<\/sub>(.*)$/);
+        if (subMatch) {
+          beforeScript = subMatch[1].replace(/<[^>]*>/g, '');
+          scriptText = subMatch[2];
+          afterScript = subMatch[3].replace(/<[^>]*>/g, '');
+        }
+      }
+      
+      // Render with scripts
+      return (
+        <Text
+          fontSize={fontSize}
+          color="gray.700"
+          letterSpacing="0.5px"
+          fontWeight={textStyles.bold ? "bold" : "medium"}
+          fontStyle={textStyles.italic ? "italic" : "normal"}
+          textDecoration={textStyles.underline ? "underline" : "none"}
+          px={noPadding ? 0 : 2}
+          py={noPadding ? 0 : 1}
+          borderRadius="md"
+          fontFamily="'Comic Neue', sans-serif"
+          display="inline-flex"
+          alignItems="baseline"
+        >
+          {beforeScript}
+          <Text
+            as="span"
+            fontSize="0.7em"
+            verticalAlign={textStyles.superscript ? "super" : "sub"}
+            lineHeight="1"
+          >
+            {scriptText}
+          </Text>
+          {afterScript}
+        </Text>
+      );
+    }
+    
+    // Regular formatting (bold, italic, underline)
+    return (
+      <Text
+        fontSize={fontSize}
+        color="gray.700"
+        letterSpacing="0.5px"
+        fontWeight={textStyles.bold ? "bold" : "medium"}
+        fontStyle={textStyles.italic ? "italic" : "normal"}
+        textDecoration={textStyles.underline ? "underline" : "none"}
+        px={noPadding ? 0 : 2}
+        py={noPadding ? 0 : 1}
+        borderRadius="md"
+        fontFamily="'Comic Neue', sans-serif"
+      >
+        {displayText}
+      </Text>
+    );
+  };
+  
+  return parseRichText(content);
+};
+
+// Use the specific config type for this game
+type SortCategoriesConfig = Extract<GameConfigType, { type: 'sort-categories-egg' }>;
+
 interface SortCategoriesEggRevealProps {
   playerName: string;
   onGameComplete: (score: number) => void;
-  config: GameConfigType;
+  config: SortCategoriesConfig;
   onHighScoreProcessStart?: () => void;
   onHighScoreProcessComplete?: () => void;
 }
@@ -53,9 +170,13 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const [isWordSelected, setIsWordSelected] = useState(false);
   const [baskets, setBaskets] = useState<BasketType[]>([]);
-  const [gameConfig, setGameConfig] = useState<GameConfigType>({
+  const [gameConfig, setGameConfig] = useState<SortCategoriesConfig>({
     title: 'Default Configuration',
-    type: 'sort-categories-egg-reveal',
+    type: 'sort-categories-egg',
+    description: 'Sort items into categories by cracking eggs',
+    difficulty: 'medium',
+    timeLimit: 300,
+    targetScore: 100,
     eggQty: 6,
     categories: [
       { name: 'Category 1', items: ['Item 1', 'Item 2', 'Item 3'] },
@@ -65,7 +186,7 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     createdAt: Timestamp.now(),
   });
   const [gameStarted, setGameStarted] = useState(false);
-  const [savedConfigs, setSavedConfigs] = useState<GameConfigType[]>([]);
+  const [savedConfigs, setSavedConfigs] = useState<SortCategoriesConfig[]>([]);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [ghostPosition, setGhostPosition] = useState({ x: 0, y: 0 });
@@ -105,19 +226,23 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
         where('share', '==', true)
       );
       const querySnapshot = await getDocs(q);
-      const configs: GameConfigType[] = [];
+      const configs: SortCategoriesConfig[] = [];
       querySnapshot.forEach((doc) => {
-        configs.push({ id: doc.id, ...doc.data() } as GameConfigType);
+        configs.push({ id: doc.id, ...doc.data() } as SortCategoriesConfig);
       });
       setSavedConfigs(configs);
     } catch (error) {
       console.error('Error loading configurations:', error);
       // Provide fallback data
-      const fallbackConfigs: GameConfigType[] = [
+      const fallbackConfigs: SortCategoriesConfig[] = [
         {
           id: 'fallback1',
           type: 'sort-categories-egg',
           title: 'Animals',
+          description: 'Sort animals into categories',
+          difficulty: 'medium',
+          timeLimit: 300,
+          targetScore: 100,
           eggQty: 12,
           categories: [
             { name: 'Mammals', items: ['dog', 'cat', 'elephant', 'giraffe'] },
@@ -147,7 +272,7 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   }, [initialConfig]);
 
   // Initialize game with selected configuration
-  const initializeGame = (config: GameConfigType) => {
+  const initializeGame = (config: SortCategoriesConfig) => {
     console.log('Initializing game with config:', config);
     // Ensure we preserve the ID when setting the game config
     setGameConfig({
@@ -163,8 +288,21 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
       console.error('No config ID available for game initialization');
     }
     
+    // Determine which categories format to use
+    let categoriesToUse = config.categories;
+    let isRichTextAvailable = false;
+    
+    if ((config as any).richCategories && Array.isArray((config as any).richCategories)) {
+      // Use rich text categories if available
+      categoriesToUse = (config as any).richCategories;
+      isRichTextAvailable = true;
+      console.log('Using rich text categories:', categoriesToUse);
+    } else {
+      console.log('Using legacy categories format');
+    }
+    
     // Create baskets from categories
-    const newBaskets: BasketType[] = config.categories.map((category, index) => ({
+    const newBaskets: BasketType[] = categoriesToUse.map((category: any, index: number) => ({
       id: `basket-${index}`,
       name: category.name,
       items: [],
@@ -173,11 +311,24 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     
     // Create eggs with random words from categories
     const allWords: Word[] = [];
-    config.categories.forEach(category => {
-      category.items.forEach(item => {
-        allWords.push({ text: item, category: category.name });
-      });
+    categoriesToUse.forEach((category: any) => {
+      if (isRichTextAvailable && category.items && Array.isArray(category.items)) {
+        // Rich text format: each item has content and text fields
+        category.items.forEach((item: any) => {
+          allWords.push({ 
+            text: item.content || item.text || item, // Prefer rich content for display
+            category: category.name 
+          });
+        });
+      } else if (Array.isArray(category.items)) {
+        // Legacy format: items are strings
+        category.items.forEach((item: string) => {
+          allWords.push({ text: item, category: category.name });
+        });
+      }
     });
+    
+    console.log('Generated words for eggs:', allWords.length, allWords);
     
     // Calculate grid-like positions for eggs
     const newEggs: EggType[] = [];
@@ -389,7 +540,7 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   };
 
   // Handle configuration selection
-  const handleConfigSelect = (config: GameConfigType) => {
+  const handleConfigSelect = (config: SortCategoriesConfig) => {
     initializeGame(config);
     setIsConfigModalOpen(false);
   };
@@ -1106,19 +1257,16 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
               transform="translate(-50%, -50%)"
               pointerEvents="none"
               zIndex={1000}
+              bg="white"
+              borderRadius="md"
+              boxShadow="lg"
+              p={2}
             >
-              <Text
+              <RichText 
+                content={selectedWord.text} 
                 fontSize={{ base: "sm", md: "md" }}
-                fontWeight="bold"
-                color="gray.700"
-                bg="white"
-                p={2}
-                borderRadius="md"
-                boxShadow="lg"
-                fontFamily="'Comic Neue', sans-serif"
-              >
-                {selectedWord.text}
-              </Text>
+                noPadding
+              />
             </Box>
           )}
         </Box>
