@@ -3,13 +3,17 @@ import { collection, getDocs, deleteDoc, doc, query, where, getDoc, addDoc, serv
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useCustomToast, ToastComponent } from '../hooks/useCustomToast';
-import { getTeacherAssignments, deleteAssignment, getAssignmentAttempts, createAssignmentWithEmailLink } from '../services/assignmentService';
+import { getTeacherAssignments, deleteAssignment, getAssignmentAttempts, createAssignmentWithEmailLink, createAssignment } from '../services/assignmentService';
 import { Assignment as AssignmentType, Attempt } from '../types';
 import { generateAndUploadThumbnail } from '../utils/thumbnailGenerator';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
+import { useFolderManager } from '../components/FolderManager';
+import { GameWithFolder } from '../types/game';
+import { useModal } from '../contexts/ModalContext';
+import { GlobalModals } from '../components/GlobalModals';
 
-interface Game {
+interface Game extends GameWithFolder {
   id: string;
   title: string;
   description?: string;
@@ -18,6 +22,10 @@ interface Game {
   createdBy: string;
   share: boolean;
   userId: string;
+  // Folder properties from GameWithFolder
+  folderId?: string;
+  folderName?: string;
+  folderColor?: string;
 }
 
 interface GameTemplate {
@@ -42,9 +50,10 @@ interface Student {
   age?: number;
   notes?: string;
   createdAt: Timestamp;
+  passwordSetupSent?: boolean; // Track if password setup email was sent
 }
 
-type TabType = 'games' | 'assignments' | 'create' | 'students';
+type TabType = 'assignments' | 'create' | 'students';
 
 // Use the proper Assignment type from types
 type Assignment = AssignmentType;
@@ -54,6 +63,7 @@ const TeacherDashboard = () => {
   const { toastMessage, showToast } = useCustomToast();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showModal } = useModal();
   
   // Check if we're returning from student view
   useEffect(() => {
@@ -66,28 +76,23 @@ const TeacherDashboard = () => {
   const [publicGames, setPublicGames] = useState<Game[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>('create');
-  const [pendingDeleteAssignment, setPendingDeleteAssignment] = useState<string | null>(null);
-  const [pendingDeleteGame, setPendingDeleteGame] = useState<string | null>(null);
   const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
   const [assignmentAttempts, setAssignmentAttempts] = useState<Attempt[]>([]);
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [gameSearchQuery, setGameSearchQuery] = useState<string>('');
+  const [gameTypeFilter, setGameTypeFilter] = useState<string>('all');
+  const [gameFolderFilter, setGameFolderFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(false);
-  const [assigningGame, setAssigningGame] = useState<Game | null>(null);
-  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   
   // Game template state
   const [blankTemplates, setBlankTemplates] = useState<GameTemplate[]>([]);
   const [categoryTemplates, setCategoryTemplates] = useState<GameTemplate[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
-  const [pendingDeleteTemplate, setPendingDeleteTemplate] = useState<string | null>(null);
 
   // Student management state
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  const [showStudentModal, setShowStudentModal] = useState(false);
-  const [pendingDeleteStudent, setPendingDeleteStudent] = useState<string | null>(null);
   const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
   
   // Add state to track last visited tab for returning from student view
@@ -95,6 +100,63 @@ const TeacherDashboard = () => {
   
   // Add state for assignment status filter
   const [activeStatusFilter, setActiveStatusFilter] = useState('all');
+
+  // Add state for edit confirmation modal
+  const [showEditConfirmModal, setShowEditConfirmModal] = useState(false);
+  const [gameToEdit, setGameToEdit] = useState<Game | null>(null);
+
+  // Initialize folder manager hook
+  const folderManager = useFolderManager({
+    userId: currentUser?.uid || '',
+    games: myGames,
+    onGamesUpdate: setMyGames,
+    onShowToast: showToast
+  });
+
+  // Debug logging for folder manager
+  useEffect(() => {
+    console.log('=== FOLDER MANAGER DEBUG ===');
+    console.log('Current user:', currentUser);
+    console.log('Current user ID:', currentUser?.uid);
+    console.log('My games count:', myGames.length);
+    console.log('My games:', myGames);
+    console.log('Folder manager folders:', folderManager.folders);
+    console.log('Folder manager loading:', folderManager.isLoading);
+    console.log('============================');
+  }, [currentUser, myGames, folderManager.folders, folderManager.isLoading]);
+
+  // Add click-away handler and keyboard support for folder actions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Only handle if there's an active selection
+      if (!folderManager.selectedFolderId) return;
+      
+      // Check if the click is outside of any folder button or action area
+      const target = event.target as HTMLElement;
+      const folderButton = target.closest('[data-folder-button]');
+      const folderActions = target.closest('[data-folder-actions]');
+      
+      // If click is not on a folder button or its actions, clear selection
+      if (!folderButton && !folderActions) {
+        folderManager.setSelectedFolderId(null);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Close folder actions on ESC key
+      if (event.key === 'Escape' && folderManager.selectedFolderId) {
+        folderManager.setSelectedFolderId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [folderManager.selectedFolderId, folderManager.setSelectedFolderId]);
 
   const fetchGames = useCallback(async () => {
     setIsLoading(true);
@@ -130,7 +192,11 @@ const TeacherDashboard = () => {
           thumbnailUrl: data.thumbnail || null,
           createdBy: data.email || '',
           share: data.share || false,
-          userId: data.userId || ''
+          userId: data.userId || '',
+          // Folder properties from GameWithFolder
+          folderId: data.folderId || '',
+          folderName: data.folderName || '',
+          folderColor: data.folderColor || ''
         };
       });
       
@@ -255,71 +321,134 @@ const TeacherDashboard = () => {
   }, [currentUser, fetchGames, fetchAssignments]);
 
   const handleDeleteGame = async (gameId: string) => {
+    const startTime = Date.now();
+    console.log('🗑️ handleDeleteGame called with gameId:', gameId, 'at timestamp:', startTime);
     try {
+      console.log('🗑️ Starting game deletion...');
       await deleteDoc(doc(db, 'userGameConfigs', gameId));
+      console.log('🗑️ Game deleted successfully from database, took:', Date.now() - startTime, 'ms');
+      
       setMyGames(myGames.filter(game => game.id !== gameId));
+      console.log('🗑️ Updated games state');
+      
       showToast({
         title: 'Game deleted',
         status: 'success',
         duration: 3000,
       });
-      setPendingDeleteGame(null);
+      console.log('🗑️ Game deletion completed successfully, total time:', Date.now() - startTime, 'ms');
     } catch (error) {
-      console.error('Error deleting game:', error);
+      console.error('🗑️ Error deleting game:', error);
       showToast({
         title: 'Error deleting game',
         status: 'error',
         duration: 3000,
       });
-      setPendingDeleteGame(null);
     }
   };
 
   const confirmDeleteGame = (gameId: string) => {
-    setPendingDeleteGame(gameId);
+    console.log('🔵 confirmDeleteGame called with gameId:', gameId);
+    
+    // Find the game to get its details
+    const game = myGames.find(g => g.id === gameId);
+    if (!game) {
+      console.warn('🟡 confirmDeleteGame: Game not found:', gameId);
+      return;
+    }
+    
+    console.log('🔵 confirmDeleteGame: Showing modal for game:', {
+      gameId,
+      gameName: game.title
+    });
+    
+    // Show the global delete confirmation modal
+    showModal('delete-confirmation', {
+      title: 'Delete Game?',
+      itemName: game.title,
+      itemType: 'game',
+      warningMessage: undefined,
+      onDelete: () => handleDeleteGame(gameId)
+    });
   };
 
   const cancelDeleteGame = () => {
-    setPendingDeleteGame(null);
+    console.log('🔵 cancelDeleteGame called');
+    // No cleanup needed since we're using global modal
   };
 
   const handleDeleteAssignment = async (assignmentId: string) => {
+    const startTime = Date.now();
+    console.log('🗑️ handleDeleteAssignment called with assignmentId:', assignmentId, 'at timestamp:', startTime);
     try {
+      console.log('🗑️ Starting assignment deletion...');
       await deleteAssignment(assignmentId);
+      console.log('🗑️ Assignment deleted successfully from database, took:', Date.now() - startTime, 'ms');
+      
       setAssignments(assignments.filter(assignment => assignment.id !== assignmentId));
+      console.log('🗑️ Updated assignments state');
+      
       showToast({
         title: 'Assignment deleted',
         status: 'success',
         duration: 3000,
       });
-      setPendingDeleteAssignment(null);
-    } catch {
+      console.log('🗑️ Assignment deletion completed successfully, total time:', Date.now() - startTime, 'ms');
+    } catch (error) {
+      console.error('🗑️ Error deleting assignment:', error);
       showToast({
         title: 'Error deleting assignment',
         status: 'error',
         duration: 3000,
       });
-      setPendingDeleteAssignment(null);
     }
   };
 
   const confirmDeleteAssignment = (assignmentId: string) => {
-    setPendingDeleteAssignment(assignmentId);
+    console.log('🔵 confirmDeleteAssignment called with assignmentId:', assignmentId);
+    
+    // Find the assignment to get its details
+    const assignment = assignments.find(a => a.id === assignmentId);
+    if (!assignment) {
+      console.warn('🟡 confirmDeleteAssignment: Assignment not found:', assignmentId);
+      return;
+    }
+    
+    console.log('🔵 confirmDeleteAssignment: Showing modal for assignment:', {
+      assignmentId,
+      assignmentName: assignment.gameName,
+      studentEmail: assignment.studentEmail
+    });
+    
+    // Show the global delete confirmation modal
+    showModal('delete-confirmation', {
+      title: 'Delete Assignment?',
+      itemName: `${assignment.gameName} (${assignment.studentEmail})`,
+      itemType: 'assignment',
+      warningMessage: undefined,
+      onDelete: () => handleDeleteAssignment(assignmentId)
+    });
   };
 
   const cancelDeleteAssignment = () => {
-    setPendingDeleteAssignment(null);
+    console.log('🔵 cancelDeleteAssignment called');
+    // No cleanup needed since we're using global modal
   };
 
   const handleViewAssignment = async (assignment: Assignment) => {
-    setViewingAssignment(assignment);
     setLoadingAttempts(true);
     
     try {
+      let attempts: any[] = [];
       if (assignment.id) {
-        const attempts = await getAssignmentAttempts(assignment.id);
-        setAssignmentAttempts(attempts);
+        attempts = await getAssignmentAttempts(assignment.id);
       }
+      
+      showModal('assignment-details', {
+        assignment,
+        attempts,
+        isLoadingAttempts: false
+      });
     } catch (error) {
       console.error('Error fetching attempts:', error);
       showToast({
@@ -333,8 +462,7 @@ const TeacherDashboard = () => {
   };
 
   const closeViewAssignment = () => {
-    setViewingAssignment(null);
-    setAssignmentAttempts([]);
+    // This function is no longer needed since we use global modal
   };
 
   // Filter assignments based on search query
@@ -346,61 +474,86 @@ const TeacherDashboard = () => {
     );
   });
 
+  // Filter games based on search query, type, and folder
+  const getFilteredGames = useCallback(() => {
+    let baseGames = myGames;
+    
+    // First apply folder selection (this is the existing logic)
+    if (folderManager.selectedFolderId) {
+      baseGames = folderManager.getGamesInFolder(folderManager.selectedFolderId);
+    }
+    
+    // Then apply search and filter logic
+    return baseGames.filter(game => {
+      // Text search filter
+      const matchesSearch = !gameSearchQuery || 
+        game.title.toLowerCase().includes(gameSearchQuery.toLowerCase()) ||
+        (game.description || '').toLowerCase().includes(gameSearchQuery.toLowerCase()) ||
+        (game.gameType || '').toLowerCase().includes(gameSearchQuery.toLowerCase());
+      
+      // Game type filter
+      const matchesType = gameTypeFilter === 'all' || 
+        (game.gameType || '').toLowerCase().includes(gameTypeFilter.toLowerCase());
+      
+      // Folder filter (additional layer on top of folder selection)
+      let matchesFolder = true;
+      if (gameFolderFilter !== 'all' && !folderManager.selectedFolderId) {
+        if (gameFolderFilter === 'unorganized') {
+          matchesFolder = !game.folderId;
+        } else if (gameFolderFilter === 'in-folders') {
+          matchesFolder = !!game.folderId;
+        }
+      }
+      
+      return matchesSearch && matchesType && matchesFolder;
+    });
+  }, [myGames, gameSearchQuery, gameTypeFilter, gameFolderFilter, folderManager.selectedFolderId, folderManager]);
+
   const handleCreateAssignment = (game: Game) => {
-    // Set the game to be assigned and show the assignment modal
-    setAssigningGame(game);
-    setShowAssignmentModal(true);
+    // Use global modal for assignment creation
+    showModal('assignment-creation', { game });
     console.log(`Opening assignment modal for ${game.title}`);
   };
 
   const handleCancelAssignment = () => {
-    setAssigningGame(null);
-    setShowAssignmentModal(false);
+    // No cleanup needed for global modal
   };
 
-  const handleAssignGame = async (studentEmail: string, deadline: Date, timesRequired: number) => {
-    if (!assigningGame) return;
-    
-    console.log(`Assigning ${assigningGame.title} to ${studentEmail}`);
-    console.log(`Deadline: ${deadline}, Times to complete: ${timesRequired}`);
+  const handleAssignGame = async (game: any, studentEmail: string, deadline: Date, timesRequired: number, usePasswordAuth: boolean = true) => {
+    console.log(`Assigning ${game.title} to ${studentEmail}`);
+    console.log(`Deadline: ${deadline}, Times to complete: ${timesRequired}, usePasswordAuth: ${usePasswordAuth}`);
     
     try {
       // Create assignment data
       const assignmentData = {
-        gameName: assigningGame.title,
-        gameId: assigningGame.id,
-        gameType: assigningGame.gameType || 'Unknown',
+        gameName: game.title,
+        gameId: game.id,
+        gameType: game.gameType || 'Unknown',
         studentEmail: studentEmail,
         teacherId: currentUser?.uid || '',
         teacherEmail: currentUser?.email || '',
         timesRequired: timesRequired,
         deadline: Timestamp.fromDate(deadline),
-        usePasswordless: true,
+        usePasswordAuth: usePasswordAuth,
       };
       
-      // Create the assignment with email link authentication
-      const assignmentId = await createAssignmentWithEmailLink(assignmentData);
-      
-      console.log('Successfully created assignment with ID:', assignmentId);
-      
-      showToast({
-        title: 'Assignment created',
-        status: 'success',
-        duration: 3000,
-      });
+      // Choose the appropriate assignment creation method based on usePasswordAuth flag
+      let assignmentId: string;
+      if (usePasswordAuth) {
+        // Create assignment with passwordless email link authentication
+        assignmentId = await createAssignmentWithEmailLink(assignmentData);
+        console.log('Successfully created assignment with passwordless auth, ID:', assignmentId);
+      } else {
+        // Create standard assignment with regular email notification
+        assignmentId = await createAssignment(assignmentData);
+        console.log('Successfully created standard assignment, ID:', assignmentId);
+      }
       
       // Refresh assignments list
       fetchAssignments();
     } catch (error) {
       console.error('Error creating assignment:', error);
-      showToast({
-        title: 'Error creating assignment',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setShowAssignmentModal(false);
-      setAssigningGame(null);
+      throw error; // Re-throw so the global modal can handle the error
     }
   };
 
@@ -439,663 +592,10 @@ const TeacherDashboard = () => {
     }
   };
 
-  // Confirmation modal component
-  const DeleteConfirmationModal = () => {
-    if (!pendingDeleteAssignment) return null;
 
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '8px',
-          maxWidth: '400px',
-          width: '100%',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h3 style={{ marginBottom: '16px', fontSize: '18px' }}>Delete Assignment?</h3>
-          <p style={{ marginBottom: '24px', color: '#4A5568' }}>
-            Are you sure you want to delete this assignment? This action cannot be undone.
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <button
-              onClick={cancelDeleteAssignment}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#E2E8F0',
-                color: '#4A5568',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => handleDeleteAssignment(pendingDeleteAssignment)}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#F56565',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
-  // Game delete confirmation modal component
-  const DeleteGameConfirmationModal = () => {
-    if (!pendingDeleteGame) return null;
-    
-    // Find the game info to display in the confirmation
-    const gameToDelete = myGames.find(game => game.id === pendingDeleteGame);
-    
-    if (!gameToDelete) return null;
 
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '8px',
-          maxWidth: '400px',
-          width: '100%',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h3 style={{ marginBottom: '16px', fontSize: '18px' }}>Delete Game?</h3>
-          <p style={{ marginBottom: '8px', color: '#4A5568' }}>
-            Are you sure you want to delete <strong>{gameToDelete.title}</strong>?
-          </p>
-          <p style={{ marginBottom: '24px', color: '#4A5568' }}>
-            This action cannot be undone.
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <button
-              onClick={cancelDeleteGame}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#E2E8F0',
-                color: '#4A5568',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => handleDeleteGame(pendingDeleteGame)}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#F56565',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
-  // Assignment details modal component
-  const AssignmentDetailsModal = () => {
-    if (!viewingAssignment) return null;
-
-    // Format duration in seconds to a readable format
-    const formatDuration = (seconds: number) => {
-      if (seconds < 60) {
-        return `${seconds} sec`;
-      }
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      return `${minutes} min ${remainingSeconds} sec`;
-    };
-
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '8px',
-          maxWidth: '700px',
-          width: '100%',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          maxHeight: '80vh',
-          overflowY: 'auto'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '24px', margin: 0 }}>Assignment Details</h2>
-            <button
-              onClick={closeViewAssignment}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#718096'
-              }}
-            >
-              ×
-            </button>
-          </div>
-          
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Title:</div>
-              <div>{viewingAssignment.gameName}</div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Game Type:</div>
-              <div>{viewingAssignment.gameType}</div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Student Email:</div>
-              <div>{viewingAssignment.studentEmail}</div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Due Date:</div>
-              <div>{viewingAssignment.deadline?.toDate().toLocaleDateString()}</div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Status:</div>
-              <div>{viewingAssignment.status}</div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Times Required:</div>
-              <div>{viewingAssignment.timesRequired}</div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Times Completed:</div>
-              <div>{viewingAssignment.completedCount}</div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Created At:</div>
-              <div>{viewingAssignment.createdAt?.toDate().toLocaleString()}</div>
-            </div>
-            
-            {viewingAssignment.lastCompletedAt && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ fontWeight: 'bold' }}>Last Completed At:</div>
-                <div>{viewingAssignment.lastCompletedAt.toDate().toLocaleString()}</div>
-              </div>
-            )}
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Assignment Link:</div>
-              <div>{`${window.location.origin}/assignment/${viewingAssignment.linkToken}`}</div>
-            </div>
-          </div>
-          
-          {/* Attempt History Section */}
-          <div style={{ marginTop: '24px' }}>
-            <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Attempt History</h3>
-            
-            {loadingAttempts ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>Loading attempts...</div>
-            ) : assignmentAttempts.length > 0 ? (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
-                    <th style={{ padding: '12px', textAlign: 'left' }}>Date & Time</th>
-                    <th style={{ padding: '12px', textAlign: 'right' }}>Duration</th>
-                    <th style={{ padding: '12px', textAlign: 'right' }}>Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Sort attempts by timestamp (newest first) */}
-                  {assignmentAttempts
-                    .sort((a, b) => b.timestamp.seconds - a.timestamp.seconds)
-                    .map((attempt) => (
-                      <tr key={attempt.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                        <td style={{ padding: '12px', textAlign: 'left' }}>
-                          {attempt.timestamp.toDate().toLocaleString()}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right' }}>
-                          {formatDuration(attempt.duration)}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right' }}>
-                          {attempt.score !== undefined ? attempt.score : 'N/A'}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#718096' }}>
-                No attempts yet
-              </div>
-            )}
-          </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-            <button
-              onClick={closeViewAssignment}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#3182CE',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Assignment creation modal component
-  const AssignmentCreationModal = () => {
-    if (!assigningGame || !showAssignmentModal) return null;
-    
-    // State for the form - update for multiple student selection
-    const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
-    const [selectedStudents, setSelectedStudents] = useState<Student[]>([]);
-    const [studentEmail, setStudentEmail] = useState('');
-    const [deadline, setDeadline] = useState('');
-    const [timesRequired, setTimesRequired] = useState(1);
-    const [usePasswordless, setUsePasswordless] = useState(true);
-    const [assignmentStudents, setAssignmentStudents] = useState<Student[]>([]);
-    const [loadingStudents, setLoadingStudents] = useState(false);
-    
-    // Fetch students when modal opens
-    useEffect(() => {
-      if (showAssignmentModal && currentUser) {
-        fetchAssignmentStudents();
-      }
-    }, [showAssignmentModal, currentUser]);
-    
-    // Function to fetch students for assignment
-    const fetchAssignmentStudents = async () => {
-      if (!currentUser) return;
-      
-      setLoadingStudents(true);
-      try {
-        // Fetch from users collection where role is student and teacherId matches current user
-        const usersCollection = collection(db, 'users');
-        const q = query(
-          usersCollection, 
-          where('role', '==', 'student'), 
-          where('teacherId', '==', currentUser.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        
-        const studentsList = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            name: data.name || '',
-            email: data.email || '',
-            grade: data.grade || '',
-            age: data.age || 0,
-            notes: data.notes || '',
-            createdAt: data.createdAt || Timestamp.now()
-          } as Student;
-        });
-        
-        setAssignmentStudents(studentsList);
-      } catch (error) {
-        console.error('Error fetching students for assignment:', error);
-        showToast({
-          title: 'Error fetching students',
-          status: 'error',
-          duration: 3000,
-        });
-      } finally {
-        setLoadingStudents(false);
-      }
-    };
-    
-    // Handle student selection - updated for multi-select
-    const handleStudentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-      setSelectedStudentIds(selectedOptions);
-      
-      // Find the selected students
-      const students = assignmentStudents.filter(student => 
-        selectedOptions.includes(student.id)
-      );
-      setSelectedStudents(students);
-    };
-    
-    // Function to remove a student from selection
-    const removeStudent = (studentId: string) => {
-      setSelectedStudentIds(selectedStudentIds.filter(id => id !== studentId));
-      setSelectedStudents(selectedStudents.filter(student => student.id !== studentId));
-    };
-    
-    // Handle assignment creation for multiple students
-    const handleAssignToMultipleStudents = () => {
-      if (selectedStudents.length === 0 || !deadline) {
-        showToast({
-          title: 'Missing required fields',
-          description: 'Please select at least one student and set a deadline',
-          status: 'error',
-          duration: 3000,
-        });
-        return;
-      }
-      
-      // Create assignments for each selected student
-      const assignmentPromises = selectedStudents.map(student => 
-        handleAssignGame(student.email, new Date(deadline), timesRequired)
-      );
-      
-      Promise.all(assignmentPromises)
-        .then(() => {
-          showToast({
-            title: 'Assignments created',
-            description: `Created assignments for ${selectedStudents.length} student(s)`,
-            status: 'success',
-            duration: 3000,
-          });
-          setShowAssignmentModal(false);
-        })
-        .catch(error => {
-          console.error('Error creating assignments:', error);
-          showToast({
-            title: 'Error creating assignments',
-            status: 'error',
-            duration: 3000,
-          });
-        });
-    };
-    
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '8px',
-          maxWidth: '600px',
-          width: '100%',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h2 style={{ marginBottom: '16px', fontSize: '24px', textAlign: 'center' }}>Assign Game to Student</h2>
-          
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>Game: {assigningGame.title}</div>
-            <div style={{ color: '#666' }}>Type: {assigningGame.gameType}</div>
-          </div>
-          
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              Student Email *
-            </label>
-            {loadingStudents ? (
-              <div style={{ padding: '8px 0' }}>Loading students...</div>
-            ) : assignmentStudents.length > 0 ? (
-              <>
-                <select 
-                  multiple
-                  value={selectedStudentIds}
-                  onChange={handleStudentChange}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '4px',
-                    backgroundColor: '#F7FAFC',
-                    minHeight: '120px' // Taller for multiple selection
-                  }}
-                  required
-                >
-                  {assignmentStudents.map(student => (
-                    <option key={student.id} value={student.id}>
-                      {student.name} ({student.email}) {student.grade ? `- ${student.grade}` : ''} {student.age ? `- Age ${student.age}` : ''}
-                    </option>
-                  ))}
-                </select>
-                
-                {/* Selected Students - Always visible section */}
-                <div style={{ marginTop: '8px' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                    Selected Students ({selectedStudents.length}):
-                  </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    flexWrap: 'wrap', 
-                    gap: '8px',
-                    minHeight: '40px',
-                    maxHeight: '100px',
-                    overflowY: 'auto',
-                    padding: '8px',
-                    backgroundColor: '#EDF2F7',
-                    borderRadius: '4px'
-                  }}>
-                    {selectedStudents.length > 0 ? (
-                      selectedStudents.map(student => (
-                        <div key={student.id} style={{ 
-                          display: 'flex',
-                          alignItems: 'center',
-                          backgroundColor: '#E2E8F0',
-                          padding: '4px 8px',
-                          borderRadius: '16px',
-                          fontSize: '14px'
-                        }}>
-                          {student.name}
-                          <button 
-                            onClick={() => removeStudent(student.id)}
-                            style={{
-                              marginLeft: '4px',
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              color: '#4A5568'
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))
-                    ) : (
-                      <div style={{ 
-                        color: '#718096', 
-                        fontSize: '14px', 
-                        width: '100%', 
-                        textAlign: 'center',
-                        padding: '6px 0'
-                      }}>
-                        No students selected
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                <div style={{ 
-                  fontSize: '14px', 
-                  color: '#666', 
-                  marginTop: '4px',
-                  fontStyle: 'italic'
-                }}>
-                  Hold Ctrl/Cmd key to select multiple students
-                </div>
-              </>
-            ) : (
-              <div>
-                <div style={{ marginBottom: '8px', color: '#E53E3E' }}>
-                  No students found. Please add students in the My Students tab first.
-                </div>
-                <input 
-                  type="email" 
-                  placeholder="student@example.com"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '4px',
-                    backgroundColor: '#F7FAFC'
-                  }}
-                  value={studentEmail}
-                  onChange={(e) => setStudentEmail(e.target.value)}
-                  required
-                />
-              </div>
-            )}
-            <div style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>
-              An email notification with assignment details will be sent to each selected student.
-            </div>
-          </div>
-          
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              Deadline *
-            </label>
-            <input 
-              type="date" 
-              style={{
-                width: '200px',
-                padding: '8px 12px',
-                border: '1px solid #E2E8F0',
-                borderRadius: '4px',
-                backgroundColor: '#F7FAFC'
-              }}
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              Number of Times to Complete
-            </label>
-            <select 
-              style={{
-                width: '120px',
-                padding: '8px 12px',
-                border: '1px solid #E2E8F0',
-                borderRadius: '4px',
-                backgroundColor: '#F7FAFC'
-              }}
-              value={timesRequired}
-              onChange={(e) => setTimesRequired(Number(e.target.value))}
-            >
-              <option value={1}>1</option>
-              <option value={2}>2</option>
-              <option value={3}>3</option>
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-            </select>
-          </div>
-          
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              Authentication Method
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <input 
-                type="checkbox" 
-                checked={usePasswordless}
-                onChange={() => setUsePasswordless(!usePasswordless)}
-                style={{ marginRight: '8px' }}
-              />
-              <span>Use passwordless authentication (recommended for young students)</span>
-            </div>
-            <div style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>
-              Students will receive an email with a single-click link to access the assignment without needing a password.
-            </div>
-          </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <button
-              onClick={handleCancelAssignment}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: 'white',
-                color: '#4A5568',
-                border: '1px solid #E2E8F0',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAssignToMultipleStudents}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#3182CE',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Assign Game
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // Template item component
   const TemplateItem = ({ template, onClick }: { template: GameTemplate, onClick: () => void }) => {
@@ -1233,109 +733,66 @@ const TeacherDashboard = () => {
 
   // Handler for deleting a template
   const handleDeleteTemplate = async (templateId: string) => {
+    const startTime = Date.now();
+    console.log('🗑️ handleDeleteTemplate called with templateId:', templateId, 'at timestamp:', startTime);
     try {
+      console.log('🗑️ Starting template deletion...');
       // First check if it's in the categoryTemplates collection
       await deleteDoc(doc(db, 'categoryTemplates', templateId));
+      console.log('🗑️ Template deleted successfully from database, took:', Date.now() - startTime, 'ms');
       
       // Update the templates list
       setCategoryTemplates(categoryTemplates.filter(template => template.id !== templateId));
+      console.log('🗑️ Updated templates state');
       
       showToast({
         title: 'Template deleted',
         status: 'success',
         duration: 3000,
       });
+      console.log('🗑️ Template deletion completed successfully, total time:', Date.now() - startTime, 'ms');
     } catch (error) {
-      console.error('Error deleting template:', error);
+      console.error('🗑️ Error deleting template:', error);
       showToast({
         title: 'Error deleting template',
         status: 'error',
         duration: 3000,
       });
-    } finally {
-      setPendingDeleteTemplate(null);
     }
   };
 
   // Function to confirm template deletion
   const confirmDeleteTemplate = (templateId: string) => {
-    setPendingDeleteTemplate(templateId);
+    console.log('🔵 confirmDeleteTemplate called with templateId:', templateId);
+    
+    // Find the template to get its details
+    const template = categoryTemplates.find(t => t.id === templateId);
+    if (!template) {
+      console.warn('🟡 confirmDeleteTemplate: Template not found:', templateId);
+      return;
+    }
+    
+    console.log('🔵 confirmDeleteTemplate: Showing modal for template:', {
+      templateId,
+      templateName: template.title
+    });
+    
+    // Show the global delete confirmation modal
+    showModal('delete-confirmation', {
+      title: 'Delete Template?',
+      itemName: template.title,
+      itemType: 'template',
+      warningMessage: undefined,
+      onDelete: () => handleDeleteTemplate(templateId)
+    });
   };
 
-  // Function to cancel template deletion
   const cancelDeleteTemplate = () => {
-    setPendingDeleteTemplate(null);
+    console.log('🔵 cancelDeleteTemplate called');
+    // No cleanup needed since we're using global modal
   };
 
   // Template delete confirmation modal component
-  const TemplateDeleteConfirmationModal = () => {
-    if (!pendingDeleteTemplate) return null;
-    
-    // Find the template info to display in the confirmation
-    const templateToDelete = categoryTemplates.find(template => template.id === pendingDeleteTemplate);
-    
-    if (!templateToDelete) return null;
-
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '8px',
-          maxWidth: '400px',
-          width: '100%',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h3 style={{ marginBottom: '16px', fontSize: '18px' }}>Delete Template?</h3>
-          <p style={{ marginBottom: '8px', color: '#4A5568' }}>
-            Are you sure you want to delete <strong>{templateToDelete.title}</strong>?
-          </p>
-          <p style={{ marginBottom: '24px', color: '#4A5568' }}>
-            This action cannot be undone.
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <button
-              onClick={cancelDeleteTemplate}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#E2E8F0',
-                color: '#4A5568',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => handleDeleteTemplate(pendingDeleteTemplate)}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#F56565',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // Function to fetch students for the current teacher
   const fetchStudents = async () => {
@@ -1362,7 +819,8 @@ const TeacherDashboard = () => {
           grade: data.grade || '',
           age: data.age || 0,
           notes: data.notes || '',
-          createdAt: data.createdAt || Timestamp.now()
+          createdAt: data.createdAt || Timestamp.now(),
+          passwordSetupSent: data.passwordSetupSent || false
         } as Student;
       });
       
@@ -1379,38 +837,59 @@ const TeacherDashboard = () => {
     }
   };
   
-  // Function to add a new student
-  const handleAddStudent = async (studentData: Omit<Student, 'id' | 'createdAt'>) => {
+  // Function to add a new student with email-based password setup
+  const handleAddStudent = async (studentData: {
+    name: string;
+    email: string;
+    grade: string;
+    age: number;
+    notes: string;
+  }) => {
     if (!currentUser) return;
     
     try {
+      console.log('Creating student record for:', studentData.email);
+      
       const newStudentData = {
-        ...studentData,
-        role: 'student', // Explicitly set role as student
+        name: studentData.name,  // Make sure this is 'name', not 'studentName'
+        email: studentData.email,
+        grade: studentData.grade,
+        age: studentData.age,
+        notes: studentData.notes,
+        role: 'student',
         teacherId: currentUser.uid,
         teacherEmail: currentUser.email,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        passwordSetupSent: false // Will be updated by the trigger
       };
       
-      // Add to users collection instead of students
+      // Add to users collection
       const docRef = await addDoc(collection(db, 'users'), newStudentData);
       
       // Add the new student to the local state
       const newStudent = {
         id: docRef.id,
-        ...studentData,
-        createdAt: Timestamp.now()
+        name: studentData.name,
+        email: studentData.email,
+        grade: studentData.grade,
+        age: studentData.age,
+        notes: studentData.notes,
+        createdAt: Timestamp.now(),
+        passwordSetupSent: false
       } as Student;
       
       setStudents([...students, newStudent]);
       
+      // The password setup email will be sent automatically by the 
+      // sendPasswordSetupEmail trigger when the student document is created
+      
       showToast({
         title: 'Student added successfully',
+        description: `Password setup email will be sent automatically to ${studentData.email}`,
         status: 'success',
-        duration: 3000,
+        duration: 5000,
       });
       
-      setShowStudentModal(false);
     } catch (error) {
       console.error('Error adding student:', error);
       showToast({
@@ -1421,338 +900,59 @@ const TeacherDashboard = () => {
     }
   };
   
-  // Function to update an existing student
-  const handleUpdateStudent = async (studentId: string, studentData: Partial<Student>) => {
-    try {
-      // Update in users collection
-      const studentRef = doc(db, 'users', studentId);
-      await updateDoc(studentRef, studentData);
-      
-      // Update the student in the local state
-      setStudents(students.map(student => 
-        student.id === studentId ? { ...student, ...studentData } : student
-      ));
-      
-      showToast({
-        title: 'Student updated successfully',
-        status: 'success',
-        duration: 3000,
-      });
-      
-      setEditingStudent(null);
-      setShowStudentModal(false);
-    } catch (error) {
-      console.error('Error updating student:', error);
-      showToast({
-        title: 'Error updating student',
-        status: 'error',
-        duration: 3000,
-      });
-    }
-  };
-  
-  // Function to delete a student
-  const handleDeleteStudent = async (studentId: string) => {
-    try {
-      // Delete from users collection
-      await deleteDoc(doc(db, 'users', studentId));
-      
-      // Remove the student from the local state
-      setStudents(students.filter(student => student.id !== studentId));
-      
-      showToast({
-        title: 'Student deleted',
-        status: 'success',
-        duration: 3000,
-      });
-      
-      setPendingDeleteStudent(null);
-    } catch (error) {
-      console.error('Error deleting student:', error);
-      showToast({
-        title: 'Error deleting student',
-        status: 'error',
-        duration: 3000,
-      });
-      setPendingDeleteStudent(null);
-    }
-  };
-  
   // Function to confirm student deletion
   const confirmDeleteStudent = (studentId: string) => {
-    setPendingDeleteStudent(studentId);
+    console.log('🔵 confirmDeleteStudent called with studentId:', studentId);
+    
+    // Find the student to get its details
+    const student = students.find(s => s.id === studentId);
+    if (!student) {
+      console.warn('🟡 confirmDeleteStudent: Student not found:', studentId);
+      return;
+    }
+    
+    console.log('🔵 confirmDeleteStudent: Showing modal for student:', {
+      studentId,
+      studentName: student.name
+    });
+    
+    // Show the global delete confirmation modal
+    showModal('delete-confirmation', {
+      title: 'Delete Student?',
+      itemName: student.name,
+      itemType: 'student',
+      warningMessage: 'All associated assignments will remain but will no longer be linked to this student.',
+      onDelete: () => handleDeleteStudent(studentId)
+    });
   };
   
   // Function to cancel student deletion
   const cancelDeleteStudent = () => {
-    setPendingDeleteStudent(null);
+    console.log('🔵 cancelDeleteStudent called');
+    // No cleanup needed since we're using global modal
   };
   
   // Function to open the add student modal
   const openAddStudentModal = () => {
-    setEditingStudent(null);
-    setShowStudentModal(true);
+    console.log('🔵 openAddStudentModal called');
+    showModal('student-modal', {
+      student: null // null indicates creating a new student
+    });
   };
   
   // Function to open the edit student modal
   const openEditStudentModal = (student: Student) => {
-    setEditingStudent(student);
-    setShowStudentModal(true);
-  };
-
-  // Student Modal Component for adding/editing students
-  const StudentModal = () => {
-    if (!showStudentModal) return null;
-    
-    // State for the form
-    const [name, setName] = useState(editingStudent?.name || '');
-    const [email, setEmail] = useState(editingStudent?.email || '');
-    const [grade, setGrade] = useState(editingStudent?.grade || '');
-    const [age, setAge] = useState(editingStudent?.age || 0);
-    const [notes, setNotes] = useState(editingStudent?.notes || '');
-    
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      
-      const studentData = {
-        name,
-        email,
-        grade,
-        age,
-        notes
-      };
-      
-      if (editingStudent) {
-        handleUpdateStudent(editingStudent.id, studentData);
-      } else {
-        handleAddStudent(studentData);
+    console.log('🔵 openEditStudentModal called with student:', student);
+    showModal('student-modal', {
+      student: {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        grade: student.grade || '',
+        age: student.age || 0,
+        notes: student.notes || ''
       }
-    };
-    
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '8px',
-          maxWidth: '500px',
-          width: '100%',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h3 style={{ marginBottom: '16px', fontSize: '20px' }}>
-            {editingStudent ? 'Edit Student' : 'Add New Student'}
-          </h3>
-          
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                Name *
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '4px',
-                  backgroundColor: '#F8FAFC'
-                }}
-              />
-            </div>
-            
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                Email *
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '4px',
-                  backgroundColor: '#F8FAFC'
-                }}
-              />
-            </div>
-            
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                Grade/Class
-              </label>
-              <input
-                type="text"
-                value={grade}
-                onChange={(e) => setGrade(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '4px',
-                  backgroundColor: '#F8FAFC'
-                }}
-              />
-            </div>
-            
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                Age
-              </label>
-              <input
-                type="number"
-                value={age}
-                onChange={(e) => setAge(Number(e.target.value))}
-                min="0"
-                max="100"
-                style={{
-                  width: '120px',
-                  padding: '8px 12px',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '4px',
-                  backgroundColor: '#F8FAFC'
-                }}
-              />
-            </div>
-            
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                Notes
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '4px',
-                  backgroundColor: '#F8FAFC',
-                  minHeight: '100px',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={() => setShowStudentModal(false)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#E2E8F0',
-                  color: '#4A5568',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#4299E1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                {editingStudent ? 'Update Student' : 'Add Student'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  };
-  
-  // Student delete confirmation modal
-  const StudentDeleteConfirmationModal = () => {
-    if (!pendingDeleteStudent) return null;
-    
-    // Find the student info to display in the confirmation
-    const studentToDelete = students.find(student => student.id === pendingDeleteStudent);
-    
-    if (!studentToDelete) return null;
-
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '8px',
-          maxWidth: '400px',
-          width: '100%',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h3 style={{ marginBottom: '16px', fontSize: '18px' }}>Delete Student?</h3>
-          <p style={{ marginBottom: '8px', color: '#4A5568' }}>
-            Are you sure you want to delete <strong>{studentToDelete.name}</strong>?
-          </p>
-          <p style={{ marginBottom: '24px', color: '#4A5568' }}>
-            This action cannot be undone. All associated assignments will remain but will no longer be linked to this student.
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <button
-              onClick={cancelDeleteStudent}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#E2E8F0',
-                color: '#4A5568',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => handleDeleteStudent(pendingDeleteStudent)}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#F56565',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    });
   };
 
   // Function to handle viewing a student's dashboard
@@ -1835,16 +1035,143 @@ const TeacherDashboard = () => {
     );
   };
 
+  // Function to handle playing a game
+  const handlePlayGame = (gameId: string) => {
+    navigate(`/game/${gameId}`);
+  };
+
+  // Function to handle editing a game (with option to update or copy)
+  const handleEditGame = (game: Game) => {
+    setGameToEdit(game);
+    setShowEditConfirmModal(true);
+  };
+
+  // Function to handle edit confirmation choice
+  const handleEditChoice = (shouldUpdate: boolean) => {
+    if (!gameToEdit) return;
+    
+    // Navigate to the appropriate configuration page based on game type
+    const gameType = gameToEdit.gameType;
+    let configRoute = '/configure';
+    
+    if (gameType === 'whack-a-mole') {
+      configRoute = '/configure/whack-a-mole';
+    } else if (gameType === 'sort-categories-egg') {
+      configRoute = '/configure/sort-categories-egg';
+    } else if (gameType === 'spinner-wheel') {
+      configRoute = '/configure/spinner-wheel';
+    }
+    
+    if (shouldUpdate) {
+      // Edit the existing game
+      navigate(`${configRoute}/${gameToEdit.id}`);
+    } else {
+      // Create a copy - pass the game ID as template and add copy query parameter
+      navigate(`${configRoute}/${gameToEdit.id}?copy=true`);
+    }
+    
+    setShowEditConfirmModal(false);
+    setGameToEdit(null);
+  };
+
+  // Function to handle assigning a game to students
+  const handleAssignGameFromCreated = (game: Game) => {
+    showModal('assignment-creation', { game });
+  };
+
+  // Edit confirmation modal component
+
+  // Function to update an existing student
+  const handleUpdateStudent = async (studentId: string, studentData: Partial<Student>) => {
+    try {
+      console.log('Updating student:', studentId, studentData);
+      
+      // Update in users collection
+      const studentRef = doc(db, 'users', studentId);
+      await updateDoc(studentRef, studentData);
+      
+      // Update the student in the local state
+      setStudents(students.map(s => 
+        s.id === studentId ? { ...s, ...studentData } : s
+      ));
+      
+      showToast({
+        title: 'Student updated successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      
+    } catch (error) {
+      console.error('Error updating student:', error);
+      showToast({
+        title: 'Error updating student',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+  
+  // Function to delete a student
+  const handleDeleteStudent = async (studentId: string) => {
+    const startTime = Date.now();
+    console.log('🗑️ handleDeleteStudent called with studentId:', studentId, 'at timestamp:', startTime);
+    try {
+      console.log('🗑️ Starting student deletion...');
+      // Delete from users collection
+      await deleteDoc(doc(db, 'users', studentId));
+      console.log('🗑️ Student deleted successfully from database, took:', Date.now() - startTime, 'ms');
+      
+      // Remove the student from the local state
+      setStudents(students.filter(student => student.id !== studentId));
+      console.log('🗑️ Updated students state');
+      
+      showToast({
+        title: 'Student deleted',
+        status: 'success',
+        duration: 3000,
+      });
+      console.log('🗑️ Student deletion completed successfully, total time:', Date.now() - startTime, 'ms');
+    } catch (error) {
+      console.error('🗑️ Error deleting student:', error);
+      showToast({
+        title: 'Error deleting student',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
       <ToastComponent toastMessage={toastMessage} />
-      <DeleteConfirmationModal />
-      <DeleteGameConfirmationModal />
-      <AssignmentDetailsModal />
-      <AssignmentCreationModal />
-      <TemplateDeleteConfirmationModal />
-      <StudentModal />
-      <StudentDeleteConfirmationModal />
+
+
+
+      <GlobalModals 
+        onDeleteFolder={folderManager.handleDeleteFolder}
+        onSaveFolder={folderManager.handleSaveFolder}
+        onCancelFolder={folderManager.handleCancelFolder}
+        onSaveStudent={(studentData, studentId) => {
+          if (studentId) {
+            handleUpdateStudent(studentId, studentData);
+          } else {
+            handleAddStudent(studentData);
+          }
+        }}
+        onCancelStudent={() => {
+          // No cleanup needed since we're using global modal
+        }}
+        onCloseAssignmentDetails={closeViewAssignment}
+        onAssignGame={async (game, studentEmails, deadline, timesRequired, usePasswordAuth) => {
+          // Create assignments for each student email
+          const assignmentPromises = studentEmails.map(email => 
+            handleAssignGame(game, email, deadline, timesRequired, usePasswordAuth)
+          );
+          await Promise.all(assignmentPromises);
+        }}
+        onCancelAssignment={handleCancelAssignment}
+        showToast={showToast}
+      />
       
       <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '32px' }}>
         Create
@@ -1873,24 +1200,6 @@ const TeacherDashboard = () => {
             }}
           >
             Create Games
-          </div>
-          <div
-            onClick={() => setActiveTab('games')}
-            style={{
-              padding: '12px 24px',
-              position: 'relative',
-              cursor: 'pointer',
-              color: activeTab === 'games' ? '#4299E1' : '#718096',
-              fontWeight: activeTab === 'games' ? 'bold' : 'normal',
-              borderBottom: activeTab === 'games' ? '2px solid #4299E1' : 'none',
-              marginBottom: activeTab === 'games' ? '-1px' : '0',
-              transition: 'all 0.2s ease',
-              textDecoration: 'none',
-              backgroundColor: activeTab === 'games' ? '#EBF8FF' : 'transparent',
-              borderRadius: '4px 4px 0 0'
-            }}
-          >
-            Create Assignments
           </div>
           <div
             onClick={() => setActiveTab('assignments')}
@@ -1930,147 +1239,7 @@ const TeacherDashboard = () => {
           </div>
         </div>
 
-        {activeTab === 'games' && (
-          <div>
-            {/* Available Games Section */}
-            <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Available Games</h2>
-            
-            {isLoading ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>Loading games...</div>
-            ) : myGames.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '40px' }}>
-                {myGames.map((game) => (
-                  <div key={game.id} style={{ 
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    backgroundColor: 'white',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <div style={{ 
-                          width: '80px', 
-                          height: '80px', 
-                          backgroundColor: (game.gameType || '').includes('whack') ? '#c6f6d5' : '#e9d8fd',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden'
-                        }}>
-                          {game.thumbnailUrl ? (
-                            <img src={game.thumbnailUrl} alt={game.title} style={{ maxWidth: '100%', maxHeight: '100%' }} />
-                          ) : (
-                            <div style={{ fontSize: '32px', color: '#718096' }}>🎮</div>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>{game.title}</h3>
-                          <p style={{ color: '#718096', fontSize: '14px' }}>Type: {game.gameType || 'Unknown'}</p>
-                        </div>
-                      </div>
-                      
-                      <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-                          onClick={() => handleCreateAssignment(game)}
-              style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#38A169',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                            fontSize: '14px'
-              }}
-            >
-                          New Assignment
-            </button>
-                      <button
-                          onClick={() => confirmDeleteGame(game.id)}
-                        style={{
-                          padding: '6px 12px',
-                          backgroundColor: '#F56565',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '14px'
-                        }}
-                      >
-                        Delete
-                      </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-          </div>
-        ) : (
-              <p style={{ marginBottom: '40px', color: '#718096' }}>You haven't created any games yet.</p>
-            )}
 
-            {/* Public Games Section */}
-            <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Public Games</h2>
-            
-            {publicGames.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {publicGames.map((game) => (
-                  <div key={game.id} style={{ 
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    backgroundColor: 'white',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <div style={{ 
-                          width: '80px', 
-                          height: '80px', 
-                          backgroundColor: (game.gameType || '').includes('whack') ? '#c6f6d5' : '#e9d8fd',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden'
-                        }}>
-                          {game.thumbnailUrl ? (
-                            <img src={game.thumbnailUrl} alt={game.title} style={{ maxWidth: '100%', maxHeight: '100%' }} />
-                          ) : (
-                            <div style={{ fontSize: '32px', color: '#718096' }}>🎮</div>
-                          )}
-                        </div>
-                        
-          <div>
-                          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>{game.title}</h3>
-                          <p style={{ color: '#718096', fontSize: '14px' }}>Type: {game.gameType || 'Unknown'}</p>
-                        </div>
-                      </div>
-                      
-            <button
-                        onClick={() => handleCreateAssignment(game)}
-              style={{
-                          padding: '6px 12px',
-                          backgroundColor: '#38A169',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                          fontSize: '14px'
-              }}
-            >
-                        New Assignment
-            </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p style={{ color: '#718096' }}>No public games available.</p>
-            )}
-          </div>
-        )}
 
         {activeTab === 'assignments' && (
           <div>
@@ -2207,41 +1376,1071 @@ const TeacherDashboard = () => {
 
         {activeTab === 'create' && (
           <div>
+            {/* Start Creating Section - Moved to top */}
+            <div style={{ marginBottom: '48px' }}>
+              <h2 style={{ 
+                fontSize: '24px', 
+                fontWeight: 'bold', 
+                marginBottom: '20px',
+                color: '#2D3748',
+                borderBottom: '2px solid #805AD5',
+                paddingBottom: '8px'
+              }}>
+                Start Creating
+              </h2>
+              
             {isLoadingTemplates ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>Loading templates...</div>
-            ) : (
-              <>
-                <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Blank Game Templates</h2>
-                {blankTemplates.length > 0 ? (
-                  <div style={{ marginBottom: '32px' }}>
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '40px',
+                  backgroundColor: '#F7FAFC',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0'
+                }}>
+                  <div style={{ fontSize: '16px', color: '#718096' }}>Loading templates...</div>
+                </div>
+              ) : blankTemplates.length > 0 ? (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                  gap: '20px' 
+                }}>
                     {blankTemplates.map((template) => (
-                      <TemplateItem 
+                    <div 
                         key={template.id} 
-                        template={template} 
                         onClick={() => handleTemplateClick(template)}
-                      />
+                      style={{ 
+                        backgroundColor: 'white',
+                        borderRadius: '12px',
+                        padding: '24px',
+                        border: '2px solid #E2E8F0',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                        transition: 'all 0.2s ease',
+                        cursor: 'pointer',
+                        textAlign: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#805AD5';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#E2E8F0';
+                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <div style={{ 
+                        width: '80px', 
+                        height: '80px', 
+                        backgroundColor: template.type === 'whack-a-mole' ? '#C6F6D5' : 
+                                        template.type === 'spinner-wheel' ? '#FED7D7' : '#E9D8FD',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px',
+                        fontSize: '32px'
+                      }}>
+                        {template.thumbnail ? (
+                          <img 
+                            src={template.thumbnail} 
+                            alt={template.title} 
+                            style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              objectFit: 'cover', 
+                              borderRadius: '12px' 
+                            }}
+                          />
+                        ) : (
+                          template.type === 'whack-a-mole' ? '🔨' : 
+                          template.type === 'spinner-wheel' ? '🎡' : '🥚'
+                        )}
+                      </div>
+                      
+                      <h3 style={{ 
+                        fontSize: '18px', 
+                        fontWeight: '600', 
+                        marginBottom: '8px',
+                        color: '#2D3748'
+                      }}>
+                        {template.title}
+                      </h3>
+                      
+                      <p style={{ 
+                        color: '#718096', 
+                        fontSize: '14px',
+                        marginBottom: '16px',
+                        textTransform: 'capitalize'
+                      }}>
+                        {(template.type || 'Unknown').replace('-', ' ')}
+                      </p>
+                      
+                      <div style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#805AD5',
+                        color: 'white',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        ✨ Create Game
+                      </div>
+                    </div>
                     ))}
                   </div>
                 ) : (
-                  <p style={{ marginBottom: '32px', color: '#718096' }}>No blank templates available.</p>
-                )}
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '40px',
+                  backgroundColor: '#F7FAFC',
+                  borderRadius: '12px',
+                  border: '2px dashed #CBD5E0'
+                }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>📝</div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: '#2D3748' }}>
+                    No templates available
+                  </h3>
+                  <p style={{ color: '#718096' }}>
+                    Templates will appear here when they become available
+                  </p>
+                </div>
+              )}
+            </div>
 
-                <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Modifiable Game Templates</h2>
-                {categoryTemplates.length > 0 ? (
-                  <div style={{ marginBottom: '32px' }}>
-                    {categoryTemplates.map((template) => (
-                      <TemplateItem 
-                        key={template.id} 
-                        template={template} 
-                        onClick={() => handleTemplateClick(template)}
-                      />
-                    ))}
+            {/* My Created Games Section */}
+            <div style={{ marginBottom: '48px' }}>
+              <h2 style={{ 
+                fontSize: '24px', 
+                fontWeight: 'bold', 
+                marginBottom: '20px',
+                color: '#2D3748',
+                borderBottom: '2px solid #4299E1',
+                paddingBottom: '8px'
+              }}>
+                My Created Games
+              </h2>
+              
+              {isLoading ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '40px',
+                  backgroundColor: '#F7FAFC',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0'
+                }}>
+                  <div style={{ fontSize: '16px', color: '#718096' }}>Loading games...</div>
                   </div>
-                ) : (
-                  <p style={{ color: '#718096' }}>No modifiable templates available.</p>
-                )}
-              </>
-            )}
+              ) : myGames.length > 0 ? (
+                <div>
+                  {/* Search and Filter Section */}
+                  <div style={{ 
+                    marginBottom: '24px',
+                    padding: '16px',
+                    backgroundColor: '#FAFAFA',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0'
+                  }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#2D3748' }}>
+                        🔍 Search & Filter Games
+                      </h3>
+                      {(gameSearchQuery || gameTypeFilter !== 'all' || gameFolderFilter !== 'all') && (
+                        <button
+                          onClick={() => {
+                            setGameSearchQuery('');
+                            setGameTypeFilter('all');
+                            setGameFolderFilter('all');
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#F7FAFC',
+                            color: '#4A5568',
+                            border: '1px solid #CBD5E0',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Search Input */}
+                    <div style={{ marginBottom: '12px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search by title, description, or game type..."
+                        value={gameSearchQuery}
+                        onChange={(e) => setGameSearchQuery(e.target.value)}
+                        style={{
+                          padding: '10px 12px',
+                          border: '1px solid #CBD5E0',
+                          borderRadius: '6px',
+                          width: '100%',
+                          fontSize: '14px',
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                          outline: 'none',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#4299E1';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#CBD5E0';
+                        }}
+                      />
+                    </div>
+                    
+                    {/* Filter Row */}
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '12px', 
+                      flexWrap: 'wrap',
+                      alignItems: 'center' 
+                    }}>
+                      {/* Game Type Filter */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <label style={{ fontSize: '14px', color: '#4A5568', fontWeight: '500' }}>
+                          Type:
+                        </label>
+                        <select
+                          value={gameTypeFilter}
+                          onChange={(e) => setGameTypeFilter(e.target.value)}
+                          style={{
+                            padding: '6px 8px',
+                            border: '1px solid #CBD5E0',
+                            borderRadius: '4px',
+                            fontSize: '14px',
+                            backgroundColor: 'white',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="all">All Types</option>
+                          <option value="whack">🔨 Whack-a-Mole</option>
+                          <option value="spinner">🎡 Spinner Wheel</option>
+                          <option value="sort">🥚 Sort Categories</option>
+                        </select>
+                      </div>
+                      
+                      {/* Folder Organization Filter (only show when no specific folder is selected) */}
+                      {!folderManager.selectedFolderId && folderManager.folders.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <label style={{ fontSize: '14px', color: '#4A5568', fontWeight: '500' }}>
+                            Organization:
+                          </label>
+                          <select
+                            value={gameFolderFilter}
+                            onChange={(e) => setGameFolderFilter(e.target.value)}
+                            style={{
+                              padding: '6px 8px',
+                              border: '1px solid #CBD5E0',
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                              backgroundColor: 'white',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="all">All Games</option>
+                            <option value="in-folders">📁 In Folders</option>
+                            <option value="unorganized">📋 Unorganized</option>
+                          </select>
+                        </div>
+                      )}
+                      
+                      {/* Search Results Count */}
+                      <div style={{ 
+                        marginLeft: 'auto',
+                        fontSize: '14px',
+                        color: '#718096',
+                        fontWeight: '500'
+                      }}>
+                        {(() => {
+                          const filteredCount = getFilteredGames().length;
+                          const totalCount = folderManager.selectedFolderId 
+                            ? folderManager.getGamesInFolder(folderManager.selectedFolderId).length
+                            : myGames.length;
+                          
+                          if (gameSearchQuery || gameTypeFilter !== 'all' || gameFolderFilter !== 'all') {
+                            return `${filteredCount} of ${totalCount} games`;
+                          }
+                          return `${totalCount} games`;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Folder Management Section */}
+                  <div style={{ 
+                    marginBottom: '24px',
+                    padding: '16px',
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0'
+                  }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#2D3748' }}>
+                        📁 Organize Your Games
+                      </h3>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => {
+                            console.log('Manual refresh clicked');
+                            console.log('Current user ID:', currentUser?.uid);
+                            console.log('Current folders:', folderManager.folders);
+                            folderManager.refreshFolders();
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#E2E8F0',
+                            color: '#4A5568',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          🔄 Refresh
+                        </button>
+                        <button
+                          onClick={folderManager.openCreateFolderModal}
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#4299E1',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          ➕ New Folder
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Folder List */}
+                    {folderManager.folders.length > 0 && (
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '8px', 
+                        flexWrap: 'wrap',
+                        marginBottom: '12px'
+                      }}>
+                        {/* All Games Button */}
+                        <button
+                          onClick={() => {
+                            folderManager.setSelectedFolderId(null);
+                            // Clear folder filter when viewing all games
+                            setGameFolderFilter('all');
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: folderManager.selectedFolderId === null ? '#E2E8F0' : 'white',
+                            color: folderManager.selectedFolderId === null ? '#2D3748' : '#4A5568',
+                            border: '1px solid #E2E8F0',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: folderManager.selectedFolderId === null ? '600' : '400'
+                          }}
+                        >
+                          📋 All Games ({myGames.length})
+                        </button>
+                        
+                        {/* Folder Buttons */}
+                        {folderManager.folders.map(folder => {
+                          const gamesInFolder = folderManager.getGamesInFolder(folder.id);
+                          return (
+                            <div key={folder.id} style={{ position: 'relative' }}>
+                              <button
+                                data-folder-button
+                                onClick={() => {
+                                  // Toggle behavior: if same folder is clicked, deselect it
+                                  if (folderManager.selectedFolderId === folder.id) {
+                                    folderManager.setSelectedFolderId(null);
+                                    setGameFolderFilter('all');
+                                  } else {
+                                    folderManager.setSelectedFolderId(folder.id);
+                                    // Clear folder filter when selecting a specific folder
+                                    setGameFolderFilter('all');
+                                  }
+                                }}
+                                onDrop={(e) => folderManager.handleDrop(e, folder.id)}
+                                onDragOver={(e) => {
+                                  folderManager.handleDragOver(e);
+                                  e.currentTarget.classList.add('folder-drop-zone-active');
+                                }}
+                                onDragLeave={(e) => {
+                                  e.currentTarget.classList.remove('folder-drop-zone-active');
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: folderManager.selectedFolderId === folder.id ? folder.color || '#4299E1' : 'white',
+                                  color: folderManager.selectedFolderId === folder.id ? 'white' : '#4A5568',
+                                  border: `2px solid ${folder.color || '#4299E1'}`,
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  fontWeight: folderManager.selectedFolderId === folder.id ? '600' : '400',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                📁 {folder.name} ({gamesInFolder.length})
+                              </button>
+                              
+                              {/* Folder Actions */}
+                              {folderManager.selectedFolderId === folder.id && (
+                                <div 
+                                  data-folder-actions
+                                  style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: '0',
+                                    zIndex: 10,
+                                    backgroundColor: 'white',
+                                    border: '1px solid #E2E8F0',
+                                    borderRadius: '6px',
+                                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                                    padding: '4px',
+                                    marginTop: '4px',
+                                    display: 'flex',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <button
+                                    onClick={() => {
+                                      folderManager.openEditFolderModal(folder);
+                                      // Auto-close actions after opening edit modal
+                                      folderManager.setSelectedFolderId(null);
+                                    }}
+                                    style={{
+                                      padding: '4px 8px',
+                                      backgroundColor: '#F7FAFC',
+                                      color: '#4A5568',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      fontSize: '12px'
+                                    }}
+                                  >
+                                    ✏️ Edit
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      folderManager.confirmDeleteFolder(folder.id);
+                                      // Auto-close actions after opening delete confirmation
+                                      folderManager.setSelectedFolderId(null);
+                                    }}
+                                    style={{
+                                      padding: '4px 8px',
+                                      backgroundColor: '#FED7D7',
+                                      color: '#C53030',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      fontSize: '12px'
+                                    }}
+                                  >
+                                    🗑️ Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
+                    {/* Unorganized Games Drop Zone */}
+                    {folderManager.getUnorganizedGames().length > 0 && (
+                      <div
+                        onDrop={(e) => folderManager.handleDrop(e, null)}
+                        onDragOver={(e) => {
+                          folderManager.handleDragOver(e);
+                          e.currentTarget.classList.add('folder-drop-zone-active');
+                        }}
+                        onDragLeave={(e) => {
+                          e.currentTarget.classList.remove('folder-drop-zone-active');
+                        }}
+                        style={{
+                          padding: '8px',
+                          border: '2px dashed #CBD5E0',
+                          borderRadius: '6px',
+                          backgroundColor: '#F7FAFC',
+                          textAlign: 'center',
+                          fontSize: '14px',
+                          color: '#718096',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        📤 Drop games here to remove from folders
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Games Grid */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+                    gap: '20px' 
+                  }}>
+                    {(() => {
+                      // Use filtered games instead of the original logic
+                      const gamesToShow = getFilteredGames();
+                      
+                      // Show no results message if search/filters are active but no games match
+                      if (gamesToShow.length === 0 && (gameSearchQuery || gameTypeFilter !== 'all' || gameFolderFilter !== 'all')) {
+                        return (
+                          <div style={{ 
+                            gridColumn: '1 / -1',
+                            padding: '40px 20px',
+                            textAlign: 'center',
+                            backgroundColor: '#F8F9FA',
+                            borderRadius: '12px',
+                            border: '2px dashed #CBD5E0'
+                          }}>
+                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+                            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: '#2D3748' }}>
+                              No games found
+                            </h3>
+                            <p style={{ color: '#718096', marginBottom: '20px' }}>
+                              Try adjusting your search terms or filters
+                            </p>
+                            <button
+                              onClick={() => {
+                                setGameSearchQuery('');
+                                setGameTypeFilter('all');
+                                setGameFolderFilter('all');
+                              }}
+                              style={{
+                                padding: '8px 16px',
+                                backgroundColor: '#4299E1',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                              }}
+                            >
+                              Clear All Filters
+                            </button>
+                          </div>
+                        );
+                      }
+                      
+                      return gamesToShow.map((game) => (
+                        <div 
+                          key={game.id} 
+                          draggable
+                          onDragStart={(e) => {
+                            folderManager.handleDragStart(e, game.id);
+                            // Add CSS class for drag effect
+                            e.currentTarget.classList.add('game-card-dragging');
+                          }}
+                          onDragEnd={(e) => {
+                            // Remove drag effect class
+                            e.currentTarget.classList.remove('game-card-dragging');
+                          }}
+                          style={{ 
+                            backgroundColor: 'white',
+                            borderRadius: '12px',
+                            padding: '20px',
+                            border: '1px solid #E2E8F0',
+                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                            transition: 'all 0.2s ease',
+                            cursor: 'grab'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                            <div style={{ 
+                              width: '64px', 
+                              height: '64px', 
+                              backgroundColor: (game.gameType || '').includes('whack') ? '#C6F6D5' : 
+                                              (game.gameType || '').includes('spinner') ? '#FED7D7' : '#E9D8FD',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              flexShrink: 0
+                            }}>
+                              {game.thumbnailUrl ? (
+                                <img src={game.thumbnailUrl} alt={game.title} style={{ 
+                                  width: '100%', 
+                                  height: '100%', 
+                                  objectFit: 'cover',
+                                  borderRadius: '8px'
+                                }} />
+                              ) : (
+                                <div style={{ fontSize: '24px', color: '#718096' }}>
+                                  {(game.gameType || '').includes('whack') ? '🔨' : 
+                                   (game.gameType || '').includes('spinner') ? '🎡' : '🥚'}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <h3 style={{ 
+                                fontSize: '18px', 
+                                fontWeight: '600', 
+                                marginBottom: '4px',
+                                color: '#2D3748',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {game.title}
+                              </h3>
+                              
+                              {/* Folder Badge */}
+                              {game.folderName && (
+                                <div style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '2px 6px',
+                                  backgroundColor: game.folderColor || '#E2E8F0',
+                                  color: 'white',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  marginBottom: '8px'
+                                }}>
+                                  📁 {game.folderName}
+                                </div>
+                              )}
+                              
+                              <p style={{ 
+                                color: '#718096', 
+                                fontSize: '14px',
+                                marginBottom: '16px',
+                                textTransform: 'capitalize'
+                              }}>
+                                {(game.gameType || 'Unknown').replace('-', ' ')}
+                              </p>
+                              
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePlayGame(game.id);
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    backgroundColor: '#E3F2FD',
+                                    color: '#1976D2',
+                                    border: '1px solid #BBDEFB',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    transition: 'all 0.2s',
+                                    minWidth: 'auto',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#BBDEFB';
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#E3F2FD';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                  }}
+                                >
+                                  ▶️ Play
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditGame(game);
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    backgroundColor: '#F3E5F5',
+                                    color: '#7B1FA2',
+                                    border: '1px solid #E1BEE7',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    transition: 'all 0.2s',
+                                    minWidth: 'auto',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#E1BEE7';
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#F3E5F5';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                  }}
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAssignGameFromCreated(game);
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    backgroundColor: '#E8F5E8',
+                                    color: '#2E7D32',
+                                    border: '1px solid #C8E6C9',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    transition: 'all 0.2s',
+                                    minWidth: 'auto',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#C8E6C9';
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#E8F5E8';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                  }}
+                                >
+                                  📋 Assign
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    confirmDeleteGame(game.id);
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    backgroundColor: '#FFEBEE',
+                                    color: '#C62828',
+                                    border: '1px solid #FFCDD2',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    transition: 'all 0.2s',
+                                    minWidth: 'auto',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#FFCDD2';
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#FFEBEE';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                  }}
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '40px',
+                  backgroundColor: '#F7FAFC',
+                  borderRadius: '12px',
+                  border: '2px dashed #CBD5E0'
+                }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎮</div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: '#2D3748' }}>
+                    No games created yet
+                  </h3>
+                  <p style={{ color: '#718096', marginBottom: '20px' }}>
+                    Start by creating your first game using the templates below
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Public Games Section */}
+            <div style={{ marginBottom: '48px' }}>
+              <h2 style={{ 
+                fontSize: '24px', 
+                fontWeight: 'bold', 
+                marginBottom: '20px',
+                color: '#2D3748',
+                borderBottom: '2px solid #38A169',
+                paddingBottom: '8px'
+              }}>
+                Public Games
+              </h2>
+              
+              {isLoading ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '40px',
+                  backgroundColor: '#F7FAFC',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0'
+                }}>
+                  <div style={{ fontSize: '16px', color: '#718096' }}>Loading public games...</div>
+                </div>
+              ) : publicGames.length > 0 ? (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+                  gap: '20px' 
+                }}>
+                  {publicGames.map((game) => (
+                    <div key={game.id} style={{ 
+                      backgroundColor: 'white',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      border: '1px solid #E2E8F0',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                        <div style={{ 
+                          width: '64px', 
+                          height: '64px', 
+                          backgroundColor: (game.gameType || '').includes('whack') ? '#C6F6D5' : 
+                                          (game.gameType || '').includes('spinner') ? '#FED7D7' : '#E9D8FD',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          flexShrink: 0
+                        }}>
+                          {game.thumbnailUrl ? (
+                            <img src={game.thumbnailUrl} alt={game.title} style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              objectFit: 'cover',
+                              borderRadius: '8px'
+                            }} />
+                          ) : (
+                            <div style={{ fontSize: '24px', color: '#718096' }}>
+                              {(game.gameType || '').includes('whack') ? '🔨' : 
+                               (game.gameType || '').includes('spinner') ? '🎡' : '🥚'}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h3 style={{ 
+                            fontSize: '18px', 
+                            fontWeight: '600', 
+                            marginBottom: '4px',
+                            color: '#2D3748',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {game.title}
+                          </h3>
+                          <p style={{ 
+                            color: '#718096', 
+                            fontSize: '14px',
+                            marginBottom: '4px',
+                            textTransform: 'capitalize'
+                          }}>
+                            {(game.gameType || 'Unknown').replace('-', ' ')}
+                          </p>
+                          <p style={{ 
+                            color: '#A0AEC0', 
+                            fontSize: '12px',
+                            marginBottom: '16px'
+                          }}>
+                            Created by: {game.createdBy || 'Unknown'}
+                          </p>
+                          
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePlayGame(game.id);
+                              }}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#E3F2FD',
+                                color: '#1976D2',
+                                border: '1px solid #BBDEFB',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: '500',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                transition: 'all 0.2s',
+                                minWidth: 'auto',
+                                whiteSpace: 'nowrap'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#BBDEFB';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#E3F2FD';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              ▶️ Play
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const gameType = game.gameType;
+                                let configRoute = '/configure';
+                                
+                                if (gameType === 'whack-a-mole') {
+                                  configRoute = '/configure/whack-a-mole';
+                                } else if (gameType === 'sort-categories-egg') {
+                                  configRoute = '/configure/sort-categories-egg';
+                                } else if (gameType === 'spinner-wheel') {
+                                  configRoute = '/configure/spinner-wheel';
+                                }
+                                
+                                navigate(`${configRoute}/${game.id}?copy=true`);
+                              }}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#F3E5F5',
+                                color: '#7B1FA2',
+                                border: '1px solid #E1BEE7',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: '500',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                transition: 'all 0.2s',
+                                minWidth: 'auto',
+                                whiteSpace: 'nowrap'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#E1BEE7';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#F3E5F5';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              📄 Copy
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAssignGameFromCreated(game);
+                              }}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#E8F5E8',
+                                color: '#2E7D32',
+                                border: '1px solid #C8E6C9',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: '500',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                transition: 'all 0.2s',
+                                minWidth: 'auto',
+                                whiteSpace: 'nowrap'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#C8E6C9';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#E8F5E8';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              📋 Assign
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '40px',
+                  backgroundColor: '#F7FAFC',
+                  borderRadius: '12px',
+                  border: '2px dashed #CBD5E0'
+                }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🌍</div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: '#2D3748' }}>
+                    No public games available
+                  </h3>
+                  <p style={{ color: '#718096' }}>
+                    Check back later for games shared by other educators
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -2298,12 +2497,12 @@ const TeacherDashboard = () => {
             ) : students.length > 0 ? (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
-                    <th style={{ padding: '12px', textAlign: 'left' }}>Name</th>
-                    <th style={{ padding: '12px', textAlign: 'left' }}>Email</th>
-                    <th style={{ padding: '12px', textAlign: 'left' }}>Grade/Class</th>
-                    <th style={{ padding: '12px', textAlign: 'left' }}>Age</th>
-                    <th style={{ padding: '12px', textAlign: 'left' }}>Actions</th>
+                  <tr style={{ backgroundColor: '#F7FAFC', borderBottom: '2px solid #E2E8F0' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Name</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Email</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Grade</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Password Status</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2322,7 +2521,33 @@ const TeacherDashboard = () => {
                         <td style={{ padding: '12px' }}>{student.name}</td>
                         <td style={{ padding: '12px' }}>{student.email}</td>
                         <td style={{ padding: '12px' }}>{student.grade || '-'}</td>
-                        <td style={{ padding: '12px' }}>{student.age}</td>
+                        <td style={{ padding: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {student.passwordSetupSent ? (
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                fontSize: '12px',
+                                fontWeight: 'medium',
+                                backgroundColor: '#FEF3C7',
+                                color: '#92400E'
+                              }}>
+                                🔐 Password Setup Sent
+                              </span>
+                            ) : (
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                fontSize: '12px',
+                                fontWeight: 'medium',
+                                backgroundColor: '#E5E7EB',
+                                color: '#374151'
+                              }}>
+                                📧 Email Only
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td style={{ padding: '12px' }}>
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button

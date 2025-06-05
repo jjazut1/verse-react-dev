@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Assignment, Attempt } from '../types';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 // Define Game interface based on TeacherDashboard.tsx
 interface Game {
@@ -45,18 +46,39 @@ const StudentDashboard: React.FC = () => {
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [highScores, setHighScores] = useState<any[]>([]);
   const [freeGames, setFreeGames] = useState<Game[]>([]);
   const [gameConfigs, setGameConfigs] = useState<{[key: string]: any}>({});
-  const [highScores, setHighScores] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('assignments');
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('assignments');
+  
+  // Enhanced high scores state
+  const [enhancedHighScores, setEnhancedHighScores] = useState<HighScore[]>([]);
+  const [highScoresLoading, setHighScoresLoading] = useState(false);
+  
+  // High score interface
+  interface HighScore {
+    id: string;
+    userId: string;
+    playerName: string;
+    score: number;
+    configId: string;
+    createdAt: any;
+    gameType: string;
+    gameConfig?: {
+      id: string;
+      title?: string;
+      thumbnail?: string;
+      type?: string;
+      [key: string]: any;
+    } | null;
+  }
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true);
+      setLoading(true);
       
       try {
-        // If we're in teacher view mode and have a studentId
         if (isTeacherView && studentId) {
           // Get the student data
           const studentDocRef = doc(db, 'users', studentId);
@@ -86,7 +108,7 @@ const StudentDashboard: React.FC = () => {
       } catch (error) {
         console.error('Error in data fetching:', error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
     
@@ -181,35 +203,14 @@ const StudentDashboard: React.FC = () => {
   };
   
   const fetchAttemptsForEmail = async (email: string) => {
-    try {
-      // Query for attempts by this student
-      const attemptsQuery = query(
-        collection(db, 'attempts'),
-        where('studentEmail', '==', email)
-      );
-      
-      const attemptsSnapshot = await getDocs(attemptsQuery);
-      const attemptsList = attemptsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Attempt[];
-      
-      // Sort by timestamp - most recent first
-      attemptsList.sort((a, b) => {
-        const timeA = a.timestamp?.toDate().getTime() || 0;
-        const timeB = b.timestamp?.toDate().getTime() || 0;
-        return timeB - timeA;
-      });
-      
-      setAttempts(attemptsList);
-    } catch (error) {
-      console.error('Error fetching attempts:', error);
-    }
+    // Students don't have permission to read attempts collection
+    // Only teachers can view attempts, so we skip this for students
+    return;
   };
   
   const fetchAttempts = async () => {
-    if (!currentUser?.email) return;
-    await fetchAttemptsForEmail(currentUser.email);
+    // Students don't have permission to read attempts collection
+    return;
   };
   
   const fetchHighScoresForStudent = async (uid: string) => {
@@ -298,25 +299,127 @@ const StudentDashboard: React.FC = () => {
     return Math.min(100, Math.round((assignment.completedCount || 0) / assignment.timesRequired * 100));
   };
   
-  // Helper function to render a star rating (1-5)
-  const renderStars = (score: number, maxScore: number = 100) => {
-    // Convert score to 1-5 scale
-    const starCount = Math.max(1, Math.min(5, Math.ceil(score / (maxScore / 5))));
+  // Helper function to determine the maximum possible score for a game type/config
+  const getMaxScoreForGame = (gameType: string, gameConfig?: any) => {
+    switch (gameType) {
+      case 'sort-categories-egg':
+      case 'sort-categories-egg-reveal':
+        // Max score = number of eggs × 10 points per egg
+        const eggQty = gameConfig?.eggQty || 6; // Default to 6 eggs
+        return eggQty * 10;
+      
+      case 'whack-a-mole':
+        // Max score depends on game speed/difficulty
+        const speed = gameConfig?.speed || gameConfig?.difficulty || 'medium';
+        let maxScore;
+        
+        switch (speed.toLowerCase()) {
+          case 'low':
+          case 'easy':
+            maxScore = 60; // Fewer moles, lower max score
+            break;
+          case 'high':
+          case 'hard':
+            maxScore = 120; // More moles, higher max score
+            break;
+          case 'medium':
+          default:
+            maxScore = 90; // Standard medium difficulty
+            break;
+        }
+        
+        // If config has targetScore, use that instead
+        if (gameConfig?.targetScore) {
+          maxScore = gameConfig.targetScore;
+        }
+        
+        return maxScore;
+      
+      case 'spinner-wheel':
+        // Usually completion-based, typically 100 points
+        const spinnerMax = gameConfig?.maxScore || 100;
+        return spinnerMax;
+        
+      default:
+        return 100; // Fallback
+    }
+  };
+
+  // Enhanced star rating system based on percentage achievement
+  const renderStars = (score: number, gameType?: string, gameConfig?: any, maxScore?: number) => {
+    // Determine the actual maximum score for this game
+    const actualMaxScore = maxScore || getMaxScoreForGame(gameType || '', gameConfig);
+    
+    // Calculate percentage achievement
+    const percentage = Math.min(100, Math.max(0, (score / actualMaxScore) * 100));
+    
+    // Determine star count and achievement level based on percentage
+    let starCount: number;
+    let achievementLevel: string;
+    let levelColor: string;
+    
+    if (percentage >= 96) {
+      starCount = 5;
+      achievementLevel = "MASTER";
+      levelColor = "#FFD700"; // Gold
+    } else if (percentage >= 85) {
+      starCount = 4;
+      achievementLevel = "EXPERT";
+      levelColor = "#FF6B6B"; // Red
+    } else if (percentage >= 70) {
+      starCount = 3;
+      achievementLevel = "SKILLED";
+      levelColor = "#4ECDC4"; // Teal
+    } else if (percentage >= 50) {
+      starCount = 2;
+      achievementLevel = "LEARNER";
+      levelColor = "#45B7D1"; // Blue
+    } else {
+      starCount = 1;
+      achievementLevel = "BEGINNER";
+      levelColor = "#96CEB4"; // Green
+    }
     
     return (
-      <div style={{ display: 'flex', marginTop: '4px' }}>
-        {[...Array(5)].map((_, i) => (
-          <div 
-            key={i}
-            style={{
-              fontSize: '24px',
-              color: i < starCount ? '#FFD700' : '#E2E8F0',
-              marginRight: '2px'
-            }}
-          >
-            ★
-          </div>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '4px' }}>
+        {/* Stars */}
+        <div style={{ display: 'flex', marginBottom: '4px' }}>
+          {[...Array(5)].map((_, i) => (
+            <div 
+              key={i}
+              style={{
+                fontSize: '20px',
+                color: i < starCount ? '#FFD700' : '#E2E8F0',
+                marginRight: '2px',
+                textShadow: i < starCount ? '0 1px 3px rgba(0,0,0,0.3)' : 'none'
+              }}
+            >
+              ★
+            </div>
+          ))}
+        </div>
+        
+        {/* Achievement level and percentage */}
+        <div style={{
+          fontSize: '11px',
+          fontWeight: 'bold',
+          color: levelColor,
+          backgroundColor: `${levelColor}15`,
+          padding: '2px 8px',
+          borderRadius: '12px',
+          textAlign: 'center',
+          border: `1px solid ${levelColor}40`
+        }}>
+          {achievementLevel}
+        </div>
+        
+        <div style={{
+          fontSize: '10px',
+          color: colors.textLight,
+          marginTop: '2px'
+        }}>
+          {Math.round(percentage)}% ({score}/{actualMaxScore})
+        </div>
       </div>
     );
   };
@@ -547,7 +650,7 @@ const StudentDashboard: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Overdue Assignments Section */}
+            {/* Not-Yet-Done Assignments Section */}
             {overdueAssignments.length > 0 && (
               <div style={{ marginBottom: '32px' }}>
                 <div style={{ 
@@ -566,7 +669,7 @@ const StudentDashboard: React.FC = () => {
                     color: '#C53030',
                     margin: 0 
                   }}>
-                    Overdue Assignments ({overdueAssignments.length})
+                    Not-Yet-Done Assignments ({overdueAssignments.length})
                   </h3>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
@@ -722,34 +825,44 @@ const StudentDashboard: React.FC = () => {
             padding: '16px',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
           }}>
-            {attempts.slice(0, 5).map((attempt, index) => (
-              <div
-                key={attempt.id}
-                style={{
-                  padding: '12px',
-                  borderBottom: index < 4 ? '1px solid #E2E8F0' : 'none',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 'bold', color: colors.text }}>
-                    {attempt.assignmentId ? `Assignment #${attempt.assignmentId.substr(0, 5)}...` : 'Free Play'}
+            {attempts.slice(0, 5).map((attempt, index) => {
+              // Find the assignment for this attempt to get game type
+              const relatedAssignment = assignments.find(a => a.id === attempt.assignmentId);
+              const gameConfig = relatedAssignment ? gameConfigs[relatedAssignment.gameId] : undefined;
+              
+              return (
+                <div
+                  key={attempt.id}
+                  style={{
+                    padding: '12px',
+                    borderBottom: index < 4 ? '1px solid #E2E8F0' : 'none',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 'bold', color: colors.text }}>
+                      {attempt.assignmentId ? `Assignment #${attempt.assignmentId.substr(0, 5)}...` : 'Free Play'}
+                    </div>
+                    <div style={{ fontSize: '14px', color: colors.textLight }}>
+                      {attempt.timestamp?.toDate().toLocaleString() || 'Unknown date'}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '14px', color: colors.textLight }}>
-                    {attempt.timestamp?.toDate().toLocaleString() || 'Unknown date'}
+                  
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 'bold', color: colors.primary }}>
+                      {attempt.score !== undefined ? `${attempt.score} points` : 'Completed'}
+                    </div>
+                    {attempt.score !== undefined && renderStars(
+                      attempt.score,
+                      relatedAssignment?.gameType || gameConfig?.type || 'unknown',
+                      gameConfig
+                    )}
                   </div>
                 </div>
-                
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 'bold', color: colors.primary }}>
-                    {attempt.score !== undefined ? `${attempt.score} points` : 'Completed'}
-                  </div>
-                  {attempt.score !== undefined && renderStars(attempt.score)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1043,68 +1156,447 @@ const StudentDashboard: React.FC = () => {
     );
   };
   
-  const renderHighScoresTab = () => (
-    <div style={{ marginTop: '24px' }}>
-      <h2 style={{ fontSize: '24px', marginBottom: '16px', color: colors.text }}>
-        My High Scores
-      </h2>
+  const renderHighScoresTab = () => {
+    // Get achievement badge based on percentage performance (like star system)
+    const getAchievementBadge = (score: number, gameType?: string, gameConfig?: any) => {
+      // Calculate percentage using same logic as star system
+      const actualMaxScore = getMaxScoreForGame(gameType || '', gameConfig);
+      const percentage = Math.min(100, Math.max(0, (score / actualMaxScore) * 100));
       
-      {highScores.length === 0 ? (
+      // Use percentage thresholds instead of raw scores
+      if (percentage >= 96) return { emoji: '🏆', text: 'LEGEND', color: '#FFD700', bgColor: '#FFF8DC' };
+      if (percentage >= 85) return { emoji: '🥇', text: 'CHAMPION', color: '#FFD700', bgColor: '#FFF8DC' };
+      if (percentage >= 70) return { emoji: '🥈', text: 'EXPERT', color: '#C0C0C0', bgColor: '#F8F8FF' };
+      if (percentage >= 50) return { emoji: '🥉', text: 'SKILLED', color: '#CD7F32', bgColor: '#FDF5E6' };
+      if (percentage >= 25) return { emoji: '⭐', text: 'RISING STAR', color: '#32CD32', bgColor: '#F0FFF0' };
+      return { emoji: '🌟', text: 'ACHIEVER', color: '#4169E1', bgColor: '#F0F8FF' };
+    };
+    
+    // Create motivational message based on progress
+    const getMotivationalMessage = () => {
+      const totalScores = enhancedHighScores.length;
+      const topScore = enhancedHighScores[0]?.score || 0;
+      
+      if (totalScores === 0) {
+        return "🎮 Start playing games to unlock your first achievement!";
+      } else if (totalScores === 1) {
+        return "🌟 Great start! Keep playing to build your collection of achievements!";
+      } else if (topScore >= 900) {
+        return "🏆 Legendary performance! You're absolutely crushing it!";
+      } else if (topScore >= 700) {
+        return "🎯 Fantastic scores! You're becoming a true gaming expert!";
+      } else {
+        return "🚀 Keep it up! Every game makes you stronger!";
+      }
+    };
+    
+    // High Score Card Component
+    const HighScoreCard = ({ score, index }: { score: HighScore, index: number }) => {
+      const badge = getAchievementBadge(score.score, score.gameType, score.gameConfig);
+      const gameConfig = score.gameConfig;
+      const isTopScore = index === 0;
+      
+      return (
+        <div 
+          style={{
+            backgroundColor: isTopScore ? '#FFF8DC' : colors.cardBg,
+            borderRadius: '20px',
+            padding: '20px',
+            boxShadow: isTopScore 
+              ? '0 8px 25px rgba(255, 215, 0, 0.3)' 
+              : '0 4px 12px rgba(0, 0, 0, 0.08)',
+            border: isTopScore ? '3px solid #FFD700' : '2px solid #E2E8F0',
+            position: 'relative',
+            transform: isTopScore ? 'scale(1.02)' : 'scale(1)',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          {/* Top Performer Crown */}
+          {isTopScore && (
+            <div style={{
+              position: 'absolute',
+              top: '-15px',
+              right: '20px',
+              backgroundColor: '#FFD700',
+              color: '#8B4513',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+              display: 'flex',
+              alignItems: 'center'
+            }}>
+              👑 TOP SCORE
+            </div>
+          )}
+          
+          {/* Game Thumbnail */}
+          <div style={{
+            height: '140px',
+            backgroundColor: badge.bgColor,
+            borderRadius: '16px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            border: `2px solid ${badge.color}30`
+          }}>
+            {gameConfig?.thumbnail ? (
+              <img 
+                src={gameConfig.thumbnail} 
+                alt={gameConfig.title}
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'cover',
+                  borderRadius: '16px'
+                }}
+              />
+            ) : (
+              <div style={{
+                fontSize: '56px',
+                color: badge.color,
+                opacity: 0.8
+              }}>
+                {score.gameType === 'whack-a-mole' ? '🔨' : 
+                 score.gameType === 'sort-categories-egg' ? '🥚' : 
+                 score.gameType === 'spinner-wheel' ? '🎡' : '🎮'}
+              </div>
+            )}
+          </div>
+          
+          {/* Game Title */}
+          <h3 style={{ 
+            fontSize: '18px', 
+            fontWeight: 'bold', 
+            marginBottom: '8px', 
+            color: colors.text,
+            textAlign: 'center'
+          }}>
+            {gameConfig?.title || 'Unknown Game'}
+          </h3>
+          
+          {/* Achievement Badge */}
+          <div style={{
+            backgroundColor: badge.bgColor,
+            color: badge.color,
+            borderRadius: '25px',
+            padding: '8px 16px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '12px',
+            border: `2px solid ${badge.color}40`
+          }}>
+            <span style={{ marginRight: '6px', fontSize: '16px' }}>{badge.emoji}</span>
+            {badge.text}
+          </div>
+          
+          {/* Score Display */}
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '12px'
+          }}>
+            <div style={{ 
+              fontSize: '32px', 
+              fontWeight: 'bold', 
+              color: badge.color,
+              marginBottom: '4px'
+            }}>
+              {score.score}
+            </div>
+            <div style={{ fontSize: '14px', color: colors.textLight }}>
+              points
+            </div>
+            {renderStars(score.score, score.gameType, score.gameConfig)}
+          </div>
+          
+          {/* Date */}
+          <div style={{
+            fontSize: '12px',
+            color: colors.textLight,
+            textAlign: 'center',
+            marginTop: '8px'
+          }}>
+            🗓️ {score.createdAt?.toDate?.() 
+              ? score.createdAt.toDate().toLocaleDateString() 
+              : new Date(score.createdAt).toLocaleDateString()}
+          </div>
+          
+          {/* Rank indicator */}
+          <div style={{
+            position: 'absolute',
+            top: '12px',
+            left: '12px',
+            backgroundColor: isTopScore ? '#FFD700' : colors.primary,
+            color: isTopScore ? '#8B4513' : 'white',
+            borderRadius: '50%',
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+          }}>
+            #{index + 1}
+          </div>
+        </div>
+      );
+    };
+    
+    return (
+      <div style={{ marginTop: '24px' }}>
+        <h2 style={{ fontSize: '24px', marginBottom: '16px', color: colors.text }}>
+          🏆 My High Scores
+        </h2>
+        
+        {/* Motivational Header */}
         <div style={{
-          backgroundColor: colors.cardBg,
+          backgroundColor: '#4299E1',
+          color: 'white',
           borderRadius: '16px',
-          padding: '24px',
+          padding: '20px',
+          marginBottom: '24px',
           textAlign: 'center',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+          boxShadow: '0 4px 12px rgba(66, 153, 225, 0.3)'
         }}>
-          <span style={{ fontSize: '48px', marginBottom: '16px', display: 'block' }}>🏆</span>
-          <p style={{ color: colors.textLight, fontSize: '18px' }}>
-            You haven't set any high scores yet. Play games to see your best scores here!
-          </p>
+          <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>
+            {getMotivationalMessage()}
+          </div>
+          <div style={{ opacity: 0.9 }}>
+            {enhancedHighScores.length > 0 && (
+              `You've achieved ${enhancedHighScores.length} high score${enhancedHighScores.length > 1 ? 's' : ''}!`
+            )}
+          </div>
         </div>
-      ) : (
-        <div style={{
-          backgroundColor: colors.cardBg,
-          borderRadius: '16px',
-          padding: '16px',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
-        }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #E2E8F0' }}>
-                <th style={{ padding: '12px', textAlign: 'left' }}>Game</th>
-                <th style={{ padding: '12px', textAlign: 'center' }}>Score</th>
-                <th style={{ padding: '12px', textAlign: 'right' }}>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {highScores.map((score, index) => (
-                <tr key={index} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                  <td style={{ padding: '12px', color: colors.text, fontWeight: 'bold' }}>
-                    {score.gameName}
-                  </td>
-                  <td style={{ padding: '12px', textAlign: 'center' }}>
-                    <div style={{ fontWeight: 'bold', color: colors.primary }}>{score.score}</div>
-                    {renderStars(score.score)}
-                  </td>
-                  <td style={{ padding: '12px', textAlign: 'right', color: colors.textLight }}>
-                    {score.date?.toDate?.() 
-                      ? score.date.toDate().toLocaleDateString() 
-                      : new Date(score.date).toLocaleDateString()}
-                  </td>
-                </tr>
+        
+        {enhancedHighScores.length === 0 ? (
+          <div style={{
+            backgroundColor: colors.cardBg,
+            borderRadius: '20px',
+            padding: '40px',
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+          }}>
+            <div style={{ fontSize: '80px', marginBottom: '20px' }}>🏆</div>
+            <h3 style={{ fontSize: '24px', marginBottom: '12px', color: colors.text }}>
+              Your Trophy Case Awaits!
+            </h3>
+            <p style={{ color: colors.textLight, fontSize: '18px', marginBottom: '20px' }}>
+              Complete games to unlock achievements and build your high score collection!
+            </p>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              marginTop: '24px'
+            }}>
+              {/* Preview achievement cards */}
+              {[
+                { emoji: '🌟', text: 'First Score', desc: 'Complete any game' },
+                { emoji: '⭐', text: 'Rising Star', desc: 'Score 500+ points' },
+                { emoji: '🥇', text: 'Champion', desc: 'Score 800+ points' },
+                { emoji: '🏆', text: 'Legend', desc: 'Score 900+ points' }
+              ].map((achievement, index) => (
+                <div key={index} style={{
+                  backgroundColor: '#F7FAFC',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  opacity: 0.6,
+                  textAlign: 'center',
+                  border: '2px dashed #E2E8F0'
+                }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>{achievement.emoji}</div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px', color: colors.text }}>
+                    {achievement.text}
+                  </div>
+                  <div style={{ fontSize: '12px', color: colors.textLight }}>
+                    {achievement.desc}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Statistics Summary */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '16px',
+              marginBottom: '32px'
+            }}>
+              <div style={{
+                backgroundColor: colors.cardBg,
+                padding: '20px',
+                borderRadius: '16px',
+                textAlign: 'center',
+                boxShadow: '0 4px 8px rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '32px', fontWeight: 'bold', color: colors.primary }}>
+                  {enhancedHighScores.length}
+                </div>
+                <div style={{ color: colors.textLight }}>Total Achievements</div>
+              </div>
+              
+              <div style={{
+                backgroundColor: colors.cardBg,
+                padding: '20px',
+                borderRadius: '16px',
+                textAlign: 'center',
+                boxShadow: '0 4px 8px rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#FFD700' }}>
+                  {enhancedHighScores[0]?.score || 0}
+                </div>
+                <div style={{ color: colors.textLight }}>Best Score</div>
+              </div>
+              
+              <div style={{
+                backgroundColor: colors.cardBg,
+                padding: '20px',
+                borderRadius: '16px',
+                textAlign: 'center',
+                boxShadow: '0 4px 8px rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#48BB78' }}>
+                  {Math.round(enhancedHighScores.reduce((sum, score) => sum + (score.score || 0), 0) / enhancedHighScores.length) || 0}
+                </div>
+                <div style={{ color: colors.textLight }}>Average Score</div>
+              </div>
+            </div>
+            
+            {/* High Score Cards Grid */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+              gap: '20px' 
+            }}>
+              {enhancedHighScores.map((score, index) => (
+                <HighScoreCard key={score.id} score={score} index={index} />
+              ))}
+            </div>
+            
+            {/* Encouragement Footer */}
+            <div style={{
+              backgroundColor: '#F0FFF4',
+              borderRadius: '16px',
+              padding: '20px',
+              marginTop: '32px',
+              textAlign: 'center',
+              border: '2px solid #48BB78'
+            }}>
+              <div style={{ fontSize: '20px', marginBottom: '8px' }}>🎯</div>
+              <div style={{ color: '#2F855A', fontWeight: 'bold' }}>
+                Keep playing to beat your high scores and unlock new achievements!
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+  
+  // Enhanced high scores loading function
+  const loadEnhancedHighScores = async () => {
+    if (highScoresLoading) return;
+    
+    setHighScoresLoading(true);
+    try {
+      // Get the student's userId for querying high scores
+      const studentUserId = isTeacherView ? studentId : currentUser?.uid;
+      
+      if (!studentUserId) {
+        console.log('No student userId found for high scores query');
+        setEnhancedHighScores([]);
+        return;
+      }
+      
+      console.log('Querying high scores for userId:', studentUserId);
+      
+      // Query the highScores collection for this student by userId
+      const highScoresQuery = query(
+        collection(db, 'highScores'),
+        where('userId', '==', studentUserId),
+        orderBy('score', 'desc') // Order by score descending to get highest first
+      );
+      
+      const highScoresSnapshot = await getDocs(highScoresQuery);
+      console.log('Found high scores:', highScoresSnapshot.docs.length);
+      
+      const scoresWithConfigs: HighScore[] = [];
+      
+      for (const scoreDoc of highScoresSnapshot.docs) {
+        const scoreData = scoreDoc.data();
+        console.log('Processing high score:', scoreData);
+        
+        // Create base high score object
+        const highScore: HighScore = {
+          id: scoreDoc.id,
+          userId: scoreData.userId || studentUserId, // Use userId, fallback for backwards compatibility
+          playerName: scoreData.playerName || 'Student', // Keep for display, fallback
+          score: scoreData.score,
+          configId: scoreData.configId,
+          createdAt: scoreData.createdAt,
+          gameType: scoreData.gameType || 'unknown',
+          gameConfig: null
+        };
+        
+        // Try to fetch the game configuration
+        if (scoreData.configId) {
+          try {
+            const gameConfigRef = doc(db, 'userGameConfigs', scoreData.configId);
+            const gameConfigDoc = await getDoc(gameConfigRef);
+            
+            if (gameConfigDoc.exists()) {
+              const configData = gameConfigDoc.data();
+              highScore.gameConfig = {
+                id: gameConfigDoc.id,
+                title: configData.title || configData.name,
+                thumbnail: configData.thumbnail || configData.thumbnailUrl,
+                type: configData.type || configData.gameType,
+                ...configData
+              };
+              console.log('Found game config for score:', highScore.gameConfig.title);
+            } else {
+              console.log('Game config not found for configId:', scoreData.configId);
+            }
+          } catch (error) {
+            console.error('Error fetching game config:', error);
+          }
+        }
+        
+        scoresWithConfigs.push(highScore);
+      }
+      
+      console.log('Enhanced high scores loaded:', scoresWithConfigs.length);
+      setEnhancedHighScores(scoresWithConfigs);
+      
+    } catch (error) {
+      console.error('Error loading enhanced high scores:', error);
+      setEnhancedHighScores([]);
+    } finally {
+      setHighScoresLoading(false);
+    }
+  };
   
   // Handle back button for teacher view
   const handleBackToTeacherDashboard = () => {
     navigate('/teacher', { state: { activeTab: 'students' } });
   };
+  
+  // Load enhanced high scores when switching to the high scores tab
+  useEffect(() => {
+    if (activeTab === 'highscores' && !highScoresLoading && enhancedHighScores.length === 0) {
+      loadEnhancedHighScores();
+    }
+  }, [activeTab]);
   
   return (
     <div style={{ 
@@ -1160,7 +1652,7 @@ const StudentDashboard: React.FC = () => {
           <p style={{ color: colors.textLight }}>
             {isTeacherView 
               ? `Teacher view of student dashboard${studentData?.grade ? ` - Grade ${studentData.grade}` : ''}`
-              : 'Let\'s learn something new today!'
+              : ''
             }
           </p>
         </div>
@@ -1174,27 +1666,18 @@ const StudentDashboard: React.FC = () => {
         padding: '8px 0'
       }}>
         {renderTabButton('assignments', 'My Assignments', '📚')}
-        {renderTabButton('progress', 'My Progress', '📈')}
         {renderTabButton('freeplay', 'Free Play', '🎮')}
         {renderTabButton('highscores', 'High Scores', '🏆')}
       </div>
       
       {/* Loading state */}
-      {isLoading ? (
-        <div style={{ 
-          padding: '48px', 
-          textAlign: 'center',
-          color: colors.textLight
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px', display: 'inline-block' }}>
-            🔄
-          </div>
-          <p>Loading your dashboard...</p>
-        </div>
+      {loading ? (
+        <LoadingSpinner 
+          size="large"
+        />
       ) : (
         <>
           {activeTab === 'assignments' && renderAssignmentsTab()}
-          {activeTab === 'progress' && renderProgressTab()}
           {activeTab === 'freeplay' && renderFreePlayTab()}
           {activeTab === 'highscores' && renderHighScoresTab()}
         </>

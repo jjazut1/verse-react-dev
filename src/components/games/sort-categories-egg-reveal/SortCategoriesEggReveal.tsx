@@ -24,6 +24,7 @@ import {
 } from '@chakra-ui/react';
 import { collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../../config/firebase';
+import { useAuth } from '../../../contexts/AuthContext';
 import Egg from './Egg';
 import Basket from './Basket';
 import GameConfig from './GameConfig';
@@ -163,6 +164,9 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   onHighScoreProcessStart,
   onHighScoreProcessComplete,
 }): JSX.Element => {
+  // Get the current user from auth context
+  const { currentUser } = useAuth();
+  
   // Game state
   const [score, setScore] = useState(0);
   const [eggs, setEggs] = useState<EggType[]>([]);
@@ -194,9 +198,7 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   const [isGameComplete, setIsGameComplete] = useState(false);
   const [highScores, setHighScores] = useState<HighScoreType[]>([]);
   const [isHighScore, setIsHighScore] = useState(false);
-  const [showHighScoreModal, setShowHighScoreModal] = useState(false);
   const [showHighScoreDisplayModal, setShowHighScoreDisplayModal] = useState(false);
-  const [newHighScoreName, setNewHighScoreName] = useState(playerName || "");
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   
   const toast = useToast();
@@ -636,9 +638,7 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     setTargetBasket(null);
     setIsGameComplete(false);
     setIsHighScore(false);
-    setShowHighScoreModal(false);
     setShowHighScoreDisplayModal(false);
-    setNewHighScoreName("");
     
     // Reset baskets
     const emptyBaskets = gameConfig.categories.map((category, index) => ({
@@ -649,11 +649,15 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     setBaskets(emptyBaskets);
     
     // Create a fresh copy of the game config while preserving the original ID
-    const freshConfig = {
+    const freshConfig: SortCategoriesConfig = {
       ...gameConfig,
       categories: gameConfig.categories.map(cat => ({
         ...cat,
-        items: [...cat.items]
+        items: Array.isArray(cat.items) 
+          ? (typeof cat.items[0] === 'string' 
+            ? [...(cat.items as string[])]
+            : [...(cat.items as Array<{ content: string; text: string; }>)])
+          : []
       }))
     };
     
@@ -706,29 +710,26 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     if (highScores.length < 10 || newScore > (highScores[highScores.length - 1]?.score || 0)) {
       console.log('New high score detected!');
       setIsHighScore(true);
-      setShowHighScoreModal(true);
-      // Notify parent that high score process is starting
       if (onHighScoreProcessStart) {
         console.log('Notifying parent: high score process starting');
         onHighScoreProcessStart();
       }
+      // Auto-save the high score with the actual final score
+      saveHighScore(newScore);
     } else {
       // No high score to save, show high score display immediately
       console.log('Not a high score, showing display modal');
       setShowHighScoreDisplayModal(true);
-      // Don't call onHighScoreProcessComplete here
-      // We'll let the modal close handler trigger it instead
+      // Notify parent that high score process is complete after a delay
+      setTimeout(() => {
+        console.log('Notifying parent: high score process complete (not a high score)');
+        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
+      }, 500);
     }
   };
 
   // Save high score
-  const saveHighScore = async () => {
-    console.log('Attempting to save high score:', {
-      playerName: newHighScoreName,
-      score,
-      configId: gameConfig.id
-    });
-    
+  const saveHighScore = async (finalScore?: number) => {
     if (!gameConfig.id) {
       console.error('No game config ID available');
       toast({
@@ -737,64 +738,45 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
         status: 'error',
         duration: 3000,
       });
+      if (onHighScoreProcessComplete) onHighScoreProcessComplete();
+      return;
+    }
+
+    if (!currentUser) {
+      toast({
+        title: 'Error',
+        description: 'Must be logged in to save high score',
+        status: 'error',
+        duration: 3000,
+      });
+      if (onHighScoreProcessComplete) onHighScoreProcessComplete();
       return;
     }
 
     try {
       setIsSubmittingScore(true);
 
-      // Validate player name
-      const sanitizedName = newHighScoreName.trim();
-      if (!sanitizedName || sanitizedName.length < 3 || sanitizedName.length > 12) {
-        toast({
-          title: 'Invalid Name',
-          description: 'Please enter a name between 3 and 12 characters.',
-          status: 'error',
-          duration: 3000,
-        });
-        return;
+      // Get the user's display name from their account
+      let displayName = currentUser.displayName || playerName || 'Student';
+      
+      // Try to get the name from the users collection for more accurate display
+      try {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          displayName = userData.name || displayName;
+        }
+      } catch (error) {
+        console.log('Could not fetch user name from database, using fallback');
       }
 
-      // Check if name contains only alphanumeric characters and spaces
-      if (!/^[A-Za-z0-9\s]+$/.test(sanitizedName)) {
-        toast({
-          title: 'Invalid Name',
-          description: 'Name can only contain letters, numbers, and spaces.',
-          status: 'error',
-          duration: 3000,
-        });
-        return;
-      }
-
-      // Basic profanity check (case-insensitive)
-      const profanityRegex = /\b(ass|fuck|shit|damn|bitch|crap|piss|dick|cock|pussy|whore|slut|bastard)\b/i;
-      if (profanityRegex.test(sanitizedName)) {
-        toast({
-          title: 'Invalid Name',
-          description: 'Please choose an appropriate name.',
-          status: 'error',
-          duration: 3000,
-        });
-        return;
-      }
-
-      // Validate score
-      if (score < 0 || score > 1000) {
-        toast({
-          title: 'Invalid Score',
-          description: 'Score is out of valid range.',
-          status: 'error',
-          duration: 3000,
-        });
-        return;
-      }
-
-      // Check for recent high scores by this player (rate limiting)
-      const fiveMinutesAgo = Timestamp.fromMillis(Date.now() - 5 * 60 * 1000);
+      // Check for rate limiting (5 scores per 5 minutes per user)
+      const fiveMinutesAgo = new Date();
+      fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
       
       const recentScoresQuery = query(
         collection(db, 'highScores'),
-        where('playerName', '==', sanitizedName),
+        where('userId', '==', currentUser.uid),
         where('configId', '==', gameConfig.id),
         where('createdAt', '>', fiveMinutesAgo),
         limit(5)
@@ -802,17 +784,14 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
       
       const recentScoresSnap = await getDocs(recentScoresQuery);
       if (recentScoresSnap.size >= 5) {
-        console.log('Rate limit exceeded:', {
-          playerName: sanitizedName,
-          recentScores: recentScoresSnap.size,
-          timeWindow: '5 minutes'
-        });
         toast({
           title: 'Too Many Attempts',
           description: 'Please wait a few minutes before submitting another score.',
           status: 'error',
           duration: 3000,
         });
+        setIsSubmittingScore(false);
+        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
         return;
       }
 
@@ -828,69 +807,54 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
           status: 'error',
           duration: 3000,
         });
+        setIsSubmittingScore(false);
+        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
         return;
       }
 
       const configData = configSnap.data();
-      console.log('Game config data:', configData);
 
-      // Verify that the game config is shared
-      if (!configData?.share) {
-        console.error('Game configuration is not shared:', {
-          shared: configData?.share,
-          type: configData?.type
-        });
+      // Use the passed finalScore when available, fall back to state score
+      const scoreToSave = finalScore !== undefined ? finalScore : score;
+      
+      // Validate that we have a valid score
+      if (typeof scoreToSave !== 'number' || isNaN(scoreToSave) || scoreToSave < 0) {
+        console.error('Invalid score detected:', scoreToSave);
         toast({
           title: 'Error Saving Score',
-          description: 'High scores are not enabled for this game configuration.',
+          description: 'Invalid score value detected.',
           status: 'error',
           duration: 3000,
         });
+        setIsSubmittingScore(false);
+        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
         return;
       }
 
-      // Create high score with minimal required fields
+      // Create high score with userId and user's name
       const highScore = {
-        playerName: sanitizedName,
-        score: score,
+        userId: currentUser.uid,
+        playerName: displayName,
+        score: scoreToSave,
         configId: gameConfig.id,
         createdAt: serverTimestamp(),
-        gameType: configData.type  // Include the game type in the high score
+        gameType: 'sort-categories-egg'
       };
-
-      console.log('Saving high score to Firestore:', {
-        ...highScore,
-        nameValid: /^[A-Za-z0-9\s]+$/.test(sanitizedName),
-        lengthValid: sanitizedName.length >= 3 && sanitizedName.length <= 12,
-        scoreValid: score >= 0 && score <= 1000,
-        configExists: configSnap.exists(),
-        configShared: configData?.share
-      });
 
       // Add to Firestore
       const docRef = await addDoc(collection(db, 'highScores'), highScore);
-      console.log('Successfully saved high score with ID:', docRef.id);
       
       toast({
         title: 'High Score Saved!',
-        description: 'Your score has been recorded.',
+        description: `Your score of ${scoreToSave} has been recorded.`,
         status: 'success',
         duration: 3000,
       });
       
-      setShowHighScoreModal(false);
       await loadHighScores(gameConfig.id);
-      // Show high score display after saving
       setShowHighScoreDisplayModal(true);
     } catch (error: any) {
       console.error('Error saving high score:', error);
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        gameConfigId: gameConfig.id,
-        score,
-        playerName: newHighScoreName
-      });
       
       toast({
         title: 'Error Saving Score',
@@ -898,7 +862,6 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
         status: 'error',
         duration: 3000,
       });
-      // Notify parent that high score process is complete (even if there was an error)
       if (onHighScoreProcessComplete) onHighScoreProcessComplete();
     } finally {
       setIsSubmittingScore(false);
@@ -930,71 +893,6 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
             onConfigSelect={handleConfigSelect} 
           />
         </ModalBody>
-      </ModalContent>
-    </Modal>
-  );
-
-  // Render high score modal
-  const renderHighScoreModal = () => (
-    <Modal 
-      isOpen={showHighScoreModal} 
-      onClose={() => {
-        setShowHighScoreModal(false);
-        // Show high score display after closing the input modal
-        setShowHighScoreDisplayModal(true);
-      }}
-      closeOnOverlayClick={false}
-      size="md"
-    >
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader 
-          fontSize={{ base: "lg", md: "xl" }}
-          textAlign="center"
-          color="blue.600"
-          fontFamily="'Comic Neue', sans-serif"
-        >
-          🎉 New High Score! 🎉
-        </ModalHeader>
-        <ModalBody>
-          <VStack spacing={4} align="center">
-            <Text
-              fontSize={{ base: "md", md: "lg" }}
-              fontWeight="bold"
-              color="gray.700"
-              fontFamily="'Comic Neue', sans-serif"
-            >
-              Your Score: {score}
-            </Text>
-            <FormControl>
-              <FormLabel
-                fontSize={{ base: "sm", md: "md" }}
-                fontFamily="'Comic Neue', sans-serif"
-              >
-                Enter your nickname (3-12 characters):
-              </FormLabel>
-              <Input
-                value={newHighScoreName}
-                onChange={(e) => setNewHighScoreName(e.target.value)}
-                placeholder="Your nickname"
-                maxLength={12}
-                pattern="[A-Za-z0-9]+"
-                fontFamily="'Comic Neue', sans-serif"
-              />
-            </FormControl>
-          </VStack>
-        </ModalBody>
-        <ModalFooter justifyContent="center">
-          <Button
-            colorScheme="blue"
-            onClick={saveHighScore}
-            isLoading={isSubmittingScore}
-            loadingText="Saving..."
-            fontFamily="'Comic Neue', sans-serif"
-          >
-            Save Score
-          </Button>
-        </ModalFooter>
       </ModalContent>
     </Modal>
   );
@@ -1034,7 +932,7 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
           <HStack
             key={hs.id}
             justify="space-between"
-                    bg={isHighScore && score === hs.score && newHighScoreName === hs.playerName 
+                    bg={isHighScore && score === hs.score && playerName === hs.playerName 
                         ? "yellow.50" 
                         : index % 2 === 0 
                           ? "blue.50" 
@@ -1271,7 +1169,6 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
           )}
         </Box>
       </Box>
-      {renderHighScoreModal()}
       {renderHighScoreDisplayModal()}
     </Box>
   );

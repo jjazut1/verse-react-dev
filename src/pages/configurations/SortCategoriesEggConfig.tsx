@@ -725,6 +725,10 @@ const SortCategoriesEggConfig = () => {
       // If no templateId, this is a new configuration - no need to load anything
       if (!templateId) return;
       
+      // Check if this is a copy operation
+      const urlParams = new URLSearchParams(window.location.search);
+      const isCopy = urlParams.get('copy') === 'true';
+      
       setIsLoading(true);
       try {
         // First try to load from userGameConfigs
@@ -741,8 +745,8 @@ const SortCategoriesEggConfig = () => {
             const data = templateSnap.data();
             console.log(`Found template in categoryTemplates:`, data);
             
-            // Populate form fields
-            setTitle(data.title || '');
+            // Populate form fields - if copy, append "Copy of " to title
+            setTitle(isCopy ? `Copy of ${data.title || 'Untitled Template'}` : (data.title || ''));
             setEggQty(data.eggQty || 6);
             setShareConfig(data.share || false);
             setIsEditing(false); // Creating a new config based on template
@@ -797,8 +801,8 @@ const SortCategoriesEggConfig = () => {
               const data = blankTemplateSnap.data();
               console.log(`Found template in blankGameTemplates:`, data);
               
-              // Populate form fields
-              setTitle(data.title || '');
+              // Populate form fields - if copy, append "Copy of " to title
+              setTitle(isCopy ? `Copy of ${data.title || 'Untitled Template'}` : (data.title || ''));
               setEggQty(data.eggQty || 6);
               setShareConfig(data.share || false);
               setIsEditing(false); // Creating a new config based on blank template
@@ -882,8 +886,17 @@ const SortCategoriesEggConfig = () => {
           const data = gameConfigSnap.data();
           console.log(`Found template in userGameConfigs:`, data);
             
-          // Check if the user has permission to edit this config
-          if (data.userId !== currentUser?.uid) {
+          // Check if this is a copy operation or user doesn't have permission
+          if (isCopy) {
+            // Force this to be a copy, not an edit
+            setIsEditing(false);
+            toast({
+              title: "Creating a copy",
+              description: "Creating a new copy of this game configuration.",
+              status: "info",
+              duration: 5000,
+            });
+          } else if (data.userId !== currentUser?.uid) {
             // If not the owner, create a copy instead of editing
             setIsEditing(false);
             toast({
@@ -896,8 +909,8 @@ const SortCategoriesEggConfig = () => {
             setIsEditing(true);
           }
 
-          // Populate form fields
-          setTitle(data.title || '');
+          // Populate form fields - if copy, append "Copy of " to title
+          setTitle(isCopy ? `Copy of ${data.title || 'Untitled Game'}` : (data.title || ''));
           setEggQty(data.eggQty || 6);
           setShareConfig(data.share || false);
           

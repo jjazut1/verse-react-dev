@@ -1,7 +1,10 @@
 import { createBrowserRouter, RouterProvider, Navigate, useParams, useRouteError, isRouteErrorResponse, useNavigate, useSearchParams, redirect } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext'
+import { ModalProvider } from './contexts/ModalContext'
+import { LoadingProvider } from './contexts/LoadingContext'
 import Navbar from './components/Navbar'
+import { GlobalModals } from './components/GlobalModals'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import LoginComplete from './pages/LoginComplete'
@@ -414,7 +417,12 @@ function App() {
   return (
     <AuthProvider>
       <UnsavedChangesProvider>
-        <RouterProvider router={router} />
+        <ModalProvider>
+          <LoadingProvider>
+            <RouterProvider router={router} />
+            <GlobalModals />
+          </LoadingProvider>
+        </ModalProvider>
       </UnsavedChangesProvider>
     </AuthProvider>
   )

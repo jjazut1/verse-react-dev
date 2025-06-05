@@ -974,6 +974,10 @@ const WhackAMoleConfig = () => {
       // If no templateId, this is a new configuration - no need to load anything
       if (!templateId) return;
       
+      // Check if this is a copy operation
+      const urlParams = new URLSearchParams(window.location.search);
+      const isCopy = urlParams.get('copy') === 'true';
+      
       setIsLoading(true);
       try {
         const docRef = doc(db, 'userGameConfigs', templateId);
@@ -982,8 +986,17 @@ const WhackAMoleConfig = () => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           
-          // Check if the user has permission to edit this config
-          if (data.userId !== currentUser?.uid) {
+          // Check if this is a copy operation or user doesn't have permission
+          if (isCopy) {
+            // Force this to be a copy, not an edit
+            setIsEditing(false);
+            toast({
+              title: "Creating a copy",
+              description: "Creating a new copy of this game configuration.",
+              status: "info",
+              duration: 5000,
+            });
+          } else if (data.userId !== currentUser?.uid) {
             // If not the owner, create a copy instead of editing
             setIsEditing(false);
             toast({
@@ -996,8 +1009,8 @@ const WhackAMoleConfig = () => {
             setIsEditing(true);
           }
 
-          // Populate form fields
-          const loadedTitle = data.title || '';
+          // Populate form fields - if copy, append "Copy of " to title
+          const loadedTitle = isCopy ? `Copy of ${data.title || 'Untitled Game'}` : (data.title || '');
           const loadedGameTime = data.gameTime || 30;
           const loadedPointsPerHit = data.pointsPerHit || 10;
           const loadedPenaltyPoints = data.penaltyPoints || 5;
