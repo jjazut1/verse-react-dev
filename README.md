@@ -106,6 +106,83 @@ interface CategoryItem {
 
 ## 🚀 Recent Major Updates
 
+### ⚡ Latest Platform Improvements (June 2025)
+
+#### **Critical Bug Fixes** 🔧
+- **Modal Provider Context Error** - Fixed app-breaking error preventing home page from loading
+  - Added missing `ModalProvider` and `LoadingProvider` to the provider stack in `App.tsx`
+  - Resolved "useModal must be used within ModalProvider" errors
+  - Ensured proper context nesting for all modal and loading functionality
+
+- **Teacher Signup Bug** - Fixed Firestore user document creation for teachers
+  - Enhanced both email/password and Google signup flows
+  - Automatically creates Firestore user documents with `role: "teacher"`
+  - Enables proper teacher dashboard access and game creation interface
+  - Resolved issue where teachers couldn't access "Start Creating" games
+
+- **High Score Display Bug** - Fixed scoring inconsistencies in leaderboards
+  - Corrected React state timing issues where final scores weren't properly saved
+  - Updated `SortCategoriesEggReveal.tsx` and `WhackAMole.tsx` with proper score parameter handling
+  - Implemented fallback logic: `const scoreToSave = finalScore !== undefined ? finalScore : score`
+
+#### **Major New Features** 🆕
+
+- **Enhanced Authentication System** with dual access methods
+  - **Teacher Signup**: "Get Started as a Teacher" with dedicated signup modal
+  - **Member Login**: "Members Login" for existing users only
+  - Proper Firebase Auth integration with Firestore user document creation
+  - Automatic navigation to appropriate dashboards after authentication
+
+- **Folder Management System** for game organization
+  - Create, edit, and delete custom folders for games
+  - Drag-and-drop game assignment to folders
+  - Color-coded folder system with descriptions
+  - Enhanced teacher dashboard with organized game library
+
+- **LoadingSpinner & GlobalModals Components**
+  - **LoadingSpinner**: Reusable component with bouncing logo animation, pulsing background, and progress dots
+  - **LoadingContext**: Global loading state management across the application
+  - **GlobalModals**: Centralized modal system with multiple modal types
+  - **ModalContext**: Unified modal state management
+
+- **Student Password Setup Email System**
+  - Automatic password setup emails when teachers create student accounts
+  - Firebase Functions integration with SendGrid for email delivery
+  - Professional branded email templates with secure password reset links
+  - Enhanced student management with password status tracking
+
+#### **Achievement & Scoring System Fixes** 🏆
+
+- **Percentage-Based Achievement Badges**
+  - **LEGEND** (96-100%), **CHAMPION** (85-95%), **EXPERT** (70-84%)
+  - **SKILLED** (50-69%), **RISING STAR** (25-49%), **ACHIEVER** (0-24%)
+  - Game-specific max score calculations for fair recognition
+  - Fixed star rating system to properly reflect achievement levels
+
+- **Game-Specific Scoring Logic**
+  - **Sort Categories Egg Reveal**: `eggQty × 10 points` max score
+  - **Whack-a-Mole**: Speed-based scoring (Easy: 60, Medium: 90, Hard: 120)
+  - **Spinner Wheel**: Config-based or default 100 points
+
+#### **Platform Improvements** 📈
+
+- **Production Deployment** to https://verse-dev-central.web.app
+  - All improvements live and tested in production environment
+  - Enhanced build and deployment pipeline
+  - Comprehensive testing across all game types and user flows
+
+- **Teacher Dashboard Enhancements**
+  - Improved student management with detailed profiles
+  - Enhanced assignment creation and tracking
+  - Direct access to student dashboard views
+  - Streamlined navigation and workflow optimization
+
+- **Student Experience Improvements**
+  - Better authentication flows with clear error handling
+  - Enhanced dashboard organization and visual feedback
+  - Improved assignment access and completion tracking
+  - Cross-device compatibility and session management
+
 ### Rich Text Formatting System ✨
 - **Comprehensive Rich Text Support**: Full formatting capabilities across all three games (Spinner Wheel, Whack-a-Mole, Sort Categories Egg Reveal)
 - **Universal Formatting**: Bold, italic, underline, superscript, and subscript support for educational content like chemical formulas (H₂O), mathematical expressions (x²), and styled text
