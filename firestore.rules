@@ -194,13 +194,20 @@ service cloud.firestore {
       // 2. Allow users to create their own document (for new accounts and linking Google Auth)
       // 3. Allow users to update their own document BUT not change their role
       // 4. Allow auto-assignment of students to teachers when completing assignments
+      // 5. Allow teachers to create student documents
       allow create: if isAdmin() || 
         request.auth.uid == userId ||
         // Allow creating student records for auto-assignment (when completing assignments)
         (request.resource.data.role == 'student' && 
          request.resource.data.teacherId is string &&
          request.resource.data.email is string &&
-         request.resource.data.autoAssigned == true);
+         request.resource.data.autoAssigned == true) ||
+        // Allow teachers to create student documents
+        (isTeacherOrAdmin() &&
+         request.resource.data.role == 'student' &&
+         request.resource.data.teacherId == request.auth.uid &&
+         request.resource.data.email is string &&
+         request.resource.data.name is string);
          
       allow delete: if isAdmin();
       
@@ -215,7 +222,13 @@ service cloud.firestore {
          request.resource.data.diff(resource.data).affectedKeys()
            .hasOnly(['teacherId', 'teacherEmail', 'name', 'updatedAt', 'lastAssignmentCompletion', 'autoAssigned']) &&
          request.resource.data.teacherId is string &&
-         request.resource.data.autoAssigned == true);
+         request.resource.data.autoAssigned == true) ||
+        // Allow teachers to update their students' documents
+        (isTeacherOrAdmin() &&
+         resource.data.role == 'student' &&
+         request.resource.data.role == 'student' &&
+         resource.data.teacherId == request.auth.uid &&
+         request.resource.data.teacherId == request.auth.uid);
     }
     
     // Sort Categories Egg collection

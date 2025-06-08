@@ -382,6 +382,26 @@ export const sendPasswordSetupEmail = onDocumentCreated(
     }
 
     try {
+      // First, create or get the Firebase Auth user
+      try {
+        // Try to get existing user
+        await admin.auth().getUserByEmail(studentEmail);
+        logger.info('Found existing Firebase Auth user for:', studentEmail);
+      } catch (error: any) {
+        if (error.code === 'auth/user-not-found') {
+          // Create new Firebase Auth user with the same UID as the Firestore document
+          await admin.auth().createUser({
+            uid: userId,
+            email: studentEmail,
+            displayName: studentName,
+            emailVerified: false
+          });
+          logger.info('✅ Created Firebase Auth user for:', studentEmail);
+        } else {
+          throw error;
+        }
+      }
+      
       // Generate a password reset link using Firebase Auth
       const passwordResetLink = await admin.auth().generatePasswordResetLink(studentEmail);
       

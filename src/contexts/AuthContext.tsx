@@ -15,7 +15,7 @@ import {
   getRedirectResult
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 // For demo purposes, we'll check if user email is in this list to determine if they're a teacher
@@ -80,122 +80,157 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Check if they have a role in their user document
       try {
-        console.log(`Checking user document for uid: ${user.uid}`);
-        const userDoc = doc(db, 'users', user.uid);
-        const userRecord = await getDoc(userDoc);
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
         
-        if (userRecord.exists()) {
-          const userData = userRecord.data();
-          console.log(`User data retrieved:`, userData);
-          const role = userData.role;
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
           
-          // Set role flags based on the user's role
-          if (role === 'teacher' || role === 'admin') {
-            console.log(`User has role: ${role}, setting isTeacher to true`);
-            setIsTeacher(true);
-            setIsStudent(false);
-          } else if (role === 'student') {
-            console.log(`User has role: student, setting isStudent to true`);
-            setIsTeacher(false);
-            setIsStudent(true);
-          } else {
-            setIsTeacher(false);
-            setIsStudent(false);
-          }
+          // Update lastLogin timestamp - preserve existing createdAt
+          try {
+            const updateData: any = {
+              lastLogin: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              authUid: user.uid,
+              userId: user.uid,
+              displayName: user.displayName || userData.displayName || user.email?.split('@')[0],
+              email: user.email,
+              emailVerified: user.emailVerified,
+              linkedToAuth: true
+            };
             
-            // Update lastLogin timestamp
-            try {
-              await setDoc(userDoc, {
-                lastLogin: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              }, { merge: true });
-              console.log("Updated user lastLogin timestamp");
-            } catch (updateError) {
-              console.error("Error updating lastLogin:", updateError);
-              // Non-critical error, continue
+            // IMPORTANT: Preserve existing createdAt if it exists, otherwise create one
+            if (userData.createdAt) {
+              updateData.createdAt = userData.createdAt;
+            } else {
+              updateData.createdAt = new Date().toISOString();
             }
             
-            return;
-        } else {
-          console.log(`User document does not exist for uid: ${user.uid}, checking by email`);
+            await updateDoc(userDocRef, updateData);
+          } catch (error) {
+            console.error('Error updating user login timestamp:', error);
+          }
           
-          // If user document doesn't exist with UID, try to find by email
-          if (user.email) {
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('email', '==', user.email));
-            const querySnapshot = await getDocs(q);
+          // Check their role
+          if (userData.role === 'teacher') {
+            setIsTeacher(true);
+            setIsStudent(false);
+            return;
+          } else if (userData.role === 'student') {
+            setIsTeacher(false);
+            setIsStudent(true);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking user document by UID:', error);
+      }
+      
+      // Fallback: try to find user by email (for legacy documents)
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('email', '==', user.email));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const existingUserDoc = querySnapshot.docs[0];
+          const existingUserData = existingUserDoc.data();
+          
+          // 🛡️ IMPORTANT: Check if this document is already using the correct UID
+          // If the document ID matches the user's UID, then it's NOT a legacy document
+          if (existingUserDoc.id === user.uid) {
+            console.log('✅ Found user document by email, but it already has correct UID - no migration needed');
             
-            if (!querySnapshot.empty) {
-              // Found user by email
-              const existingUserDoc = querySnapshot.docs[0];
-              const existingUserData = existingUserDoc.data();
-              console.log(`Found user document by email: ${existingUserDoc.id}`, existingUserData);
+            // Just update the existing document with current auth info
+            try {
+              const updateData: any = {
+                lastLogin: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                authUid: user.uid,
+                userId: user.uid,
+                displayName: user.displayName || existingUserData.displayName || user.email?.split('@')[0],
+                email: user.email,
+                emailVerified: user.emailVerified,
+                linkedToAuth: true
+              };
               
-              // Set role flags based on the user's role
+              // Preserve existing createdAt
+              if (existingUserData.createdAt) {
+                updateData.createdAt = existingUserData.createdAt;
+              } else {
+                updateData.createdAt = new Date().toISOString();
+              }
+              
+              await updateDoc(existingUserDoc.ref, updateData);
+              
+              // Set their role
               if (existingUserData.role === 'teacher' || existingUserData.role === 'admin') {
-                console.log(`User has role: ${existingUserData.role}, setting isTeacher to true`);
                 setIsTeacher(true);
                 setIsStudent(false);
               } else if (existingUserData.role === 'student') {
-                console.log(`User has role: student, setting isStudent to true`);
                 setIsTeacher(false);
                 setIsStudent(true);
-              } else {
-                setIsTeacher(false);
-                setIsStudent(false);
               }
-                
-                // Create a new document with the user's actual UID
-                try {
-                  console.log(`Creating new user document with correct UID: ${user.uid}`);
-                  await setDoc(doc(db, 'users', user.uid), {
-                    ...existingUserData,
-                    userId: user.uid,
-                    updatedAt: new Date().toISOString(),
-                    lastLogin: new Date().toISOString(),
-                    displayName: user.displayName || existingUserData.displayName || user.email.split('@')[0],
-                    email: user.email,
-                    emailVerified: user.emailVerified,
-                    role: existingUserData.role  // Preserve their original role
-                  });
-                  
-                  console.log("Successfully created user document with correct UID");
-                  
-                  // Now check if we have permission to update the original document
-                  // This would be nice to have but not critical since we now have the new document
-                  try {
-                    await updateDoc(doc(db, 'users', existingUserDoc.id), {
-                      linkedToAuth: true,
-                      authUid: user.uid,
-                      lastLogin: new Date().toISOString(),
-                      updatedAt: new Date().toISOString()
-                    });
-                    console.log("Updated original user document with authUid reference");
-                  } catch (linkError) {
-                    console.warn("Could not update original document with authUid reference:", linkError);
-                    // This is not critical, we can continue
-                }
-                
-                return;
-              } catch (createError) {
-                console.error("Error creating user document with correct UID:", createError);
-                // We can continue with the current role state
+              return;
+            } catch (error) {
+              console.error('Error updating existing user document:', error);
+            }
+          } else {
+            console.log('🔄 Found legacy user document with different UID - performing migration');
+            console.log(`   Legacy UID: ${existingUserDoc.id}`);
+            console.log(`   Current UID: ${user.uid}`);
+            
+            // This is a real legacy document - perform migration
+            try {
+              const newUserData: any = {
+                ...existingUserData,
+                userId: user.uid,
+                authUid: user.uid,
+                updatedAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString(),
+                displayName: user.displayName || existingUserData.displayName || user.email?.split('@')[0],
+                email: user.email,
+                emailVerified: user.emailVerified,
+                linkedToAuth: true,
+                role: existingUserData.role  // Preserve their original role
+              };
+              
+              // IMPORTANT: Preserve existing createdAt if it exists, otherwise create one
+              if (existingUserData.createdAt) {
+                newUserData.createdAt = existingUserData.createdAt;
+              } else {
+                newUserData.createdAt = new Date().toISOString();
               }
               
+              await setDoc(doc(db, 'users', user.uid), newUserData);
+              
+              // Delete the old document ONLY if it has a different UID
+              await deleteDoc(existingUserDoc.ref);
+              console.log('✅ Successfully migrated legacy user document');
+              
+              // Set their role based on the migrated data
+              if (existingUserData.role === 'teacher' || existingUserData.role === 'admin') {
+                setIsTeacher(true);
+                setIsStudent(false);
+              } else if (existingUserData.role === 'student') {
+                setIsTeacher(false);
+                setIsStudent(true);
+              }
               return;
+            } catch (error) {
+              console.error('Error creating new user document with correct UID:', error);
             }
           }
         }
-      } catch (docError) {
-        console.error(`Error reading user document:`, docError);
-        // Continue execution - don't throw the error
+      } catch (error) {
+        console.error('Error checking user by email:', error);
       }
       
-      // If we've made it this far, user has no specific role
+      // No role found
       setIsTeacher(false);
       setIsStudent(false);
     } catch (error) {
-      console.error('Error checking user role:', error);
+      console.error('Error in checkUserRole:', error);
       setIsTeacher(false);
       setIsStudent(false);
     }

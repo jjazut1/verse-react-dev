@@ -448,7 +448,7 @@ const StudentModal: React.FC<StudentModalProps> = ({
   const [name, setName] = useState(student?.name || '');
   const [email, setEmail] = useState(student?.email || '');
   const [grade, setGrade] = useState(student?.grade || '');
-  const [age, setAge] = useState(student?.age || 0);
+  const [age, setAge] = useState<number | undefined>(student?.age);
   const [notes, setNotes] = useState(student?.notes || '');
 
   // Check if this is a new student (no ID)
@@ -459,13 +459,13 @@ const StudentModal: React.FC<StudentModalProps> = ({
       setName(student.name || '');
       setEmail(student.email || '');
       setGrade(student.grade || '');
-      setAge(student.age || 0);
+      setAge(student.age);
       setNotes(student.notes || '');
     } else {
       setName('');
       setEmail('');
       setGrade('');
-      setAge(0);
+      setAge(undefined);
       setNotes('');
     }
   }, [student?.id]);
@@ -477,7 +477,7 @@ const StudentModal: React.FC<StudentModalProps> = ({
       name: name.trim(),
       email: email.trim(),
       grade: grade.trim(),
-      age,
+      age: age || 0,
       notes: notes.trim()
     };
     
@@ -490,6 +490,18 @@ const StudentModal: React.FC<StudentModalProps> = ({
     e.stopPropagation();
     onCancel();
     hideModal();
+  };
+
+  const handleAgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '') {
+      setAge(undefined);
+    } else {
+      const numValue = Number(value);
+      if (!isNaN(numValue)) {
+        setAge(numValue);
+      }
+    }
   };
 
   return (
@@ -615,10 +627,11 @@ const StudentModal: React.FC<StudentModalProps> = ({
             </label>
             <input
               type="number"
-              value={age}
-              onChange={(e) => setAge(Number(e.target.value))}
+              value={age !== undefined ? age : ''}
+              onChange={handleAgeChange}
               min="0"
               max="100"
+              placeholder="Enter age"
               disabled={!isModalReady}
               style={{
                 width: '120px',

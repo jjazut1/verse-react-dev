@@ -1,5 +1,23 @@
 import { Timestamp, FieldValue } from 'firebase/firestore';
 
+// Folder-related interfaces
+export interface GameFolder {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  userId: string;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface GameWithFolder {
+  folderId?: string;
+  folderName?: string;
+  folderColor?: string;
+}
+
 interface BaseGameConfig {
   id?: string;
   title: string;

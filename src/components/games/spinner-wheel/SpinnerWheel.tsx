@@ -44,9 +44,20 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   // Initialize audio context
   useEffect(() => {
     // Create audio context on first user interaction
-    const initAudio = () => {
+    const initAudio = async () => {
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        try {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          
+          // Ensure audio context is running
+          if (audioContextRef.current.state === 'suspended') {
+            await audioContextRef.current.resume();
+          }
+          
+          console.log('Audio context initialized and ready');
+        } catch (error) {
+          console.error('Failed to initialize audio context:', error);
+        }
       }
     };
     
@@ -69,7 +80,7 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     patriotic: ['#DC143C', '#FFFFFF', '#000080', '#FF0000', '#87CEEB', '#4169E1', '#C0C0C0', '#191970'],
     greenShades: ['#90EE90', '#32CD32', '#228B22', '#006400', '#2E8B57', '#6B8E23', '#00FF7F', '#ADFF2F'],
     desert: ['#F4A460', '#D2B48C', '#F5F5DC', '#A0522D', '#B7410E', '#FF8C00', '#E2725B', '#C3B091'],
-    ocean: ['#ADD8E6', '#87CEEB', '#00BFFF', '#40E0D0', '#008080', '#000080', '#00FFFF', '#4682B4'],
+    ocean: ['#ADD8E6', '#87CEEB', '#00BFFF', '#40E0D0', '#008080', '#00FFFF', '#4682B4'],
     sunset: ['#FFC0CB', '#FF7F50', '#FFA500', '#FFD700', '#FFFF00', '#FF6347', '#DDA0DD', '#E6E6FA'],
     custom: (config as any).customColors || ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']
   };
@@ -125,8 +136,27 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     return closestIndex;
   };
 
-  const spin = () => {
+  const spin = async () => {
     if (items.length < 2 || spinning || gameComplete) return;
+    
+    // Ensure audio context is ready before spinning
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch (error) {
+        console.error('Failed to create audio context:', error);
+      }
+    }
+    
+    // Resume audio context if it's suspended
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      try {
+        await audioContextRef.current.resume();
+        console.log('Audio context resumed');
+      } catch (error) {
+        console.error('Failed to resume audio context:', error);
+      }
+    }
     
     // Check max spins limit
     const maxSpins = (config as any).maxSpins || 0;
@@ -150,7 +180,7 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
       clearTimeout(clickIntervalRef.current);
     }
     
-    // Start clicking sound
+    // Start clicking sound (now that audio context is ready)
     startClickingSound(duration, currentItems.length);
     
     // Randomly select winning segment
@@ -230,26 +260,33 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
 
   // Generate click sound using Web Audio API
   const generateClick = () => {
-    if (!audioContextRef.current) return;
+    if (!audioContextRef.current || audioContextRef.current.state !== 'running') {
+      console.log('Audio context not ready for click sound');
+      return;
+    }
     
-    const ctx = audioContextRef.current;
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    
-    // Create a sharp click sound
-    oscillator.type = 'square';
-    oscillator.frequency.setValueAtTime(800, ctx.currentTime); // High pitched click
-    
-    // Short, sharp envelope
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.001); // Quick attack
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05); // Quick decay
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + 0.05);
+    try {
+      const ctx = audioContextRef.current;
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      // Create a sharp click sound
+      oscillator.type = 'square';
+      oscillator.frequency.setValueAtTime(800, ctx.currentTime); // High pitched click
+      
+      // Short, sharp envelope
+      gainNode.gain.setValueAtTime(0, ctx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.001); // Quick attack
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05); // Quick decay
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.05);
+    } catch (error) {
+      console.error('Error generating click sound:', error);
+    }
   };
 
   // Calculate click timing based on wheel speed

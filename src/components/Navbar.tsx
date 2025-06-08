@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useUnsavedChangesContext } from '../contexts/UnsavedChangesContext';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { 
   Modal, 
@@ -24,6 +24,218 @@ import {
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth';
 import { auth } from '../config/firebase';
 
+// Teacher Signup Modal Component - defined outside to prevent recreation
+const TeacherSignupModal = ({ 
+  isOpen, 
+  onClose, 
+  teacherName, 
+  setTeacherName,
+  teacherEmail, 
+  setTeacherEmail,
+  teacherPassword, 
+  setTeacherPassword,
+  teacherConfirmPassword, 
+  setTeacherConfirmPassword,
+  isLoading,
+  onEmailSignup,
+  onGoogleSignup
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  teacherName: string;
+  setTeacherName: (value: string) => void;
+  teacherEmail: string;
+  setTeacherEmail: (value: string) => void;
+  teacherPassword: string;
+  setTeacherPassword: (value: string) => void;
+  teacherConfirmPassword: string;
+  setTeacherConfirmPassword: (value: string) => void;
+  isLoading: boolean;
+  onEmailSignup: () => void;
+  onGoogleSignup: () => void;
+}) => (
+  <Modal isOpen={isOpen} onClose={onClose} size="md">
+    <ModalOverlay />
+    <ModalContent>
+      <ModalHeader>
+        <VStack spacing={2} align="center">
+          <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+            👨‍🏫 Get Started as a Teacher
+          </Text>
+          <Text fontSize="sm" color="gray.600" textAlign="center">
+            Create your educator account and start building custom learning games
+          </Text>
+        </VStack>
+      </ModalHeader>
+      <ModalCloseButton />
+      <ModalBody pb={6}>
+        <VStack spacing={4}>
+          <FormControl>
+            <FormLabel>Full Name</FormLabel>
+            <Input
+              type="text"
+              value={teacherName}
+              onChange={(e) => setTeacherName(e.target.value)}
+              placeholder="Enter your full name"
+              disabled={isLoading}
+            />
+          </FormControl>
+          
+          <FormControl>
+            <FormLabel>Email Address</FormLabel>
+            <Input
+              type="email"
+              value={teacherEmail}
+              onChange={(e) => setTeacherEmail(e.target.value)}
+              placeholder="Enter your email"
+              disabled={isLoading}
+            />
+          </FormControl>
+          
+          <FormControl>
+            <FormLabel>Password</FormLabel>
+            <Input
+              type="password"
+              value={teacherPassword}
+              onChange={(e) => setTeacherPassword(e.target.value)}
+              placeholder="Create a password (min 6 characters)"
+              disabled={isLoading}
+            />
+          </FormControl>
+          
+          <FormControl>
+            <FormLabel>Confirm Password</FormLabel>
+            <Input
+              type="password"
+              value={teacherConfirmPassword}
+              onChange={(e) => setTeacherConfirmPassword(e.target.value)}
+              placeholder="Confirm your password"
+              disabled={isLoading}
+            />
+          </FormControl>
+          
+          <Button
+            colorScheme="blue"
+            width="100%"
+            onClick={onEmailSignup}
+            isLoading={isLoading}
+            loadingText="Creating Account..."
+          >
+            Create Teacher Account
+          </Button>
+          
+          <HStack width="100%">
+            <Divider />
+            <Text fontSize="sm" color="gray.500">or</Text>
+            <Divider />
+          </HStack>
+          
+          <Button
+            variant="outline"
+            width="100%"
+            onClick={onGoogleSignup}
+            isLoading={isLoading}
+            leftIcon={<Text>🚀</Text>}
+          >
+            Sign up with Google
+          </Button>
+        </VStack>
+      </ModalBody>
+    </ModalContent>
+  </Modal>
+);
+
+// Member Login Modal Component - defined outside to prevent recreation
+const MemberLoginModal = ({ 
+  isOpen, 
+  onClose, 
+  memberEmail, 
+  setMemberEmail,
+  memberPassword, 
+  setMemberPassword,
+  isLoading,
+  onEmailLogin,
+  onGoogleLogin
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  memberEmail: string;
+  setMemberEmail: (value: string) => void;
+  memberPassword: string;
+  setMemberPassword: (value: string) => void;
+  isLoading: boolean;
+  onEmailLogin: () => void;
+  onGoogleLogin: () => void;
+}) => (
+  <Modal isOpen={isOpen} onClose={onClose} size="md">
+    <ModalOverlay />
+    <ModalContent>
+      <ModalHeader>
+        <VStack spacing={2} align="center">
+          <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+            🔐 Members Login
+          </Text>
+          <Text fontSize="sm" color="gray.600" textAlign="center">
+            Sign in to access your dashboard and continue learning
+          </Text>
+        </VStack>
+      </ModalHeader>
+      <ModalCloseButton />
+      <ModalBody pb={6}>
+        <VStack spacing={4}>
+          <FormControl>
+            <FormLabel>Email Address</FormLabel>
+            <Input
+              type="email"
+              value={memberEmail}
+              onChange={(e) => setMemberEmail(e.target.value)}
+              placeholder="Enter your email"
+              disabled={isLoading}
+            />
+          </FormControl>
+          
+          <FormControl>
+            <FormLabel>Password</FormLabel>
+            <Input
+              type="password"
+              value={memberPassword}
+              onChange={(e) => setMemberPassword(e.target.value)}
+              placeholder="Enter your password"
+              disabled={isLoading}
+            />
+          </FormControl>
+          
+          <Button
+            colorScheme="blue"
+            width="100%"
+            onClick={onEmailLogin}
+            isLoading={isLoading}
+            loadingText="Signing In..."
+          >
+            Sign In
+          </Button>
+          
+          <HStack width="100%">
+            <Divider />
+            <Text fontSize="sm" color="gray.500">or</Text>
+            <Divider />
+          </HStack>
+          
+          <Button
+            variant="outline"
+            width="100%"
+            onClick={onGoogleLogin}
+            isLoading={isLoading}
+            leftIcon={<Text>🚀</Text>}
+          >
+            Sign in with Google
+          </Button>
+        </VStack>
+      </ModalBody>
+    </ModalContent>
+  </Modal>
+);
+
 const Navbar = () => {
   const { currentUser, isTeacher, isStudent, logout } = useAuth();
   const location = useLocation();
@@ -36,11 +248,15 @@ const Navbar = () => {
   const [isMemberLoginOpen, setIsMemberLoginOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Form states
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [name, setName] = useState('');
+  // Teacher Signup Form states
+  const [teacherEmail, setTeacherEmail] = useState('');
+  const [teacherPassword, setTeacherPassword] = useState('');
+  const [teacherConfirmPassword, setTeacherConfirmPassword] = useState('');
+  const [teacherName, setTeacherName] = useState('');
+  
+  // Member Login Form states
+  const [memberEmail, setMemberEmail] = useState('');
+  const [memberPassword, setMemberPassword] = useState('');
   
   const toast = useToast();
   
@@ -131,10 +347,12 @@ const Navbar = () => {
 
   // Reset form states
   const resetForms = () => {
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    setName('');
+    setTeacherEmail('');
+    setTeacherPassword('');
+    setTeacherConfirmPassword('');
+    setTeacherName('');
+    setMemberEmail('');
+    setMemberPassword('');
     setIsLoading(false);
   };
 
@@ -147,7 +365,7 @@ const Navbar = () => {
 
   // Handle teacher signup with email/password
   const handleTeacherEmailSignup = async () => {
-    if (!email || !password || !name) {
+    if (!teacherEmail || !teacherPassword || !teacherName) {
       toast({
         title: 'Missing Information',
         description: 'Please fill in all fields.',
@@ -157,7 +375,7 @@ const Navbar = () => {
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (teacherPassword !== teacherConfirmPassword) {
       toast({
         title: 'Password Mismatch',
         description: 'Passwords do not match.',
@@ -167,7 +385,7 @@ const Navbar = () => {
       return;
     }
 
-    if (password.length < 6) {
+    if (teacherPassword.length < 6) {
       toast({
         title: 'Weak Password',
         description: 'Password must be at least 6 characters.',
@@ -179,20 +397,20 @@ const Navbar = () => {
 
     setIsLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, teacherEmail, teacherPassword);
       const user = userCredential.user;
       
       // Update the user's display name in Firebase Auth
       await updateProfile(user, {
-        displayName: name
+        displayName: teacherName
       });
       
       // Create user document in Firestore with teacher role
       await setDoc(doc(db, 'users', user.uid), {
-        name: name,
-        email: email,
+        name: teacherName,
+        email: teacherEmail,
         role: 'teacher',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         createdBy: 'signup'
       });
       
@@ -205,11 +423,32 @@ const Navbar = () => {
       closeModals();
       navigate('/teacher');
     } catch (error: any) {
+      console.error('Teacher signup error:', error);
+      
+      // Handle specific Firebase Auth errors
+      let errorTitle = 'Signup Error';
+      let errorDescription = 'Failed to create account. Please try again.';
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorTitle = 'Account Already Exists';
+        errorDescription = 'This email already has an account. Please use "Members Login" to sign in instead, or use a different email address.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorDescription = 'Please enter a valid email address.';
+      } else if (error.code === 'auth/weak-password') {
+        errorDescription = 'Password is too weak. Please choose a stronger password.';
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorDescription = 'Email/password accounts are not enabled. Please contact support.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorDescription = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message) {
+        errorDescription = error.message;
+      }
+      
       toast({
-        title: 'Signup Error',
-        description: error.message || 'Failed to create account.',
+        title: errorTitle,
+        description: errorDescription,
         status: 'error',
-        duration: 3000,
+        duration: 5000,
       });
     } finally {
       setIsLoading(false);
@@ -229,23 +468,28 @@ const Navbar = () => {
       const userDoc = await getDoc(userDocRef);
       
       if (!userDoc.exists()) {
-        // Create user document in Firestore with teacher role
-        await setDoc(userDocRef, {
+        const newUserData = {
           name: user.displayName || 'Teacher',
           email: user.email || '',
           role: 'teacher',
-          createdAt: serverTimestamp(),
+          createdAt: new Date().toISOString(),
           createdBy: 'google-signup'
-        });
+        };
+        
+        // Create user document in Firestore with teacher role
+        await setDoc(userDocRef, newUserData);
       } else {
         // Update existing user to teacher role if not already set
         const userData = userDoc.data();
+        
         if (userData.role !== 'teacher') {
-          await setDoc(userDocRef, {
+          const updateData = {
             ...userData,
             role: 'teacher',
-            updatedAt: serverTimestamp()
-          }, { merge: true });
+            updatedAt: new Date().toISOString()
+          };
+          
+          await setDoc(userDocRef, updateData, { merge: true });
         }
       }
       
@@ -258,11 +502,31 @@ const Navbar = () => {
       closeModals();
       navigate('/teacher');
     } catch (error: any) {
+      console.error('🔴 NAVBAR: Teacher Google signup error:', error);
+      
+      // Handle specific error cases
+      let errorTitle = 'Google Signup Error';
+      let errorDescription = 'Failed to sign up with Google. Please try again.';
+      
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorTitle = 'Signup Cancelled';
+        errorDescription = 'Google sign-up was cancelled.';
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        errorTitle = 'Account Already Exists';
+        errorDescription = 'An account already exists with this email using a different sign-in method. Please use "Members Login" instead.';
+      } else if (error.code === 'auth/popup-blocked') {
+        errorDescription = 'Popup was blocked by your browser. Please allow popups and try again.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorDescription = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message) {
+        errorDescription = error.message;
+      }
+      
       toast({
-        title: 'Google Signup Error',
-        description: error.message || 'Failed to sign up with Google.',
-        status: 'error',
-        duration: 3000,
+        title: errorTitle,
+        description: errorDescription,
+        status: error.code === 'auth/popup-closed-by-user' ? 'info' : 'error',
+        duration: 5000,
       });
     } finally {
       setIsLoading(false);
@@ -271,7 +535,7 @@ const Navbar = () => {
 
   // Handle member login with email/password
   const handleMemberLogin = async () => {
-    if (!email || !password) {
+    if (!memberEmail || !memberPassword) {
       toast({
         title: 'Missing Information',
         description: 'Please enter your email and password.',
@@ -283,7 +547,41 @@ const Navbar = () => {
 
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, memberEmail, memberPassword);
+      const user = userCredential.user;
+      
+      // Check if user exists in Firestore database
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (!userDoc.exists()) {
+        // User doesn't exist in database - sign them out and show error
+        await auth.signOut();
+        toast({
+          title: 'Account Not Found',
+          description: 'Your account is not found in our system. Please contact your administrator or create a new account.',
+          status: 'error',
+          duration: 5000,
+        });
+        closeModals();
+        return;
+      }
+      
+      // User exists - check their role
+      const userData = userDoc.data();
+      if (!userData.role || (userData.role !== 'teacher' && userData.role !== 'student' && userData.role !== 'admin')) {
+        // User has no role or invalid role - sign them out
+        await auth.signOut();
+        toast({
+          title: 'Invalid Account',
+          description: 'Your account is not properly configured. Please contact your administrator.',
+          status: 'error',
+          duration: 5000,
+        });
+        closeModals();
+        return;
+      }
+      
       toast({
         title: 'Welcome Back!',
         description: 'Successfully logged in.',
@@ -293,9 +591,23 @@ const Navbar = () => {
       closeModals();
       // Navigation will be handled by auth state change
     } catch (error: any) {
+      console.error('Login error:', error);
+      
+      // Handle specific Firebase Auth errors
+      let errorMessage = 'Failed to log in. Please try again.';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address format.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled. Please contact support.';
+      }
+      
       toast({
         title: 'Login Error',
-        description: error.message || 'Failed to log in.',
+        description: errorMessage,
         status: 'error',
         duration: 3000,
       });
@@ -309,7 +621,41 @@ const Navbar = () => {
     setIsLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+      
+      // Check if user exists in Firestore database
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (!userDoc.exists()) {
+        // User doesn't exist in database - sign them out and show error
+        await user.delete(); // This removes the user from Firebase Auth
+        toast({
+          title: 'Account Not Found',
+          description: 'You need to create an account first. Please use "Get Started as a Teacher" to create your account.',
+          status: 'error',
+          duration: 5000,
+        });
+        closeModals();
+        return;
+      }
+      
+      // User exists - check their role
+      const userData = userDoc.data();
+      if (!userData.role || (userData.role !== 'teacher' && userData.role !== 'student' && userData.role !== 'admin')) {
+        // User has no role or invalid role - sign them out
+        await user.delete();
+        toast({
+          title: 'Invalid Account',
+          description: 'Your account is not properly configured. Please contact your administrator.',
+          status: 'error',
+          duration: 5000,
+        });
+        closeModals();
+        return;
+      }
+      
       toast({
         title: 'Welcome Back!',
         description: 'Successfully logged in with Google.',
@@ -319,180 +665,28 @@ const Navbar = () => {
       closeModals();
       // Navigation will be handled by auth state change
     } catch (error: any) {
-      toast({
-        title: 'Google Login Error',
-        description: error.message || 'Failed to log in with Google.',
-        status: 'error',
-        duration: 3000,
-      });
+      console.error('Google login error:', error);
+      
+      // Handle specific error cases
+      if (error.code === 'auth/popup-closed-by-user') {
+        toast({
+          title: 'Login Cancelled',
+          description: 'Google sign-in was cancelled.',
+          status: 'info',
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: 'Login Error',
+          description: 'Failed to log in with Google. Please try again.',
+          status: 'error',
+          duration: 3000,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Teacher Signup Modal
-  const TeacherSignupModal = () => (
-    <Modal isOpen={isTeacherSignupOpen} onClose={closeModals} size="md">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>
-          <VStack spacing={2} align="center">
-            <Text fontSize="2xl" fontWeight="bold" color="blue.600">
-              👨‍🏫 Get Started as a Teacher
-            </Text>
-            <Text fontSize="sm" color="gray.600" textAlign="center">
-              Create your educator account and start building custom learning games
-            </Text>
-          </VStack>
-        </ModalHeader>
-        <ModalCloseButton />
-        <ModalBody pb={6}>
-          <VStack spacing={4}>
-            <FormControl>
-              <FormLabel>Full Name</FormLabel>
-              <Input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your full name"
-                disabled={isLoading}
-              />
-            </FormControl>
-            
-            <FormControl>
-              <FormLabel>Email Address</FormLabel>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                disabled={isLoading}
-              />
-            </FormControl>
-            
-            <FormControl>
-              <FormLabel>Password</FormLabel>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Create a password (min 6 characters)"
-                disabled={isLoading}
-              />
-            </FormControl>
-            
-            <FormControl>
-              <FormLabel>Confirm Password</FormLabel>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                disabled={isLoading}
-              />
-            </FormControl>
-            
-            <Button
-              colorScheme="blue"
-              width="100%"
-              onClick={handleTeacherEmailSignup}
-              isLoading={isLoading}
-              loadingText="Creating Account..."
-            >
-              Create Teacher Account
-            </Button>
-            
-            <HStack width="100%">
-              <Divider />
-              <Text fontSize="sm" color="gray.500">or</Text>
-              <Divider />
-            </HStack>
-            
-            <Button
-              variant="outline"
-              width="100%"
-              onClick={handleTeacherGoogleSignup}
-              isLoading={isLoading}
-              leftIcon={<Text>🚀</Text>}
-            >
-              Sign up with Google
-            </Button>
-          </VStack>
-        </ModalBody>
-      </ModalContent>
-    </Modal>
-  );
-
-  // Member Login Modal
-  const MemberLoginModal = () => (
-    <Modal isOpen={isMemberLoginOpen} onClose={closeModals} size="md">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>
-          <VStack spacing={2} align="center">
-            <Text fontSize="2xl" fontWeight="bold" color="blue.600">
-              🔐 Members Login
-            </Text>
-            <Text fontSize="sm" color="gray.600" textAlign="center">
-              Sign in to access your dashboard and continue learning
-            </Text>
-          </VStack>
-        </ModalHeader>
-        <ModalCloseButton />
-        <ModalBody pb={6}>
-          <VStack spacing={4}>
-            <FormControl>
-              <FormLabel>Email Address</FormLabel>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                disabled={isLoading}
-              />
-            </FormControl>
-            
-            <FormControl>
-              <FormLabel>Password</FormLabel>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                disabled={isLoading}
-              />
-            </FormControl>
-            
-            <Button
-              colorScheme="blue"
-              width="100%"
-              onClick={handleMemberLogin}
-              isLoading={isLoading}
-              loadingText="Signing In..."
-            >
-              Sign In
-            </Button>
-            
-            <HStack width="100%">
-              <Divider />
-              <Text fontSize="sm" color="gray.500">or</Text>
-              <Divider />
-            </HStack>
-            
-            <Button
-              variant="outline"
-              width="100%"
-              onClick={handleMemberGoogleLogin}
-              isLoading={isLoading}
-              leftIcon={<Text>🚀</Text>}
-            >
-              Sign in with Google
-            </Button>
-          </VStack>
-        </ModalBody>
-      </ModalContent>
-    </Modal>
-  );
 
   return (
     <>
@@ -595,8 +789,32 @@ const Navbar = () => {
       </nav>
       
       {/* Modals */}
-      <TeacherSignupModal />
-      <MemberLoginModal />
+      <TeacherSignupModal 
+        isOpen={isTeacherSignupOpen}
+        onClose={closeModals}
+        teacherName={teacherName}
+        setTeacherName={setTeacherName}
+        teacherEmail={teacherEmail}
+        setTeacherEmail={setTeacherEmail}
+        teacherPassword={teacherPassword}
+        setTeacherPassword={setTeacherPassword}
+        teacherConfirmPassword={teacherConfirmPassword}
+        setTeacherConfirmPassword={setTeacherConfirmPassword}
+        isLoading={isLoading}
+        onEmailSignup={handleTeacherEmailSignup}
+        onGoogleSignup={handleTeacherGoogleSignup}
+      />
+      <MemberLoginModal 
+        isOpen={isMemberLoginOpen}
+        onClose={closeModals}
+        memberEmail={memberEmail}
+        setMemberEmail={setMemberEmail}
+        memberPassword={memberPassword}
+        setMemberPassword={setMemberPassword}
+        isLoading={isLoading}
+        onEmailLogin={handleMemberLogin}
+        onGoogleLogin={handleMemberGoogleLogin}
+      />
     </>
   );
 };

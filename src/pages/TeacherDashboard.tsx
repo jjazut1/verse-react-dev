@@ -108,8 +108,8 @@ const TeacherDashboard = () => {
   // Initialize folder manager hook
   const folderManager = useFolderManager({
     userId: currentUser?.uid || '',
-    games: myGames,
-    onGamesUpdate: setMyGames,
+    games: myGames as GameWithFolder[],
+    onGamesUpdate: (games) => setMyGames(games as Game[]),
     onShowToast: showToast
   });
 
@@ -480,7 +480,7 @@ const TeacherDashboard = () => {
     
     // First apply folder selection (this is the existing logic)
     if (folderManager.selectedFolderId) {
-      baseGames = folderManager.getGamesInFolder(folderManager.selectedFolderId);
+      baseGames = folderManager.getGamesInFolder(folderManager.selectedFolderId) as Game[];
     }
     
     // Then apply search and filter logic
@@ -519,34 +519,37 @@ const TeacherDashboard = () => {
     // No cleanup needed for global modal
   };
 
-  const handleAssignGame = async (game: any, studentEmail: string, deadline: Date, timesRequired: number, usePasswordAuth: boolean = true) => {
-    console.log(`Assigning ${game.title} to ${studentEmail}`);
+  const handleAssignGame = async (game: any, studentEmails: string[], deadline: Date, timesRequired: number, usePasswordAuth: boolean) => {
+    console.log(`Assigning ${game.title} to ${studentEmails.length} student(s)`);
     console.log(`Deadline: ${deadline}, Times to complete: ${timesRequired}, usePasswordAuth: ${usePasswordAuth}`);
     
     try {
-      // Create assignment data
-      const assignmentData = {
-        gameName: game.title,
-        gameId: game.id,
-        gameType: game.gameType || 'Unknown',
-        studentEmail: studentEmail,
-        teacherId: currentUser?.uid || '',
-        teacherEmail: currentUser?.email || '',
-        timesRequired: timesRequired,
-        deadline: Timestamp.fromDate(deadline),
-        usePasswordAuth: usePasswordAuth,
-      };
-      
-      // Choose the appropriate assignment creation method based on usePasswordAuth flag
-      let assignmentId: string;
-      if (usePasswordAuth) {
-        // Create assignment with passwordless email link authentication
-        assignmentId = await createAssignmentWithEmailLink(assignmentData);
-        console.log('Successfully created assignment with passwordless auth, ID:', assignmentId);
-      } else {
-        // Create standard assignment with regular email notification
-        assignmentId = await createAssignment(assignmentData);
-        console.log('Successfully created standard assignment, ID:', assignmentId);
+      // Create assignments for each student
+      for (const studentEmail of studentEmails) {
+        // Create assignment data
+        const assignmentData = {
+          gameName: game.title,
+          gameId: game.id,
+          gameType: game.gameType || 'Unknown',
+          studentEmail: studentEmail,
+          teacherId: currentUser?.uid || '',
+          teacherEmail: currentUser?.email || '',
+          timesRequired: timesRequired,
+          deadline: Timestamp.fromDate(deadline),
+        };
+        
+        // Choose the appropriate assignment creation method based on usePasswordAuth flag
+        // FIXED: Inverted the logic to match checkbox semantics correctly
+        let assignmentId: string;
+        if (usePasswordAuth) {
+          // Create standard assignment that requires password authentication
+          assignmentId = await createAssignment(assignmentData);
+          console.log('Successfully created assignment with password auth required, ID:', assignmentId);
+        } else {
+          // Create assignment with passwordless email link authentication
+          assignmentId = await createAssignmentWithEmailLink(assignmentData);
+          console.log('Successfully created assignment with passwordless auth, ID:', assignmentId);
+        }
       }
       
       // Refresh assignments list
@@ -1162,13 +1165,7 @@ const TeacherDashboard = () => {
           // No cleanup needed since we're using global modal
         }}
         onCloseAssignmentDetails={closeViewAssignment}
-        onAssignGame={async (game, studentEmails, deadline, timesRequired, usePasswordAuth) => {
-          // Create assignments for each student email
-          const assignmentPromises = studentEmails.map(email => 
-            handleAssignGame(game, email, deadline, timesRequired, usePasswordAuth)
-          );
-          await Promise.all(assignmentPromises);
-        }}
+        onAssignGame={handleAssignGame}
         onCancelAssignment={handleCancelAssignment}
         showToast={showToast}
       />

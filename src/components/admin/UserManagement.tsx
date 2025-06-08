@@ -278,36 +278,194 @@ const UserManagement: React.FC = () => {
   };
 
   const getRoleBadge = (role: string) => {
-    let color = "gray";
+    const colors = {
+      admin: { bg: '#FED7D7', color: '#C53030', text: 'ADMIN' },
+      teacher: { bg: '#C6F6D5', color: '#2F855A', text: 'TEACHER' },
+      student: { bg: '#BEE3F8', color: '#2C5282', text: 'STUDENT' },
+    };
     
-    switch(role) {
-      case 'admin':
-        color = "red";
-        break;
-      case 'teacher':
-        color = "green";
-        break;
-      case 'user':
-        color = "blue";
-        break;
-    }
+    const config = colors[role as keyof typeof colors] || { bg: '#F7FAFC', color: '#4A5568', text: role.toUpperCase() };
     
-    return <Badge colorScheme={color}>{role}</Badge>;
+    return (
+      <span style={{
+        backgroundColor: config.bg,
+        color: config.color,
+        padding: '4px 8px',
+        borderRadius: '12px',
+        fontSize: '12px',
+        fontWeight: 'bold'
+      }}>
+        {config.text}
+      </span>
+    );
   };
   
   const getStatusBadge = (status: string) => {
-    let color = "gray";
+    const colors = {
+      active: { bg: '#C6F6D5', color: '#2F855A' },
+      pending: { bg: '#FEEBC8', color: '#C05621' },
+      disabled: { bg: '#FED7D7', color: '#C53030' },
+    };
     
-    switch(status) {
-      case 'Active':
-        color = "green";
-        break;
-      case 'Pending':
-        color = "yellow";
-        break;
+    const config = colors[status as keyof typeof colors] || { bg: '#F7FAFC', color: '#4A5568' };
+    
+    return (
+      <span style={{
+        backgroundColor: config.bg,
+        color: config.color,
+        padding: '4px 8px',
+        borderRadius: '12px',
+        fontSize: '12px',
+        fontWeight: 'bold'
+      }}>
+        {status.toUpperCase()}
+      </span>
+    );
+  };
+
+  // Add function to format dates safely
+  const formatDate = (dateValue: any): string => {
+    // Handle null, undefined, and empty values first
+    if (dateValue === null || dateValue === undefined) {
+      return 'N/A';
     }
     
-    return <Badge colorScheme={color}>{status}</Badge>;
+    // Handle empty strings
+    if (typeof dateValue === 'string' && dateValue.trim() === '') {
+      return 'N/A';
+    }
+    
+    try {
+      let date: Date;
+      
+      // Handle Firestore Timestamp objects
+      if (dateValue && typeof dateValue.toDate === 'function') {
+        date = dateValue.toDate();
+      }
+      // Handle ISO string dates
+      else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      }
+      // Handle Date objects
+      else if (dateValue instanceof Date) {
+        date = dateValue;
+      }
+      // Handle epoch timestamps
+      else if (typeof dateValue === 'number') {
+        date = new Date(dateValue);
+      }
+      else {
+        console.log('Unhandled date value type:', typeof dateValue, dateValue);
+        return 'Invalid Date';
+      }
+      
+      // Check if the resulting date is valid
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('Error formatting date:', error, dateValue);
+      return 'Invalid Date';
+    }
+  };
+
+  // Add function to fix user dates
+  const fixUserDates = async () => {
+    try {
+      setIsLoading(true);
+      
+      let fixedCount = 0;
+      
+      for (const user of users) {
+        const dateStatus = formatDate(user.createdAt);
+        
+        // More comprehensive check for invalid dates
+        const needsFix = !user.createdAt || 
+                        user.createdAt === null || 
+                        user.createdAt === undefined ||
+                        (typeof user.createdAt === 'string' && user.createdAt.trim() === '') ||
+                        dateStatus === 'Invalid Date' || 
+                        dateStatus === 'N/A';
+        
+        if (needsFix) {
+          // Set a reasonable created date - use current date if we have no other info
+          const now = new Date().toISOString();
+          
+          await updateDoc(doc(db, 'users', user.id), {
+            createdAt: now,
+            updatedAt: now
+          });
+          
+          fixedCount++;
+        }
+      }
+      
+      // Refresh the user list
+      await fetchUsers();
+      
+      if (fixedCount > 0) {
+        toast({
+          title: 'Dates fixed',
+          description: `Fixed creation dates for ${fixedCount} user(s)`,
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: 'No fixes needed',
+          description: 'All users already have valid creation dates',
+          status: 'info',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error('Error fixing user dates:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fix user dates',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add function to fix a specific user's date
+  const fixSingleUserDate = async (user: User) => {
+    try {
+      const now = new Date().toISOString();
+      
+      await updateDoc(doc(db, 'users', user.id), {
+        createdAt: now,
+        updatedAt: now
+      });
+      
+      // Refresh the user list
+      await fetchUsers();
+      
+      toast({
+        title: 'User date fixed',
+        description: `Fixed creation date for ${user.email}`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error fixing single user date:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fix user date',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
   };
 
   return (
@@ -330,6 +488,14 @@ const UserManagement: React.FC = () => {
             isDisabled={isLoading}
           >
             Refresh
+          </Button>
+          <Button 
+            colorScheme="orange" 
+            size="sm" 
+            onClick={fixUserDates} 
+            isDisabled={isLoading}
+          >
+            Fix Dates
           </Button>
         </HStack>
       </HStack>
@@ -383,10 +549,10 @@ const UserManagement: React.FC = () => {
                         ? "User needs to sign in to activate their account" 
                         : "User has signed in and account is active"}
                     >
-                      {getStatusBadge(user.status || 'Pending')}
+                      {getStatusBadge(user.status || 'active')}
                     </Tooltip>
                   </Td>
-                  <Td>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</Td>
+                  <Td>{formatDate(user.createdAt)}</Td>
                   <Td>
                     <HStack spacing={2}>
                       <IconButton
@@ -403,6 +569,16 @@ const UserManagement: React.FC = () => {
                         colorScheme="red"
                         onClick={() => handleDeleteUser(user)}
                       />
+                      {(formatDate(user.createdAt) === 'Invalid Date' || formatDate(user.createdAt) === 'N/A') && (
+                        <IconButton
+                          aria-label="Fix date"
+                          icon={<Text fontSize="xs">📅</Text>}
+                          size="sm"
+                          colorScheme="orange"
+                          onClick={() => fixSingleUserDate(user)}
+                          title="Fix creation date"
+                        />
+                      )}
                     </HStack>
                   </Td>
                 </Tr>

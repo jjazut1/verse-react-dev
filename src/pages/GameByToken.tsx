@@ -28,7 +28,7 @@ const GameByToken: React.FC = () => {
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studentName, setStudentName] = useState('');
-  const [studentNameSubmitted, setStudentNameSubmitted] = useState(false);
+  const [studentNameSubmitted, setStudentNameSubmitted] = useState(true);
   const [saveError, setSaveError] = useState<string | null>(null);
   
   // Authentication state
@@ -98,6 +98,10 @@ const GameByToken: React.FC = () => {
     const directAccessParam = searchParams.get('directAccess');
     const hasDirectAccess = directAccessParam === 'true' || sessionStorage.getItem('direct_token_access') === 'true';
     
+    // Check for requireAuth parameter (used in email links)
+    const requireAuthParam = searchParams.get('requireAuth');
+    const hasRequireAuth = requireAuthParam === 'true';
+    
     // Log all parameters to debug the detection
     console.log('GameByToken: checking for token access mode:', {
       hasOobCodeInReferrer, 
@@ -106,6 +110,8 @@ const GameByToken: React.FC = () => {
       hasModeSignIn,
       directAccessParam,
       hasDirectAccess,
+      requireAuthParam,
+      hasRequireAuth,
       referrer,
       tokenValue: token
     });
@@ -113,7 +119,8 @@ const GameByToken: React.FC = () => {
     if ((hasOobCodeInReferrer || hasOobCodeInUrl) || 
         (hasAssignmentId) || 
         (hasModeSignIn) ||
-        (hasDirectAccess)) {
+        (hasDirectAccess) ||
+        (hasRequireAuth)) {
       console.log('GameByToken: Detected special access mode - bypassing authentication requirement');
       setIsEmailLinkAccess(true);
       
@@ -255,6 +262,14 @@ const GameByToken: React.FC = () => {
         setAuthEmail(assignment.studentEmail);
         console.log('Pre-filled auth email:', assignment.studentEmail);
       }
+      
+      // Auto-set student name from assignment data
+      if (assignment.studentEmail) {
+        // Use part of email as student name
+        const fallbackName = assignment.studentEmail.split('@')[0];
+        setStudentName(fallbackName);
+        console.log('Auto-set student name from email:', fallbackName);
+      }
     } catch (err) {
       console.error('Error loading game by token:', err);
       
@@ -377,6 +392,16 @@ const GameByToken: React.FC = () => {
   
   // Add this new useEffect to automatically start game for email link users
   useEffect(() => {
+    console.log('Auto-start effect triggered with:', {
+      isEmailLinkAccess,
+      loading,
+      isPlaying,
+      hasAssignment: !!assignment,
+      hasStudentEmail: assignment?.studentEmail,
+      hasAutoStarted,
+      currentStudentName: studentName
+    });
+    
     if (
       isEmailLinkAccess &&
       !loading &&
@@ -386,34 +411,71 @@ const GameByToken: React.FC = () => {
       !hasAutoStarted // Only auto-start once
     ) {
       console.log('Auto starting game for email link user with email:', assignment.studentEmail);
-      if (!studentName && assignment.studentName) {
+      
+      // Set student name immediately
+      let nameToUse = studentName;
+      if (!nameToUse && assignment.studentName) {
+        nameToUse = assignment.studentName;
         setStudentName(assignment.studentName);
-      } else if (!studentName) {
+      } else if (!nameToUse) {
+        nameToUse = assignment.studentEmail.split('@')[0];
+        setStudentName(assignment.studentEmail.split('@')[0]);
+      }
+      
+      // Mark name as submitted to bypass any popup
+      setStudentNameSubmitted(true);
+      
+      // Auto-start the game with a short delay
+      setTimeout(() => {
+        console.log('GameByToken: Auto-starting game in email link mode with student name:', nameToUse);
+        setIsPlaying(true);
+        setStartTime(new Date());
+        setHasAutoStarted(true); // Prevent future auto-starts
+      }, 100); // Reduced delay to make it faster
+    }
+  }, [isEmailLinkAccess, loading, isPlaying, assignment, studentName, hasAutoStarted]);
+  
+  // Additional effect to force immediate start for email link users when conditions are met
+  useEffect(() => {
+    if (isEmailLinkAccess && assignment && !loading && !hasAutoStarted) {
+      console.log('Forcing immediate setup for email link user');
+      
+      // Immediately set up the student name and bypass the form
+      if (assignment.studentName) {
+        setStudentName(assignment.studentName);
+      } else if (assignment.studentEmail) {
         setStudentName(assignment.studentEmail.split('@')[0]);
       }
       setStudentNameSubmitted(true);
       
-      setTimeout(() => {
-        console.log('GameByToken: Auto-starting game in direct access mode');
-        setIsPlaying(true);
-        setStartTime(new Date());
-        setHasAutoStarted(true); // Prevent future auto-starts
-      }, 500);
+      // Force authentication state for email link users
+      setIsAuthenticated(true);
+      
+      // Create synthetic user if needed
+      if (!currentUser) {
+        const syntheticUser = {
+          email: assignment.studentEmail,
+          displayName: assignment.studentName || assignment.studentEmail.split('@')[0]
+        };
+        setCurrentUser(syntheticUser);
+      }
     }
-  }, [isEmailLinkAccess, loading, isPlaying, assignment, studentName, hasAutoStarted]);
+  }, [isEmailLinkAccess, assignment, loading, hasAutoStarted, currentUser]);
   
   // Add a new useEffect at the component top level to force bypassing authentication on direct access
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const directAccess = urlParams.get('directAccess') === 'true';
+    const hasToken = urlParams.get('token'); // Check if there's a token
     
-    if (directAccess) {
-      console.log('GameByToken: Direct access parameter detected in URL');
+    // If there's a directAccess parameter OR a token parameter, treat it as email link access
+    if (directAccess || hasToken) {
+      console.log('GameByToken: Direct access or token access detected in URL');
       setIsEmailLinkAccess(true);
       
       // Force authenticated state for direct access mode
       setIsAuthenticated(true);
-      console.log('GameByToken: Setting authenticated state to true for direct access');
+      console.log('GameByToken: Setting authenticated state to true for email link access');
       
       sessionStorage.setItem('direct_token_access', 'true');
     }
@@ -656,16 +718,12 @@ const GameByToken: React.FC = () => {
               This assignment was due on {assignment && formatDate(assignment.deadline.toDate())}.
               You can still complete it, but it will be marked as late.
             </p>
-            {!studentNameSubmitted ? (
-              renderStudentNameForm()
-            ) : (
-              <button 
-                onClick={handleStartGame}
-                className="mt-4 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
-              >
-                Start Game
-              </button>
-            )}
+            <button 
+              onClick={handleStartGame}
+              className="mt-4 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
+            >
+              Start Game
+            </button>
           </div>
         );
       }
@@ -678,16 +736,12 @@ const GameByToken: React.FC = () => {
             <p className="text-green-700 mb-4">
               You have already completed this assignment with a score of {assignment.score}.
             </p>
-            {!studentNameSubmitted ? (
-              renderStudentNameForm()
-            ) : (
-              <button 
-                onClick={handleStartGame}
-                className="mt-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
-              >
-                Play Again
-              </button>
-            )}
+            <button 
+              onClick={handleStartGame}
+              className="mt-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
+            >
+              Play Again
+            </button>
           </div>
         );
       }
@@ -712,16 +766,12 @@ const GameByToken: React.FC = () => {
             </p>
           )}
           
-          {!studentNameSubmitted && !isEmailLinkAccess ? (
-            renderStudentNameForm()
-          ) : (
-            <button 
-              onClick={handleStartGame}
-              className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-lg transition-colors"
-            >
-              Start Game
-            </button>
-          )}
+          <button 
+            onClick={handleStartGame}
+            className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-lg transition-colors"
+          >
+            Start Game
+          </button>
         </div>
       );
     }
@@ -754,7 +804,6 @@ const GameByToken: React.FC = () => {
             <SpinnerWheel
               config={gameConfig}
               onGameComplete={handleGameComplete}
-              playerName={studentName}
             />
           );
         default:
@@ -1002,87 +1051,6 @@ const GameByToken: React.FC = () => {
           </button>
         </>
       )}
-    </div>
-  );
-  
-  // Render student name form
-  const renderStudentNameForm = () => (
-    <div style={{
-      backgroundColor: 'white',
-      borderRadius: 'var(--border-radius-md)',
-      padding: 'var(--spacing-6)',
-      maxWidth: '500px',
-      width: '100%',
-      margin: '0 auto',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-    }}>
-      <h2 style={{
-        fontSize: 'var(--font-size-xl)',
-        color: 'var(--color-gray-800)',
-        marginBottom: 'var(--spacing-4)',
-        textAlign: 'center'
-      }}>
-        Before You Start
-      </h2>
-      
-      {assignment && (
-        <div style={{ 
-          marginBottom: 'var(--spacing-4)',
-          backgroundColor: 'var(--color-info-50)',
-          padding: 'var(--spacing-3)',
-          borderRadius: 'var(--border-radius-sm)',
-          fontSize: 'var(--font-size-sm)',
-          color: 'var(--color-info-700)'
-        }}>
-          <p>You're authenticated as: <strong>{assignment.studentEmail}</strong></p>
-          <p style={{ marginTop: 'var(--spacing-2)' }}>This unique link was sent specifically to you.</p>
-        </div>
-      )}
-      
-      <div style={{ marginBottom: 'var(--spacing-4)' }}>
-        <label 
-          htmlFor="studentName"
-          style={{
-            display: 'block',
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-gray-700)',
-            marginBottom: 'var(--spacing-1)'
-          }}
-        >
-          Your Name
-        </label>
-        <input
-          id="studentName"
-          type="text"
-          value={studentName}
-          onChange={(e) => setStudentName(e.target.value)}
-          placeholder="Enter your name"
-          style={{
-            width: '100%',
-            padding: 'var(--spacing-2)',
-            border: '1px solid var(--color-gray-300)',
-            borderRadius: 'var(--border-radius-sm)',
-            fontSize: 'var(--font-size-md)'
-          }}
-        />
-      </div>
-      
-      <button
-        onClick={handleStartGame}
-        style={{
-          width: '100%',
-          padding: 'var(--spacing-3)',
-          backgroundColor: 'var(--color-primary-600)',
-          color: 'white',
-          border: 'none',
-          borderRadius: 'var(--border-radius-sm)',
-          fontSize: 'var(--font-size-md)',
-          fontWeight: 'bold',
-          cursor: 'pointer'
-        }}
-      >
-        Continue to Game
-      </button>
     </div>
   );
   
@@ -1551,25 +1519,12 @@ const GameByToken: React.FC = () => {
           
           {/* Only show the game if authenticated or after they've submitted their name */}
           {!isPlaying ? (
-            !studentNameSubmitted ? renderStudentNameForm() : (
-              <button
-                onClick={handleStartGame}
-                style={{
-                  padding: 'var(--spacing-3) var(--spacing-6)',
-                  backgroundColor: 'var(--color-primary-600)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 'var(--border-radius-sm)',
-                  fontSize: 'var(--font-size-lg)',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  display: 'block',
-                  margin: '0 auto'
-                }}
-              >
-                Start Game
-              </button>
-            )
+            <button 
+              onClick={handleStartGame}
+              className="mt-4 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
+            >
+              Start Game
+            </button>
           ) : (
             <div style={{ 
               backgroundColor: 'white',
