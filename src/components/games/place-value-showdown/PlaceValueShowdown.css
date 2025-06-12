@@ -1,3 +1,11 @@
+/* ============================================
+   PLACE VALUE SHOWDOWN - GAME STYLES
+   ============================================ */
+
+/* ============================================
+   BASE COMPONENT & LAYOUT
+   ============================================ */
+
 .place-value-showdown {
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -8,7 +16,29 @@
   overflow-x: hidden;
 }
 
-/* Game Header */
+/* Game Area Layout */
+.game-area {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Side-by-side layout for desktop */
+@media (min-width: 900px) {
+  .game-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: stretch;
+  }
+}
+
+/* ============================================
+   GAME HEADER & SCOREBOARD
+   ============================================ */
+
 .game-header {
   text-align: center;
   margin-bottom: 10px;
@@ -37,6 +67,16 @@
   100% { background-position: 0% 50%; }
 }
 
+/* Header Content Layout */
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+/* Scoreboard */
 .scoreboard {
   display: flex;
   justify-content: center;
@@ -77,28 +117,71 @@
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* Game Message */
-.game-message {
-  text-align: center;
-  margin-bottom: 15px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 2px solid #4ecdc4;
+/* Header Controls */
+.header-controls {
+  display: flex;
+  gap: 6px;
 }
 
-.game-message p {
-  margin: 0;
+/* ============================================
+   BUTTONS & CONTROLS
+   ============================================ */
+
+.feature-button {
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 2px solid transparent;
+}
+
+.feature-button.compact {
+  padding: 6px 8px;
   font-size: 1rem;
-  line-height: 1.3;
-  color: #333;
+  border-radius: 10px;
+  min-width: 35px;
 }
 
-/* Welcome Screen */
-.welcome-screen {
-  text-align: center;
-  padding: 40px;
+.feature-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.feature-button.active {
+  background: linear-gradient(45deg, #28a745, #34ce57);
+  border-color: #fff;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.continue-button {
+  background: linear-gradient(45deg, #28a745, #34ce57);
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+  transition: all 0.3s ease;
+  border: 2px solid white;
+}
+
+.continue-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+.continue-button.compact {
+  font-size: 0.95rem;
+  padding: 8px 16px;
+  white-space: nowrap;
 }
 
 .start-button {
@@ -124,24 +207,56 @@
   transform: translateY(-1px);
 }
 
-/* Game Area */
-.game-area {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  max-width: 1200px;
-  margin: 0 auto;
+/* ============================================
+   GAME MESSAGES & NOTIFICATIONS
+   ============================================ */
+
+.game-message {
+  text-align: center;
+  margin-bottom: 15px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 2px solid #4ecdc4;
 }
 
-/* Side-by-side layout for desktop */
-@media (min-width: 900px) {
-  .game-area {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    align-items: stretch;
-  }
+.game-message p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+  color: #333;
 }
+
+.welcome-screen {
+  text-align: center;
+  padding: 40px;
+}
+
+.ready-indicator {
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #28a745;
+  background: rgba(40, 167, 69, 0.1);
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 2px solid #28a745;
+  animation: pulse 2s infinite;
+  display: block;
+  margin: 0 auto;
+  width: fit-content;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* ============================================
+   PLAYER AREAS
+   ============================================ */
 
 .player-area {
   background: rgba(255, 255, 255, 0.95);
@@ -171,7 +286,15 @@
   color: #333;
 }
 
-/* Number Slots */
+.teacher-spacer {
+  margin: 15px 0;
+  flex-grow: 1;
+}
+
+/* ============================================
+   NUMBER SLOTS & CARD PLACEMENT
+   ============================================ */
+
 .number-slots {
   display: flex;
   justify-content: center;
@@ -184,6 +307,13 @@
   background: rgba(78, 205, 196, 0.05);
   width: fit-content;
   margin: 0 auto 15px auto;
+}
+
+.slot-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
 .number-slot {
@@ -236,7 +366,20 @@
   border-color: #ff6b6b;
 }
 
-/* Cards */
+.comma-separator {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #666;
+  display: flex;
+  align-items: center;
+  margin: 0 5px;
+  user-select: none;
+}
+
+/* ============================================
+   CARDS & DECK
+   ============================================ */
+
 .card {
   width: 65px;
   height: 65px;
@@ -305,7 +448,7 @@
   50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.8); }
 }
 
-/* Student Deck Container */
+/* Student Deck */
 .student-deck-container {
   flex-grow: 1;
   display: flex;
@@ -314,7 +457,6 @@
   margin: 15px 0;
 }
 
-/* Student Deck */
 .student-deck {
   display: flex;
   justify-content: center;
@@ -330,84 +472,29 @@
   margin: 0 auto;
 }
 
-/* Teacher Spacer */
-.teacher-spacer {
-  margin: 15px 0;
-  flex-grow: 1;
+/* Ghost Card for Drag Effect */
+.ghost-card {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  animation: ghostFloat 1s infinite ease-in-out;
 }
 
-/* Comma Separator */
-.comma-separator {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #666;
-  display: flex;
-  align-items: center;
-  margin: 0 5px;
-  user-select: none;
+.ghost-card .card {
+  opacity: 0.8;
+  transform: scale(1.1);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
-/* Compact Header Layout */
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 15px;
-  flex-wrap: wrap;
+@keyframes ghostFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
 }
 
-.header-controls {
-  display: flex;
-  gap: 6px;
-}
+/* ============================================
+   EDUCATIONAL FEATURES
+   ============================================ */
 
-.feature-button {
-  background: linear-gradient(45deg, #667eea, #764ba2);
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  font-size: 0.9rem;
-  font-weight: bold;
-  border-radius: 15px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 2px solid transparent;
-}
-
-.feature-button.compact {
-  padding: 6px 8px;
-  font-size: 1rem;
-  border-radius: 10px;
-  min-width: 35px;
-}
-
-.feature-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.feature-button.active {
-  background: linear-gradient(45deg, #28a745, #34ce57);
-  border-color: #fff;
-  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
-}
-
-.continue-button.compact {
-  font-size: 0.95rem;
-  padding: 8px 16px;
-  white-space: nowrap;
-}
-
-/* Slot Container */
-.slot-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Place Value Labels */
 .place-value-label {
   font-size: 0.8rem;
   font-weight: bold;
@@ -421,7 +508,6 @@
   min-width: 50px;
 }
 
-/* Inline Expanded Notation */
 .inline-notation {
   margin-top: 8px;
   text-align: center;
@@ -438,29 +524,6 @@
   color: #444;
 }
 
-/* Ready Indicator */
-.ready-indicator {
-  text-align: center;
-  font-size: 1.3rem;
-  font-weight: bold;
-  color: #28a745;
-  background: rgba(40, 167, 69, 0.1);
-  padding: 4px 8px;
-  border-radius: 8px;
-  border: 2px solid #28a745;
-  animation: pulse 2s infinite;
-  display: block;
-  margin: 0 auto;
-  width: fit-content;
-}
-
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-/* Final Number Display */
 .final-number {
   text-align: center;
   font-size: 1.5rem;
@@ -474,237 +537,197 @@
   border: 2px solid #f39c12;
 }
 
+/* ============================================
+   GAME COMPLETION
+   ============================================ */
 
-
-.continue-button {
-  background: linear-gradient(45deg, #28a745, #34ce57);
-  color: white;
-  border: none;
-  padding: 12px 25px;
-  font-size: 1.2rem;
-  font-weight: bold;
-  border-radius: 20px;
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
-  transition: all 0.3s ease;
-  border: 2px solid white;
-}
-
-.continue-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
-}
-
-/* Game Complete */
 .game-complete {
   text-align: center;
-  background: rgba(255, 255, 255, 0.95);
+  padding: 30px;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
   border-radius: 20px;
-  padding: 40px;
   margin: 20px auto;
   max-width: 500px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  border: 3px solid #ffd700;
+  box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
+  border: 3px solid #f39c12;
   animation: gameCompleteAnimation 1s ease-out;
 }
 
 @keyframes gameCompleteAnimation {
   0% {
-    transform: scale(0.8);
+    transform: scale(0.8) rotate(-5deg);
     opacity: 0;
   }
   50% {
-    transform: scale(1.1);
+    transform: scale(1.05) rotate(2deg);
   }
   100% {
-    transform: scale(1);
+    transform: scale(1) rotate(0deg);
     opacity: 1;
   }
 }
 
 .game-complete h2 {
-  color: #ff6b6b;
-  margin-bottom: 20px;
+  margin: 0 0 15px 0;
   font-size: 2rem;
+  color: #333;
 }
 
 .final-scores {
-  font-size: 1.3rem;
-  line-height: 1.6;
+  font-size: 1.2rem;
+  color: #333;
 }
 
 .final-scores p {
-  margin: 10px 0;
+  margin: 5px 0;
 }
 
-/* Ghost Card */
-.ghost-card {
-  z-index: 1000;
-  pointer-events: none;
-  transform: rotate(-5deg);
-  filter: drop-shadow(0 8px 15px rgba(0, 0, 0, 0.3));
-  opacity: 0.8;
-}
+/* ============================================
+   RESPONSIVE DESIGN - TABLET
+   ============================================ */
 
-.ghost-card .card {
-  border-color: #ffd700;
-  background: linear-gradient(45deg, #ffd700, #ffed4e);
-  color: #333;
-  transform: scale(1.1);
-  animation: ghostFloat 2s ease-in-out infinite;
-}
-
-@keyframes ghostFloat {
-  0%, 100% { transform: scale(1.1) translateY(0); }
-  50% { transform: scale(1.1) translateY(-5px); }
-}
-
-/* Responsive Design */
 @media (max-width: 768px) {
   .place-value-showdown {
-    padding: 15px;
+    padding: 8px;
   }
-  
+
   .game-header h2 {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
-  
+
   .scoreboard {
-    gap: 20px;
-    font-size: 1.1rem;
+    gap: 15px;
+    font-size: 1rem;
   }
-  
+
   .game-area {
-    gap: 25px;
+    gap: 12px;
   }
-  
+
   .player-area {
-    padding: 20px;
+    padding: 10px;
   }
-  
+
   .number-slots {
-    gap: 8px;
+    gap: 10px;
     padding: 12px;
   }
-  
+
   .number-slot {
     width: 55px;
     height: 55px;
   }
-  
+
   .card {
     width: 55px;
     height: 55px;
-    font-size: 1.3rem;
+    font-size: 1.4rem;
   }
-  
+
   .game-message p {
-    font-size: 1.1rem;
+    font-size: 0.9rem;
   }
-  
+
   .comma-separator {
     font-size: 2rem;
-    margin: 0 3px;
   }
-  
+
   .student-deck {
-    gap: 8px;
     padding: 12px;
   }
-  
+
   .header-content {
-    flex-direction: column;
     gap: 10px;
   }
-  
-  .feature-button.compact {
-    font-size: 0.9rem;
-    padding: 5px 7px;
-    min-width: 32px;
-  }
-  
-  .place-value-label {
-    font-size: 0.7rem;
-    padding: 3px 6px;
-    min-width: 40px;
-  }
-  
-  .notation-line {
-    font-size: 0.8rem;
-    padding: 3px 6px;
-  }
-  
 
-  
+  .feature-button.compact {
+    padding: 5px 6px;
+    font-size: 0.9rem;
+    min-width: 30px;
+  }
+
+  .place-value-label {
+    font-size: 0.75rem;
+    padding: 3px 6px;
+    min-width: 45px;
+  }
+
+  .notation-line {
+    font-size: 0.85rem;
+    padding: 3px 6px;
+  }
+
   .student-deck-container {
     margin: 12px 0;
   }
 }
 
+/* ============================================
+   RESPONSIVE DESIGN - MOBILE
+   ============================================ */
+
 @media (max-width: 480px) {
   .game-header h2 {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
   }
-  
+
   .scoreboard {
-    flex-direction: column;
-    gap: 15px;
+    gap: 12px;
+    font-size: 0.9rem;
   }
-  
+
   .number-slots {
     gap: 8px;
-    padding: 12px;
+    padding: 10px;
   }
-  
+
   .number-slot {
     width: 50px;
     height: 50px;
   }
-  
+
   .card {
     width: 50px;
     height: 50px;
-    font-size: 1.1rem;
+    font-size: 1.3rem;
   }
-  
+
   .student-deck {
-    gap: 8px;
-    padding: 12px;
+    padding: 10px;
+    gap: 6px;
   }
-  
+
   .comma-separator {
-    font-size: 1.5rem;
-    margin: 0 2px;
+    font-size: 1.8rem;
+    margin: 0 3px;
   }
-  
+
   .header-controls {
     gap: 4px;
   }
-  
+
   .feature-button.compact {
+    padding: 4px 5px;
     font-size: 0.8rem;
-    padding: 4px 6px;
     min-width: 28px;
   }
-  
+
   .continue-button.compact {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     padding: 6px 12px;
   }
-  
-  .place-value-label {
-    font-size: 0.6rem;
-    padding: 2px 4px;
-    min-width: 35px;
-  }
-  
-  .notation-line {
-    font-size: 0.75rem;
-    padding: 2px 4px;
-  }
-  
 
-  
+  .place-value-label {
+    font-size: 0.7rem;
+    padding: 2px 4px;
+    min-width: 40px;
+  }
+
+  .notation-line {
+    font-size: 0.8rem;
+    padding: 2px 4px;
+  }
+
   .student-deck-container {
     margin: 10px 0;
   }
