@@ -47,7 +47,7 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     const initAudio = async () => {
       if (!audioContextRef.current) {
         try {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
           
           // Ensure audio context is running
           if (audioContextRef.current.state === 'suspended') {
@@ -266,24 +266,24 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     }
     
     try {
-      const ctx = audioContextRef.current;
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-      
-      // Create a sharp click sound
-      oscillator.type = 'square';
-      oscillator.frequency.setValueAtTime(800, ctx.currentTime); // High pitched click
-      
-      // Short, sharp envelope
-      gainNode.gain.setValueAtTime(0, ctx.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.001); // Quick attack
-      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05); // Quick decay
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.05);
+    const ctx = audioContextRef.current;
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    // Create a sharp click sound
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(800, ctx.currentTime); // High pitched click
+    
+    // Short, sharp envelope
+    gainNode.gain.setValueAtTime(0, ctx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.001); // Quick attack
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05); // Quick decay
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.05);
     } catch (error) {
       console.error('Error generating click sound:', error);
     }

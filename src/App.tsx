@@ -20,6 +20,8 @@ import GameByToken from './pages/GameByToken'
 import AdminPage from './pages/AdminPage'
 import SetAdminPage from './pages/SetAdminPage'
 import SpinnerWheelConfig from './pages/configurations/SpinnerWheelConfig'
+import AnagramConfig from './pages/configurations/AnagramConfig'
+import PlaceValueShowdownConfig from './pages/configurations/PlaceValueShowdownConfig'
 import { useEffect } from 'react'
 
 // Create a layout component that includes the Navbar
@@ -391,6 +393,22 @@ const router = createBrowserRouter([
       {
         path: "spinner-wheel/:templateId",
         element: <SpinnerWheelConfig />
+      },
+      {
+        path: "anagram",
+        element: <AnagramConfig />
+      },
+      {
+        path: "anagram/:templateId",
+        element: <AnagramConfig />
+      },
+      {
+        path: "place-value-showdown",
+        element: <PlaceValueShowdownConfig />
+      },
+      {
+        path: "place-value-showdown/:templateId",
+        element: <PlaceValueShowdownConfig />
       }
       // Additional game configuration routes will be added here
     ]

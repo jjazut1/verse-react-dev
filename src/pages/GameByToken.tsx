@@ -11,6 +11,7 @@ import { auth } from '../config/firebase';
 import SortCategoriesEggRevealAdapter from '../components/games/sort-categories-egg-reveal/SortCategoriesEggRevealAdapter';
 import WhackAMoleAdapter from '../components/games/whack-a-mole/WhackAMoleAdapter';
 import SpinnerWheel from '../components/games/spinner-wheel/SpinnerWheel';
+import PlaceValueShowdownAdapter from '../components/games/place-value-showdown/PlaceValueShowdownAdapter';
 
 const GameByToken: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -718,12 +719,12 @@ const GameByToken: React.FC = () => {
               This assignment was due on {assignment && formatDate(assignment.deadline.toDate())}.
               You can still complete it, but it will be marked as late.
             </p>
-            <button 
-              onClick={handleStartGame}
-              className="mt-4 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
-            >
-              Start Game
-            </button>
+              <button 
+                onClick={handleStartGame}
+                className="mt-4 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
+              >
+                Start Game
+              </button>
           </div>
         );
       }
@@ -736,12 +737,12 @@ const GameByToken: React.FC = () => {
             <p className="text-green-700 mb-4">
               You have already completed this assignment with a score of {assignment.score}.
             </p>
-            <button 
-              onClick={handleStartGame}
-              className="mt-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
-            >
-              Play Again
-            </button>
+              <button 
+                onClick={handleStartGame}
+                className="mt-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
+              >
+                Play Again
+              </button>
           </div>
         );
       }
@@ -766,12 +767,12 @@ const GameByToken: React.FC = () => {
             </p>
           )}
           
-          <button 
-            onClick={handleStartGame}
-            className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-lg transition-colors"
-          >
-            Start Game
-          </button>
+            <button 
+              onClick={handleStartGame}
+              className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-lg transition-colors"
+            >
+              Start Game
+            </button>
         </div>
       );
     }
@@ -804,6 +805,16 @@ const GameByToken: React.FC = () => {
             <SpinnerWheel
               config={gameConfig}
               onGameComplete={handleGameComplete}
+            />
+          );
+        case 'place-value-showdown':
+          return (
+            <PlaceValueShowdownAdapter
+              config={gameConfig}
+              onGameComplete={handleGameComplete}
+              playerName={studentName}
+              onHighScoreProcessStart={handleHighScoreProcessStart}
+              onHighScoreProcessComplete={handleHighScoreProcessComplete}
             />
           );
         default:
@@ -1519,12 +1530,12 @@ const GameByToken: React.FC = () => {
           
           {/* Only show the game if authenticated or after they've submitted their name */}
           {!isPlaying ? (
-            <button 
-              onClick={handleStartGame}
+              <button
+                onClick={handleStartGame}
               className="mt-4 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
-            >
-              Start Game
-            </button>
+              >
+                Start Game
+              </button>
           ) : (
             <div style={{ 
               backgroundColor: 'white',

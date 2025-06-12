@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, getDocs, deleteDoc, doc, query, where, getDoc, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -100,10 +100,9 @@ const TeacherDashboard = () => {
   
   // Add state for assignment status filter
   const [activeStatusFilter, setActiveStatusFilter] = useState('all');
-
-  // Add state for edit confirmation modal
-  const [showEditConfirmModal, setShowEditConfirmModal] = useState(false);
-  const [gameToEdit, setGameToEdit] = useState<Game | null>(null);
+  
+  // Ref to store the current game being edited
+  const gameToEditRef = useRef<Game | null>(null);
 
   // Initialize folder manager hook
   const folderManager = useFolderManager({
@@ -526,29 +525,29 @@ const TeacherDashboard = () => {
     try {
       // Create assignments for each student
       for (const studentEmail of studentEmails) {
-        // Create assignment data
-        const assignmentData = {
-          gameName: game.title,
-          gameId: game.id,
-          gameType: game.gameType || 'Unknown',
-          studentEmail: studentEmail,
-          teacherId: currentUser?.uid || '',
-          teacherEmail: currentUser?.email || '',
-          timesRequired: timesRequired,
-          deadline: Timestamp.fromDate(deadline),
-        };
-        
-        // Choose the appropriate assignment creation method based on usePasswordAuth flag
+      // Create assignment data
+      const assignmentData = {
+        gameName: game.title,
+        gameId: game.id,
+        gameType: game.gameType || 'Unknown',
+        studentEmail: studentEmail,
+        teacherId: currentUser?.uid || '',
+        teacherEmail: currentUser?.email || '',
+        timesRequired: timesRequired,
+        deadline: Timestamp.fromDate(deadline),
+      };
+      
+      // Choose the appropriate assignment creation method based on usePasswordAuth flag
         // FIXED: Inverted the logic to match checkbox semantics correctly
-        let assignmentId: string;
-        if (usePasswordAuth) {
+      let assignmentId: string;
+      if (usePasswordAuth) {
           // Create standard assignment that requires password authentication
           assignmentId = await createAssignment(assignmentData);
           console.log('Successfully created assignment with password auth required, ID:', assignmentId);
         } else {
-          // Create assignment with passwordless email link authentication
-          assignmentId = await createAssignmentWithEmailLink(assignmentData);
-          console.log('Successfully created assignment with passwordless auth, ID:', assignmentId);
+        // Create assignment with passwordless email link authentication
+        assignmentId = await createAssignmentWithEmailLink(assignmentData);
+        console.log('Successfully created assignment with passwordless auth, ID:', assignmentId);
         }
       }
       
@@ -589,6 +588,20 @@ const TeacherDashboard = () => {
       } else {
         navigate('/configure/spinner-wheel');
       }
+    } else if (template.type === 'anagram') {
+      // If there's a template ID for editing, include it in the path
+      if (template.id) {
+        navigate(`/configure/anagram/${template.id}`);
+      } else {
+        navigate('/configure/anagram');
+      }
+    } else if (template.type === 'place-value-showdown') {
+      // If there's a template ID for editing, include it in the path
+      if (template.id) {
+        navigate(`/configure/place-value-showdown/${template.id}`);
+      } else {
+        navigate('/configure/place-value-showdown');
+      }
     } else {
       // Default to the configuration router for unknown types
       navigate('/configure');
@@ -610,6 +623,10 @@ const TeacherDashboard = () => {
           return { bgColor: '#f0e6ff', icon: '🥚' };
         case 'spinner-wheel':
           return { bgColor: '#fff5e6', icon: '🎡' };
+        case 'anagram':
+          return { bgColor: '#e6f3ff', icon: '🧩' };
+        case 'place-value-showdown':
+          return { bgColor: '#ffe6e6', icon: '🎯' };
         default:
           return { bgColor: '#f0f0f0', icon: '🎮' };
       }
@@ -958,6 +975,52 @@ const TeacherDashboard = () => {
     });
   };
 
+  // Function to open the student notes modal
+  const openStudentNotesModal = (student: Student) => {
+    console.log('🔵 openStudentNotesModal called with student:', student);
+    showModal('student-notes', {
+      student: {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        notes: student.notes || ''
+      }
+    });
+  };
+
+  // Function to save student notes
+  const handleSaveStudentNotes = async (studentId: string, notes: string) => {
+    try {
+      console.log('Saving student notes:', studentId, notes);
+      
+      // Update in users collection
+      const studentRef = doc(db, 'users', studentId);
+      await updateDoc(studentRef, { 
+        notes: notes,
+        updatedAt: serverTimestamp()
+      });
+      
+      // Update the student in the local state
+      setStudents(students.map(s => 
+        s.id === studentId ? { ...s, notes: notes } : s
+      ));
+      
+      showToast({
+        title: 'Notes saved successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      
+    } catch (error) {
+      console.error('Error saving student notes:', error);
+      showToast({
+        title: 'Error saving notes',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
   // Function to handle viewing a student's dashboard
   const handleViewStudentDashboard = (student: Student) => {
     // Remember which tab we're coming from for navigation back
@@ -1045,16 +1108,16 @@ const TeacherDashboard = () => {
 
   // Function to handle editing a game (with option to update or copy)
   const handleEditGame = (game: Game) => {
-    setGameToEdit(game);
-    setShowEditConfirmModal(true);
+    gameToEditRef.current = game;
+    showModal('edit-choice', { 
+      gameName: game.title
+    });
   };
 
-  // Function to handle edit confirmation choice
-  const handleEditChoice = (shouldUpdate: boolean) => {
-    if (!gameToEdit) return;
-    
+  // Function to create navigation handlers for edit choices
+  const createEditNavigationHandlers = (game: Game) => {
     // Navigate to the appropriate configuration page based on game type
-    const gameType = gameToEdit.gameType;
+    const gameType = game.gameType;
     let configRoute = '/configure';
     
     if (gameType === 'whack-a-mole') {
@@ -1063,18 +1126,22 @@ const TeacherDashboard = () => {
       configRoute = '/configure/sort-categories-egg';
     } else if (gameType === 'spinner-wheel') {
       configRoute = '/configure/spinner-wheel';
+    } else if (gameType === 'anagram') {
+      configRoute = '/configure/anagram';
+    } else if (gameType === 'place-value-showdown') {
+      configRoute = '/configure/place-value-showdown';
     }
     
-    if (shouldUpdate) {
-      // Edit the existing game
-      navigate(`${configRoute}/${gameToEdit.id}`);
-    } else {
-      // Create a copy - pass the game ID as template and add copy query parameter
-      navigate(`${configRoute}/${gameToEdit.id}?copy=true`);
-    }
-    
-    setShowEditConfirmModal(false);
-    setGameToEdit(null);
+    return {
+      handleUpdate: () => {
+        // Edit the existing game
+        navigate(`${configRoute}/${game.id}`);
+      },
+      handleCopy: () => {
+        // Create a copy - pass the game ID as template and add copy query parameter
+        navigate(`${configRoute}/${game.id}?copy=true`);
+      }
+    };
   };
 
   // Function to handle assigning a game to students
@@ -1163,6 +1230,24 @@ const TeacherDashboard = () => {
         }}
         onCancelStudent={() => {
           // No cleanup needed since we're using global modal
+        }}
+        onSaveStudentNotes={handleSaveStudentNotes}
+        onUpdateGame={() => {
+          const game = gameToEditRef.current;
+          if (game) {
+            const { handleUpdate } = createEditNavigationHandlers(game);
+            handleUpdate();
+          }
+        }}
+        onCopyGame={() => {
+          const game = gameToEditRef.current;
+          if (game) {
+            const { handleCopy } = createEditNavigationHandlers(game);
+            handleCopy();
+          }
+        }}
+        onCancelEdit={() => {
+          gameToEditRef.current = null;
         }}
         onCloseAssignmentDetails={closeViewAssignment}
         onAssignGame={handleAssignGame}
@@ -1431,7 +1516,8 @@ const TeacherDashboard = () => {
                         width: '80px', 
                         height: '80px', 
                         backgroundColor: template.type === 'whack-a-mole' ? '#C6F6D5' : 
-                                        template.type === 'spinner-wheel' ? '#FED7D7' : '#E9D8FD',
+                                        template.type === 'spinner-wheel' ? '#FED7D7' : 
+                                        template.type === 'anagram' ? '#BFDBFE' : '#E9D8FD',
                         borderRadius: '12px',
                         display: 'flex',
                         alignItems: 'center',
@@ -1452,7 +1538,8 @@ const TeacherDashboard = () => {
                           />
                         ) : (
                           template.type === 'whack-a-mole' ? '🔨' : 
-                          template.type === 'spinner-wheel' ? '🎡' : '🥚'
+                          template.type === 'spinner-wheel' ? '🎡' : 
+                          template.type === 'anagram' ? '🧩' : '🥚'
                         )}
                       </div>
                       
@@ -1627,6 +1714,7 @@ const TeacherDashboard = () => {
                           <option value="whack">🔨 Whack-a-Mole</option>
                           <option value="spinner">🎡 Spinner Wheel</option>
                           <option value="sort">🥚 Sort Categories</option>
+                          <option value="anagram">🧩 Anagram</option>
                         </select>
                       </div>
                       
@@ -1984,7 +2072,8 @@ const TeacherDashboard = () => {
                               width: '64px', 
                               height: '64px', 
                               backgroundColor: (game.gameType || '').includes('whack') ? '#C6F6D5' : 
-                                              (game.gameType || '').includes('spinner') ? '#FED7D7' : '#E9D8FD',
+                                              (game.gameType || '').includes('spinner') ? '#FED7D7' : 
+                                              (game.gameType || '').includes('anagram') ? '#BFDBFE' : '#E9D8FD',
                               borderRadius: '8px',
                               display: 'flex',
                               alignItems: 'center',
@@ -2002,7 +2091,8 @@ const TeacherDashboard = () => {
                               ) : (
                                 <div style={{ fontSize: '24px', color: '#718096' }}>
                                   {(game.gameType || '').includes('whack') ? '🔨' : 
-                                   (game.gameType || '').includes('spinner') ? '🎡' : '🥚'}
+                                   (game.gameType || '').includes('spinner') ? '🎡' : 
+                                   (game.gameType || '').includes('anagram') ? '🧩' : '🥚'}
                                 </div>
                               )}
                             </div>
@@ -2255,7 +2345,8 @@ const TeacherDashboard = () => {
                           width: '64px', 
                           height: '64px', 
                           backgroundColor: (game.gameType || '').includes('whack') ? '#C6F6D5' : 
-                                          (game.gameType || '').includes('spinner') ? '#FED7D7' : '#E9D8FD',
+                                          (game.gameType || '').includes('spinner') ? '#FED7D7' : 
+                                          (game.gameType || '').includes('anagram') ? '#BFDBFE' : '#E9D8FD',
                           borderRadius: '8px',
                           display: 'flex',
                           alignItems: 'center',
@@ -2273,7 +2364,8 @@ const TeacherDashboard = () => {
                           ) : (
                             <div style={{ fontSize: '24px', color: '#718096' }}>
                               {(game.gameType || '').includes('whack') ? '🔨' : 
-                               (game.gameType || '').includes('spinner') ? '🎡' : '🥚'}
+                               (game.gameType || '').includes('spinner') ? '🎡' : 
+                               (game.gameType || '').includes('anagram') ? '🧩' : '🥚'}
                             </div>
                           )}
                         </div>
@@ -2351,6 +2443,10 @@ const TeacherDashboard = () => {
                                   configRoute = '/configure/sort-categories-egg';
                                 } else if (gameType === 'spinner-wheel') {
                                   configRoute = '/configure/spinner-wheel';
+                                } else if (gameType === 'anagram') {
+                                  configRoute = '/configure/anagram';
+                                } else if (gameType === 'place-value-showdown') {
+                                  configRoute = '/configure/place-value-showdown';
                                 }
                                 
                                 navigate(`${configRoute}/${game.id}?copy=true`);
@@ -2560,6 +2656,20 @@ const TeacherDashboard = () => {
                               }}
                             >
                               View
+                            </button>
+                            <button
+                              onClick={() => openStudentNotesModal(student)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#805AD5', // Purple color for Notes button
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                              }}
+                            >
+                              Notes
                             </button>
                             <button
                               onClick={() => openEditStudentModal(student)}

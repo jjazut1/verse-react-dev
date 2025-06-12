@@ -81,6 +81,17 @@ interface AssignmentCreationModalProps {
   showToast: (options: { title: string; description?: string; status: 'success' | 'error' | 'info' | 'warning'; duration: number }) => void;
 }
 
+interface StudentNotesModalProps {
+  student: {
+    id: string;
+    name: string;
+    email: string;
+    notes?: string;
+  };
+  onSave: (studentId: string, notes: string) => void;
+  onCancel: () => void;
+}
+
 const DEFAULT_FOLDER_COLORS = [
   '#3182CE', // Blue
   '#38A169', // Green
@@ -1409,6 +1420,153 @@ const AssignmentCreationModal: React.FC<AssignmentCreationModalProps> = ({
   );
 };
 
+// Student Notes Modal
+const StudentNotesModal: React.FC<StudentNotesModalProps> = ({
+  student,
+  onSave,
+  onCancel
+}) => {
+  const { hideModal, isModalReady } = useModal();
+  const [notes, setNotes] = useState(student?.notes || '');
+
+  useEffect(() => {
+    if (student) {
+      setNotes(student.notes || '');
+    } else {
+      setNotes('');
+    }
+  }, [student?.id]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(student.id, notes.trim());
+    hideModal();
+  };
+
+  const handleCancelClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onCancel();
+    hideModal();
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      handleCancelClick(e);
+    }
+  };
+
+  return (
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000
+      }}
+      onClick={handleBackdropClick}
+    >
+      <div 
+        style={{
+          backgroundColor: 'white',
+          padding: '24px',
+          borderRadius: '8px',
+          maxWidth: '500px',
+          width: '100%',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          opacity: isModalReady ? 1 : 0.7,
+          transition: 'opacity 0.1s ease-in-out',
+          maxHeight: '70vh',
+          overflowY: 'auto'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: 'bold' }}>
+          📝 Student Notes
+        </h3>
+        
+        <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '6px' }}>
+          <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
+            {student.name}
+          </div>
+          <div style={{ fontSize: '14px', color: '#6B7280' }}>
+            {student.email}
+          </div>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+              Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add notes about this student's progress, behavior, or other observations..."
+              disabled={!isModalReady}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #E2E8F0',
+                borderRadius: '4px',
+                backgroundColor: '#F8FAFC',
+                minHeight: '120px',
+                resize: 'vertical',
+                fontSize: '14px',
+                lineHeight: '1.5',
+                fontFamily: 'inherit'
+              }}
+            />
+            <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+              These notes are private and only visible to you
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={handleCancelClick}
+              disabled={!isModalReady}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#E2E8F0',
+                color: '#4A5568',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: isModalReady ? 'pointer' : 'not-allowed',
+                opacity: isModalReady ? 1 : 0.6
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!isModalReady}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#4299E1',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: isModalReady ? 'pointer' : 'not-allowed',
+                opacity: isModalReady ? 1 : 0.6
+              }}
+            >
+              Save Notes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export const GlobalModals: React.FC<{ 
   // Folder management
   onDeleteFolder?: (folderId: string) => void;
@@ -1418,6 +1576,7 @@ export const GlobalModals: React.FC<{
   // Student management
   onSaveStudent?: (studentData: { name: string; email: string; grade: string; age: number; notes: string }, studentId?: string) => void;
   onCancelStudent?: () => void;
+  onSaveStudentNotes?: (studentId: string, notes: string) => void;
   
   // Delete confirmations
   onDelete?: () => void;
@@ -1441,6 +1600,7 @@ export const GlobalModals: React.FC<{
   onCancelFolder,
   onSaveStudent,
   onCancelStudent,
+  onSaveStudentNotes,
   onDelete,
   onCancelDelete,
   onUpdateGame,
@@ -1586,6 +1746,24 @@ export const GlobalModals: React.FC<{
         onAssign={onAssignGame}
         onCancel={onCancelAssignment}
         showToast={showToast}
+      />
+    );
+  }
+
+  // Student notes modal
+  if (modalId === 'student-notes') {
+    const { student } = modalProps;
+    
+    if (!onSaveStudentNotes) {
+      console.warn('🟡 GlobalModals: Missing onSaveStudentNotes for student-notes modal');
+      return null;
+    }
+    
+    return (
+      <StudentNotesModal
+        student={student}
+        onSave={onSaveStudentNotes}
+        onCancel={onCancelStudent || (() => {})}
       />
     );
   }

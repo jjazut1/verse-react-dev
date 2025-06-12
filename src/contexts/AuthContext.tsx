@@ -181,44 +181,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log(`   Current UID: ${user.uid}`);
             
             // This is a real legacy document - perform migration
-            try {
-              const newUserData: any = {
-                ...existingUserData,
-                userId: user.uid,
-                authUid: user.uid,
-                updatedAt: new Date().toISOString(),
-                lastLogin: new Date().toISOString(),
-                displayName: user.displayName || existingUserData.displayName || user.email?.split('@')[0],
-                email: user.email,
-                emailVerified: user.emailVerified,
-                linkedToAuth: true,
-                role: existingUserData.role  // Preserve their original role
-              };
-              
-              // IMPORTANT: Preserve existing createdAt if it exists, otherwise create one
-              if (existingUserData.createdAt) {
-                newUserData.createdAt = existingUserData.createdAt;
-              } else {
-                newUserData.createdAt = new Date().toISOString();
-              }
-              
-              await setDoc(doc(db, 'users', user.uid), newUserData);
-              
+          try {
+            const newUserData: any = {
+              ...existingUserData,
+              userId: user.uid,
+              authUid: user.uid,
+              updatedAt: new Date().toISOString(),
+              lastLogin: new Date().toISOString(),
+              displayName: user.displayName || existingUserData.displayName || user.email?.split('@')[0],
+              email: user.email,
+              emailVerified: user.emailVerified,
+              linkedToAuth: true,
+              role: existingUserData.role  // Preserve their original role
+            };
+            
+            // IMPORTANT: Preserve existing createdAt if it exists, otherwise create one
+            if (existingUserData.createdAt) {
+              newUserData.createdAt = existingUserData.createdAt;
+            } else {
+              newUserData.createdAt = new Date().toISOString();
+            }
+            
+            await setDoc(doc(db, 'users', user.uid), newUserData);
+            
               // Delete the old document ONLY if it has a different UID
-              await deleteDoc(existingUserDoc.ref);
+            await deleteDoc(existingUserDoc.ref);
               console.log('✅ Successfully migrated legacy user document');
-              
-              // Set their role based on the migrated data
+            
+            // Set their role based on the migrated data
               if (existingUserData.role === 'teacher' || existingUserData.role === 'admin') {
-                setIsTeacher(true);
-                setIsStudent(false);
-              } else if (existingUserData.role === 'student') {
-                setIsTeacher(false);
-                setIsStudent(true);
-              }
-              return;
-            } catch (error) {
-              console.error('Error creating new user document with correct UID:', error);
+              setIsTeacher(true);
+              setIsStudent(false);
+            } else if (existingUserData.role === 'student') {
+              setIsTeacher(false);
+              setIsStudent(true);
+            }
+            return;
+          } catch (error) {
+            console.error('Error creating new user document with correct UID:', error);
             }
           }
         }

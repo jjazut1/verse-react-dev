@@ -74,7 +74,36 @@ interface SpinnerWheelConfig extends BaseGameConfig {
   instructions: string;
 }
 
-export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig;
+export interface AnagramConfig extends BaseGameConfig {
+  type: 'anagram';
+  gameMode: 'letters-to-word' | 'words-to-sentence' | 'mixed';
+  showDefinitions: boolean;
+  enableHints: boolean;
+  maxAttempts: number;
+  shuffleIntensity: 'low' | 'medium' | 'high';
+  correctFeedbackDuration: 'always' | 'momentary';
+  anagrams: Array<{
+    id: string;
+    original: string; // The correct word or sentence
+    definition?: string; // Optional definition/hint
+    type: 'word' | 'sentence'; // Whether this is a word or sentence anagram
+    difficulty: 'easy' | 'medium' | 'hard';
+  }>;
+}
+
+export interface PlaceValueShowdownConfig extends BaseGameConfig {
+  type: 'place-value-showdown';
+  numberOfCards: 2 | 3 | 4 | 5; // Number of digit cards per round
+  objective: 'largest' | 'smallest'; // What number to create
+  winningScore: number; // Points needed to win (default 5)
+  aiDifficulty: 'easy' | 'medium' | 'hard'; // How smart the teacher AI is
+  playerName: string; // Student's name
+  teacherName: string; // Teacher's name (for display)
+  enableHints: boolean; // Show place value hints
+  gameMode: 'student-vs-teacher' | 'practice'; // Competition vs practice mode
+}
+
+export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig | AnagramConfig | PlaceValueShowdownConfig;
 
 export interface Word {
   text: string;

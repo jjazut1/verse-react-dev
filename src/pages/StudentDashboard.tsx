@@ -339,6 +339,11 @@ const StudentDashboard: React.FC = () => {
         // Usually completion-based, typically 100 points
         const spinnerMax = gameConfig?.maxScore || 100;
         return spinnerMax;
+      
+      case 'place-value-showdown':
+        // Max score is based on winning score × maximum possible value
+        const winningScore = gameConfig?.winningScore || 5;
+        return winningScore * 20; // Approximate max points per round
         
       default:
         return 100; // Fallback
@@ -565,8 +570,9 @@ const StudentDashboard: React.FC = () => {
                 color: getBorderColor(),
                 opacity: 0.7
               }}>
-                {gameConfig?.type === 'whack-a-mole' ? '🔨' : 
-                 gameConfig?.type === 'sort-categories-egg' ? '🥚' : '🎮'}
+                                {gameConfig?.type === 'whack-a-mole' ? '🔨' :
+                 gameConfig?.type === 'sort-categories-egg' ? '🥚' :
+                 gameConfig?.type === 'place-value-showdown' ? '🎯' : '🎮'}
               </div>
             )}
           </div>
@@ -974,7 +980,8 @@ const StudentDashboard: React.FC = () => {
                         color: '#38B2AC'
                       }}>
                         {game.type === 'whack-a-mole' ? '🔨' : 
-                         game.type === 'sort-categories-egg' ? '🥚' : '🎮'}
+                         game.type === 'sort-categories-egg' ? '🥚' :
+                         game.type === 'place-value-showdown' ? '🎯' : '🎮'}
                       </div>
                     )}
                   </div>
@@ -1103,7 +1110,8 @@ const StudentDashboard: React.FC = () => {
                           color: '#48BB78'
                         }}>
                           {game.type === 'whack-a-mole' ? '🔨' : 
-                           game.type === 'sort-categories-egg' ? '🥚' : '🎮'}
+                           game.type === 'sort-categories-egg' ? '🥚' :
+                           game.type === 'place-value-showdown' ? '🎯' : '🎮'}
                         </div>
                       )}
                     </div>
@@ -1262,7 +1270,8 @@ const StudentDashboard: React.FC = () => {
               }}>
                 {score.gameType === 'whack-a-mole' ? '🔨' : 
                  score.gameType === 'sort-categories-egg' ? '🥚' : 
-                 score.gameType === 'spinner-wheel' ? '🎡' : '🎮'}
+                 score.gameType === 'spinner-wheel' ? '🎡' :
+                 score.gameType === 'place-value-showdown' ? '🎯' : '🎮'}
               </div>
             )}
           </div>

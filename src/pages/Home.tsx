@@ -71,6 +71,9 @@ function getBackgroundColorByType(type: string): string {
   const colors: Record<string, string> = {
     'sort-categories-egg': '#f0e6ff', // Light purple
     'whack-a-mole': '#e6fff0',  // Light green
+    'spinner-wheel': '#fff3e0', // Light orange
+    'anagram': '#e3f2fd', // Light blue
+    'place-value-showdown': '#ffe6e6', // Light red
     'default': 'var(--color-primary-100)'
   };
   
@@ -84,6 +87,12 @@ function getIconByType(type: string): string {
       return '🥚';
     case 'whack-a-mole':
       return '🔨';
+    case 'spinner-wheel':
+      return '🎡';
+    case 'anagram':
+      return '🧩';
+    case 'place-value-showdown':
+      return '🎯';
     default:
       return '';
   }

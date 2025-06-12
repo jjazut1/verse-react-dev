@@ -6,6 +6,8 @@ import { db } from '../config/firebase';
 import SortCategoriesEggRevealAdapter from './games/sort-categories-egg-reveal/SortCategoriesEggRevealAdapter';
 import WhackAMole from './games/whack-a-mole/WhackAMole';
 import SpinnerWheel from './games/spinner-wheel/SpinnerWheel';
+import AnagramAdapter from './games/anagram/AnagramAdapter';
+import PlaceValueShowdownAdapter from './games/place-value-showdown/PlaceValueShowdownAdapter';
 import { useCustomToast } from '../hooks/useCustomToast';
 import { GameConfig } from '../types/game';
 
@@ -103,6 +105,21 @@ const GamePlayer = () => {
       case 'spinner-wheel':
         return (
           <SpinnerWheel
+            onGameComplete={handleGameComplete}
+            config={gameConfig}
+          />
+        );
+      case 'anagram':
+        return (
+          <AnagramAdapter
+            playerName="Player"
+            onGameComplete={handleGameComplete}
+            config={gameConfig}
+          />
+        );
+      case 'place-value-showdown':
+        return (
+          <PlaceValueShowdownAdapter
             playerName="Player"
             onGameComplete={handleGameComplete}
             config={gameConfig}
