@@ -81,6 +81,30 @@
   padding: 10px 0;
 }
 
+/* Drop Zone Indicator */
+.drop-zone-indicator {
+  width: 4px;
+  height: 40px;
+  background-color: #007bff;
+  border-radius: 2px;
+  position: relative;
+  animation: dropZonePulse 1s ease-in-out infinite alternate;
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.6);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+@keyframes dropZonePulse {
+  from {
+    opacity: 0.6;
+    transform: scaleY(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
 /* Individual Draggable Words */
 .draggable-word {
   color: #555;

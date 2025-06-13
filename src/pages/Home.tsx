@@ -73,6 +73,7 @@ function getBackgroundColorByType(type: string): string {
     'whack-a-mole': '#e6fff0',  // Light green
     'spinner-wheel': '#fff3e0', // Light orange
     'anagram': '#e3f2fd', // Light blue
+    'sentence-sense': '#e8f5e8', // Light green
     'place-value-showdown': '#ffe6e6', // Light red
     'default': 'var(--color-primary-100)'
   };
@@ -91,6 +92,8 @@ function getIconByType(type: string): string {
       return '🎡';
     case 'anagram':
       return '🧩';
+    case 'sentence-sense':
+      return '📝';
     case 'place-value-showdown':
       return '🎯';
     default:
@@ -248,363 +251,6 @@ const GameItem = ({ title, type, thumbnail, id, isPlayable, config, onClick, isO
   );
 };
 
-const ConfigurationModal = ({ 
-  isOpen, 
-  onClose, 
-  template,
-  onSave 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  template: any;
-  onSave: (config: any, isUpdate: boolean) => void;
-}) => {
-  const [title, setTitle] = useState(template?.title || '');
-  const [eggQty, setEggQty] = useState(template?.eggQty || 6);
-  const [categories, setCategories] = useState<{ name: string; items: string }[]>(
-    template?.categories 
-      ? template.categories.map((cat: any) => ({ 
-          name: cat.name, 
-          items: Array.isArray(cat.items) ? cat.items.join(', ') : cat.items 
-        }))
-      : [{ name: '', items: '' }]
-  );
-  const [shareConfig, setShareConfig] = useState(template?.share || false);
-
-  // Whack-a-mole specific state
-  const [gameTime, setGameTime] = useState(template?.gameTime || 30);
-  const [pointsPerHit, setPointsPerHit] = useState(template?.pointsPerHit || 10);
-  const [penaltyPoints, setPenaltyPoints] = useState(template?.penaltyPoints || 5);
-  const [bonusPoints, setBonusPoints] = useState(template?.bonusPoints || 10);
-  const [bonusThreshold, setBonusThreshold] = useState(template?.bonusThreshold || 3);
-  const [gameSpeed, setGameSpeed] = useState(template?.speed || 2);
-  const [instructions, setInstructions] = useState(template?.instructions || '');
-  const [wordCategories, setWordCategories] = useState<{ title: string; words: string[] }[]>(
-    template?.categories || [{ title: '', words: [] }]
-  );
-
-  const { currentUser } = useAuth();
-  const isOwnTemplate = template?.userId === currentUser?.uid;
-  const gameType = template?.type || 'sort-categories-egg';
-
-  // Reset form when template changes
-  useEffect(() => {
-    if (template) {
-      setTitle(template.title || '');
-      setShareConfig(template.share || false);
-
-      if (template.type === 'sort-categories-egg') {
-        setEggQty(template.eggQty || 6);
-        setCategories(
-          template.categories 
-            ? template.categories.map((cat: any) => ({ 
-                name: cat.name, 
-                items: Array.isArray(cat.items) ? cat.items.join(', ') : cat.items 
-              }))
-            : [{ name: '', items: '' }]
-        );
-      } else if (template.type === 'whack-a-mole') {
-        setGameTime(template.gameTime || 30);
-        setPointsPerHit(template.pointsPerHit || 10);
-        setPenaltyPoints(template.penaltyPoints || 5);
-        setBonusPoints(template.bonusPoints || 10);
-        setBonusThreshold(template.bonusThreshold || 3);
-        setGameSpeed(template.speed || 2);
-        setInstructions(template.instructions || '');
-        setWordCategories(template.categories || [{ title: '', words: [] }]);
-      }
-    }
-  }, [template]);
-
-  const handleAddCategory = () => {
-    if (gameType === 'sort-categories-egg') {
-      setCategories([...categories, { name: '', items: '' }]);
-    } else {
-      setWordCategories([...wordCategories, { title: '', words: [] }]);
-    }
-  };
-
-  const handleCategoryChange = (index: number, field: 'name' | 'items', value: string) => {
-    if (gameType === 'sort-categories-egg') {
-      const newCategories = [...categories];
-      newCategories[index][field] = value;
-      setCategories(newCategories);
-    }
-  };
-
-  const handleWordCategoryChange = (index: number, field: 'title' | 'words', value: string) => {
-    const newCategories = [...wordCategories];
-    if (field === 'title') {
-      newCategories[index].title = value;
-    } else {
-      newCategories[index].words = value.split(',').map(word => word.trim());
-    }
-    setWordCategories(newCategories);
-  };
-
-  const handleSave = (isUpdate: boolean = false) => {
-    let configData;
-
-    if (gameType === 'sort-categories-egg') {
-      // Transform categories to ensure items is always an array
-      const transformedCategories = categories.map(cat => ({
-        name: (cat.name || '').trim(),
-        items: (cat.items || '').split(',')
-          .map(item => item.trim())
-          .filter(item => item.length > 0)
-      }));
-
-      configData = {
-        title: title.trim(),
-        type: 'sort-categories-egg',
-        eggQty: eggQty,
-        categories: transformedCategories,
-        share: shareConfig,
-        email: currentUser?.email || '',
-        userId: currentUser?.uid || '',
-        createdAt: serverTimestamp()
-      };
-    } else {
-      // Whack-a-mole configuration
-      configData = {
-        title: title.trim(),
-        type: 'whack-a-mole',
-        gameTime,
-        pointsPerHit,
-        penaltyPoints,
-        bonusPoints,
-        bonusThreshold,
-        speed: gameSpeed,
-        instructions,
-        categories: wordCategories,
-        share: shareConfig,
-        email: currentUser?.email || '',
-        userId: currentUser?.uid || '',
-        createdAt: serverTimestamp()
-      };
-    }
-
-    onSave(configData, isUpdate);
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>Configure Game Template</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody pb={6}>
-          <VStack spacing={4}>
-            <FormControl>
-              <FormLabel>Configuration Title</FormLabel>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter configuration title"
-              />
-            </FormControl>
-
-            {gameType === 'sort-categories-egg' ? (
-              // Sort Categories Egg Configuration
-              <>
-                <FormControl>
-                  <FormLabel>Number of Eggs</FormLabel>
-                  <NumberInput
-                    value={eggQty}
-                    onChange={(_, value) => setEggQty(value)}
-                    min={1}
-                    max={20}
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                </FormControl>
-
-                {categories.map((category, index) => (
-                  <VStack key={index} w="100%" spacing={2}>
-                    <FormControl>
-                      <FormLabel>Category {index + 1} Name</FormLabel>
-                      <Input
-                        value={category.name}
-                        onChange={(e) => handleCategoryChange(index, 'name', e.target.value)}
-                        placeholder="Category name"
-                      />
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel>Items (comma-separated)</FormLabel>
-                      <Textarea
-                        value={category.items}
-                        onChange={(e) => handleCategoryChange(index, 'items', e.target.value)}
-                        placeholder="Item1, Item2, Item3"
-                      />
-                    </FormControl>
-                  </VStack>
-                ))}
-              </>
-            ) : (
-              // Whack-a-mole Configuration
-              <>
-                <FormControl>
-                  <FormLabel>Game Time (seconds)</FormLabel>
-                  <NumberInput
-                    value={gameTime}
-                    onChange={(_, value) => setGameTime(value)}
-                    min={30}
-                    max={300}
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Game Speed</FormLabel>
-                  <Select
-                    value={gameSpeed}
-                    onChange={(e) => setGameSpeed(Number(e.target.value))}
-                  >
-                    <option value={1}>Slow (10-12 moles)</option>
-                    <option value={2}>Medium (14-16 moles)</option>
-                    <option value={3}>Fast (17-19 moles)</option>
-                  </Select>
-                  <FormHelperText>Controls how frequently moles appear during the game</FormHelperText>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Game Instructions</FormLabel>
-                  <Textarea
-                    value={instructions}
-                    onChange={(e) => setInstructions(e.target.value)}
-                    placeholder="Enter custom instructions shown to players (optional)"
-                    rows={3}
-                  />
-                  <FormHelperText>
-                    Custom instructions to show on the game start screen. If left empty, default instructions will be shown.
-                  </FormHelperText>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Points Per Hit</FormLabel>
-                  <NumberInput
-                    value={pointsPerHit}
-                    onChange={(_, value) => setPointsPerHit(value)}
-                    min={1}
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Penalty Points</FormLabel>
-                  <NumberInput
-                    value={penaltyPoints}
-                    onChange={(_, value) => setPenaltyPoints(value)}
-                    min={0}
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Bonus Points</FormLabel>
-                  <NumberInput
-                    value={bonusPoints}
-                    onChange={(_, value) => setBonusPoints(value)}
-                    min={0}
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Bonus Threshold</FormLabel>
-                  <NumberInput
-                    value={bonusThreshold}
-                    onChange={(_, value) => setBonusThreshold(value)}
-                    min={1}
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                </FormControl>
-
-                {wordCategories.map((category, index) => (
-                  <VStack key={index} w="100%" spacing={2}>
-                    <FormControl>
-                      <FormLabel>Category {index + 1} Title</FormLabel>
-                      <Input
-                        value={category.title}
-                        onChange={(e) => handleWordCategoryChange(index, 'title', e.target.value)}
-                        placeholder="Category title"
-                      />
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel>Words (comma-separated)</FormLabel>
-                      <Textarea
-                        value={category.words.join(', ')}
-                        onChange={(e) => handleWordCategoryChange(index, 'words', e.target.value)}
-                        placeholder="word1, word2, word3"
-                      />
-                    </FormControl>
-                  </VStack>
-                ))}
-              </>
-            )}
-
-            <Button onClick={handleAddCategory} colorScheme="blue" width="100%">
-              Add Category
-            </Button>
-
-            <FormControl display="flex" alignItems="center">
-              <FormLabel mb="0">Share Configuration</FormLabel>
-              <Switch
-                isChecked={shareConfig}
-                onChange={(e) => setShareConfig(e.target.checked)}
-              />
-            </FormControl>
-
-            {isOwnTemplate ? (
-              <HStack spacing={4} width="100%">
-                <Button onClick={() => handleSave(true)} colorScheme="blue" flex={1}>
-                  Update Configuration
-                </Button>
-                <Button onClick={() => handleSave(false)} colorScheme="green" flex={1}>
-                  Save as New
-                </Button>
-              </HStack>
-            ) : (
-              <Button onClick={() => handleSave(false)} colorScheme="green" width="100%">
-                Save as New Configuration
-              </Button>
-            )}
-          </VStack>
-        </ModalBody>
-      </ModalContent>
-    </Modal>
-  );
-};
-
 // Define a proper interface for game objects
 interface GameObject {
   id: string;
@@ -624,8 +270,6 @@ const Home = () => {
   const [modifiableSearch, setModifiableSearch] = useState('');
   const [blankSearch, setBlankSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const navigate = useNavigate();
   const { currentUser, isTeacher, isStudent } = useAuth();
   const toast = useToast();
@@ -934,25 +578,49 @@ const Home = () => {
 
           // Process blank templates
           const blankTemplatesData = blankTemplatesSnapshot.docs.map(doc => {
+            const docData = doc.data();
+            console.log('🔍 Processing blank template:', {
+              id: doc.id,
+              title: docData.title,
+              originalType: docData.type,
+              allData: docData
+            });
+
             // Ensure blank templates have a valid game type
-            let type = doc.data().type || 'sort-categories-egg';
+            let type = docData.type || 'sort-categories-egg';
+            
+            // List of all supported game types
+            const supportedGameTypes = [
+              'whack-a-mole', 
+              'sort-categories-egg', 
+              'spinner-wheel', 
+              'anagram', 
+              'sentence-sense', 
+              'place-value-showdown'
+            ];
             
             // Make sure the type is one of our supported game types
-            if (type !== 'whack-a-mole' && type !== 'sort-categories-egg') {
+            if (!supportedGameTypes.includes(type)) {
+              console.warn('🚨 Unsupported blank template type:', type, 'for template:', doc.id);
               // Default to sort-categories-egg if type is not supported
               type = 'sort-categories-egg';
             }
             
-            return {
+            const processedTemplate = {
               id: doc.id,
-              title: doc.data().title || 'Untitled Template',
+              title: docData.title || 'Untitled Template',
               type: type, // Use the validated type
-              thumbnail: doc.data().thumbnail,
-              categories: doc.data().categories || [],
-              eggQty: doc.data().eggQty || 6,
-              share: doc.data().share || false
+              thumbnail: docData.thumbnail,
+              categories: docData.categories || [],
+              eggQty: docData.eggQty || 6,
+              share: docData.share || false
             };
+
+            console.log('🔍 Processed blank template:', processedTemplate);
+            return processedTemplate;
           });
+          console.log('🔍 All processed blank templates:', blankTemplatesData);
+          console.log('🔍 Setting blankTemplates state with:', blankTemplatesData.length, 'templates');
           setBlankTemplates(blankTemplatesData);
         } else {
           // Set empty arrays for non-teacher users
@@ -1012,6 +680,15 @@ const Home = () => {
   );
 
   const handleTemplateClick = (template: any, isBlankTemplate: boolean = false) => {
+    // Add comprehensive debug logging
+    console.log('🔍 handleTemplateClick called with:', {
+      template,
+      isBlankTemplate,
+      templateId: template?.id,
+      templateType: template?.type,
+      templateTitle: template?.title
+    });
+
     if (!currentUser) {
       toast({
         title: 'Authentication Required',
@@ -1022,178 +699,41 @@ const Home = () => {
       return;
     }
 
-    // Ensure template has a valid type
-    let templateType = template.type || 'sort-categories-egg';
-    if (templateType !== 'whack-a-mole' && templateType !== 'sort-categories-egg') {
-      templateType = 'sort-categories-egg'; // Default to sort-categories-egg
-    }
+    // Get the template type from the template
+    const templateType = template.type;
+    console.log('🔍 Template type:', templateType);
+
+    // List of game types that have dedicated configuration pages
+    const supportedGameTypes = [
+      'whack-a-mole', 
+      'sort-categories-egg', 
+      'spinner-wheel', 
+      'anagram', 
+      'sentence-sense', 
+      'place-value-showdown'
+    ];
+
+    console.log('🔍 Supported game types:', supportedGameTypes);
+    console.log('🔍 Is templateType supported?', supportedGameTypes.includes(templateType));
 
     // Navigate to the appropriate configuration page based on game type
-    if (templateType === 'whack-a-mole' || templateType === 'sort-categories-egg') {
+    if (supportedGameTypes.includes(templateType)) {
       // For games with dedicated config pages, navigate to the appropriate route
       if (template.id) {
-        navigate(`/configure/${templateType}/${template.id}`);
+        const navigateUrl = `/configure/${templateType}/${template.id}`;
+        console.log('🔍 Navigating to:', navigateUrl);
+        navigate(navigateUrl);
       } else {
-        navigate(`/configure/${templateType}`);
+        const navigateUrl = `/configure/${templateType}`;
+        console.log('🔍 Navigating to (no ID):', navigateUrl);
+        navigate(navigateUrl);
       }
     } else {
-      // For other game types that still use the modal
-      setSelectedTemplate({...template, type: templateType});
-      setIsConfigModalOpen(true);
-    }
-  };
-
-  interface Category {
-    name: string;
-    items: string[];
-  }
-
-  interface WordCategory {
-    title: string;
-    words: string[];
-  }
-
-  const handleSaveConfig = async (config: any, isUpdate: boolean) => {
-    try {
-      if (!currentUser) {
-        throw new Error('You must be signed in to save configurations');
-      }
-
-      let formattedCategories: Category[] | WordCategory[];
-      let baseConfigData: any;
-      let docId: string = config.id || '';
-
-      if (config.type === 'whack-a-mole') {
-        // Format whack-a-mole categories
-        formattedCategories = (config.categories || []).map((cat: { title?: string; words?: string | string[] }) => ({
-          title: (cat.title || '').trim(),
-          words: typeof cat.words === 'string' 
-            ? cat.words.split(',').map(word => word.trim()).filter(Boolean)
-            : (cat.words || []).map(word => word.trim()).filter(Boolean)
-        })).filter((cat: WordCategory) => cat.title && cat.words.length > 0);
-
-        if (formattedCategories.length === 0) {
-          throw new Error('Each category must have a title and at least one word');
-        }
-
-        baseConfigData = {
-          title: (config.title || '').trim(),
-          type: 'whack-a-mole',
-          gameTime: Number(config.gameTime) || 30,
-          pointsPerHit: Number(config.pointsPerHit) || 10,
-          penaltyPoints: Number(config.penaltyPoints) || 5,
-          bonusPoints: Number(config.bonusPoints) || 10,
-          bonusThreshold: Number(config.bonusThreshold) || 3,
-          speed: Number(config.speed) || 2,
-          instructions: config.instructions || '',
-          categories: formattedCategories,
-          share: Boolean(config.share),
-          userId: currentUser?.uid || '',
-          email: currentUser?.email || null,
-          createdAt: serverTimestamp()
-        };
-
-        console.log('Saving whack-a-mole configuration:', baseConfigData);
-
-        if (isUpdate && config.id) {
-          await updateDoc(doc(db, 'userGameConfigs', config.id), {
-            ...baseConfigData,
-            updatedAt: serverTimestamp()
-          });
-          docId = config.id;
-        } else {
-          const docRef = await addDoc(collection(db, 'userGameConfigs'), baseConfigData);
-          docId = docRef.id;
-          config.id = docId;
-        }
-      } else {
-        // Format sort-categories-egg categories
-        formattedCategories = (config.categories || []).map((cat: { name?: string; items?: string | string[] }) => {
-          const name = (cat.name || '').trim();
-          const items = Array.isArray(cat.items) 
-            ? cat.items.map(item => (item || '').trim()).filter(Boolean)
-            : (cat.items || '').split(',').map(item => item.trim()).filter(Boolean);
-          return { name, items };
-        }).filter((cat: { name: string; items: string[] }): cat is Category => Boolean(cat.name && cat.items.length > 0));
-
-        if (formattedCategories.length === 0) {
-          throw new Error('All categories must have a name and at least one item');
-        }
-
-        baseConfigData = {
-          title: (config.title || '').trim(),
-          type: 'sort-categories-egg',
-          eggQty: Number(config.eggQty) || 6,
-          categories: formattedCategories,
-          share: Boolean(config.share),
-          userId: currentUser?.uid || '',
-          email: currentUser?.email || null,
-          createdAt: serverTimestamp()
-        };
-
-        console.log('Saving sort-categories-egg configuration:', baseConfigData);
-
-        if (isUpdate && config.id) {
-          await updateDoc(doc(db, 'userGameConfigs', config.id), {
-            ...baseConfigData,
-            updatedAt: serverTimestamp()
-          });
-          docId = config.id;
-        } else {
-          const docRef = await addDoc(collection(db, 'userGameConfigs'), baseConfigData);
-          docId = docRef.id;
-          config.id = docId;
-        }
-      }
-
-      // Generate and upload thumbnail after saving the document
-      try {
-        if (docId) {
-          console.log('Generating thumbnail for document ID:', docId);
-          
-          // Generate game-specific thumbnail data
-          const gameData = {
-            ...baseConfigData,
-            id: docId
-          };
-          
-          // Generate and upload the thumbnail
-          const thumbnailUrl = await generateAndUploadThumbnail(docId, gameData);
-          
-          // Update the document with the thumbnail URL
-          if (thumbnailUrl) {
-            await updateDoc(doc(db, 'userGameConfigs', docId), {
-              thumbnail: thumbnailUrl
-            });
-            console.log('Thumbnail generated and saved:', thumbnailUrl);
-          }
-        }
-      } catch (thumbnailError) {
-        console.error('Error generating thumbnail:', thumbnailError);
-        // Continue without thumbnail - it's not critical to game functionality
-      }
-
-      toast({
-        title: isUpdate ? 'Configuration Updated' : 'Success',
-        description: isUpdate 
-          ? 'Configuration updated successfully' 
-          : 'New configuration saved successfully',
-        status: 'success',
-        duration: 3000,
-      });
-
-      // Close modal and navigate to the game
-      setIsConfigModalOpen(false);
-      navigate(`/game/${config.id}`);
-      
-    } catch (error) {
-      console.error('Error saving configuration:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Could not save configuration. Please try again.',
-        status: 'error',
-        duration: 5000,
-      });
+      // For unsupported game types, navigate to a default fallback
+      const fallbackType = 'sort-categories-egg'; // Default fallback
+      console.warn(`🚨 Unsupported template type: ${templateType}, falling back to ${fallbackType}`);
+      console.log('🔍 Template object causing fallback:', template);
+      navigate(`/configure/${fallbackType}`);
     }
   };
 
@@ -1232,20 +772,40 @@ const Home = () => {
     onTemplateClick: (template: any) => void,
     handleDeleteClick?: (id: string, type: 'template' | 'game', title: string) => void
   ) => {
+    console.log('🔍 renderTemplatesList called with:', {
+      templatesCount: templates.length,
+      isOwner,
+      hasOnTemplateClick: !!onTemplateClick,
+      hasDeleteHandler: !!handleDeleteClick,
+      templates: templates.map(t => ({ id: t.id, title: t.title, type: t.type }))
+    });
+    
     return templates.length > 0 ? (
       <div>
-        {templates.map(template => (
-          <GameItemDisplay
-            key={template.id}
-            title={template.title}
-            type={template.type}
-            thumbnail={template.thumbnail}
-            isPlayable={false}
-            onClick={() => onTemplateClick(template)}
-            isOwner={isOwner}
-            onDelete={handleDeleteClick ? () => handleDeleteClick(template.id, 'template', template.title) : undefined}
-          />
-        ))}
+        {templates.map(template => {
+          console.log('🔍 Rendering GameItemDisplay for template:', {
+            id: template.id,
+            title: template.title,
+            type: template.type,
+            hasClickHandler: !!onTemplateClick
+          });
+          
+          return (
+            <GameItemDisplay
+              key={template.id}
+              title={template.title}
+              type={template.type}
+              thumbnail={template.thumbnail}
+              isPlayable={false}
+              onClick={() => {
+                console.log('🔍 GameItemDisplay onClick triggered for:', template.title, template.type);
+                onTemplateClick(template);
+              }}
+              isOwner={isOwner}
+              onDelete={handleDeleteClick ? () => handleDeleteClick(template.id, 'template', template.title) : undefined}
+            />
+          );
+        })}
       </div>
     ) : (
       <div style={{ textAlign: 'center', padding: 'var(--spacing-4)', color: 'var(--color-gray-500)' }}>
@@ -1432,11 +992,40 @@ const Home = () => {
                     Loading templates...
                   </div>
                 ) : (
-                  renderTemplatesList(
-                    blankTemplates.filter(template => template.title.toLowerCase().includes(blankSearch.toLowerCase())),
-                    false,
-                    (template) => handleTemplateClick(template, true)
-                  )
+                  <>
+                    {/* Hard-coded Sentence Sense Template */}
+                    <GameItemDisplay
+                      title="Sentence Sense - Word Arrangement"
+                      type="sentence-sense"
+                      isPlayable={false}
+                      onClick={() => {
+                        console.log('🔍 Clicking hard-coded Sentence Sense template');
+                        navigate('/configure/sentence-sense');
+                      }}
+                    />
+                    
+                    {/* Database-loaded templates */}
+                    {(() => {
+                      const filteredTemplates = blankTemplates.filter(template => 
+                        template.title.toLowerCase().includes(blankSearch.toLowerCase())
+                      );
+                      console.log('🔍 Filtered blank templates for rendering:', {
+                        totalBlankTemplates: blankTemplates.length,
+                        filteredCount: filteredTemplates.length,
+                        searchTerm: blankSearch,
+                        filteredTemplates: filteredTemplates
+                      });
+                      
+                      return renderTemplatesList(
+                        filteredTemplates,
+                        false,
+                        (template) => {
+                          console.log('🔍 Template click handler created for:', template.title, template.type);
+                          return handleTemplateClick(template, true);
+                        }
+                      );
+                    })()}
+                  </>
                 )}
               </div>
             </div>
@@ -1444,13 +1033,6 @@ const Home = () => {
         </div>
         )}
       </div>
-
-      <ConfigurationModal
-        isOpen={isConfigModalOpen}
-        onClose={() => setIsConfigModalOpen(false)}
-        template={selectedTemplate}
-        onSave={handleSaveConfig}
-      />
 
       {/* Render the confirmation dialog */}
       <DeleteConfirmationDialog />

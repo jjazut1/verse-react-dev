@@ -32,6 +32,7 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
 }) => {
   const [words, setWords] = useState<Word[]>([]);
   const [moveCount, setMoveCount] = useState(0);
+  const [missCount, setMissCount] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
@@ -48,6 +49,7 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
   const [draggedWord, setDraggedWord] = useState<Word | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [dropZoneIndex, setDropZoneIndex] = useState<number | null>(null);
 
   useEffect(() => {
     initializeGame();
@@ -64,12 +66,63 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
     if (isDragging) {
       const handleGlobalMouseMove = (event: MouseEvent) => {
         setMousePosition({ x: event.clientX, y: event.clientY });
+        updateDropZone(event.clientX);
       };
       
       document.addEventListener('mousemove', handleGlobalMouseMove);
       return () => document.removeEventListener('mousemove', handleGlobalMouseMove);
+    } else {
+      setDropZoneIndex(null);
     }
   }, [isDragging]);
+
+  // Escape key handler to cancel drag operations
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isDragging && draggedWord) {
+        // Cancel the drag operation - return word to its original position
+        setDraggedWord(null);
+        setIsDragging(false);
+        setDropZoneIndex(null);
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener('keydown', handleEscapeKey);
+      return () => document.removeEventListener('keydown', handleEscapeKey);
+    }
+  }, [isDragging, draggedWord]);
+
+  const updateDropZone = (mouseX: number) => {
+    const sentenceContainer = containerRef.current;
+    if (!sentenceContainer) return;
+
+    const containerRect = sentenceContainer.getBoundingClientRect();
+    
+    // Check if mouse is within the sentence container area
+    if (mouseX < containerRect.left || mouseX > containerRect.right) {
+      setDropZoneIndex(null);
+      return;
+    }
+
+    // Find the appropriate drop zone index
+    const newDropZoneIndex = findInsertionIndex(mouseX, sentenceContainer);
+    setDropZoneIndex(newDropZoneIndex);
+  };
+
+  // Helper function to check if a word is correct in its current position
+  // considering that duplicate words with exact same case are interchangeable
+  const isWordCorrectAtPosition = (word: Word, position: number, allWords: Word[]): boolean => {
+    // Get the original sentence words
+    const originalWords = anagram.original.trim().split(/\s+/);
+    
+    // Check if the word at this position in the original sentence matches the current word text (case-sensitive)
+    if (position >= 0 && position < originalWords.length) {
+      return originalWords[position] === word.text;
+    }
+    
+    return false;
+  };
 
   const initializeGame = () => {
     // Clear any existing timeouts
@@ -101,6 +154,7 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
 
     setWords(shuffledWords);
     setMoveCount(0);
+    setMissCount(0);
     setStartTime(null);
     setGameStarted(false);
     setIsComplete(false);
@@ -110,6 +164,7 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
     // Reset drag state
     setDraggedWord(null);
     setIsDragging(false);
+    setDropZoneIndex(null);
   };
 
   const startGame = () => {
@@ -158,6 +213,7 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
       swapWords(draggedWord, word);
       setDraggedWord(null);
       setIsDragging(false);
+      setDropZoneIndex(null);
     }
   };
 
@@ -170,12 +226,16 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
         const clickX = e.clientX;
         const clickY = e.clientY;
         
-        // If clicking within the sentence container, try to move word to end
+        // If clicking within the sentence container, determine insertion position
         if (clickX >= rect.left && clickX <= rect.right && 
             clickY >= rect.top && clickY <= rect.bottom) {
-          moveWordToEnd(draggedWord);
+          
+          // Find the best insertion position based on click location
+          const insertionIndex = findInsertionIndex(clickX, sentenceContainer);
+          insertWordAtPosition(draggedWord, insertionIndex);
           setDraggedWord(null);
           setIsDragging(false);
+          setDropZoneIndex(null);
           return;
         }
       }
@@ -183,7 +243,30 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
       // Otherwise cancel drag
       setDraggedWord(null);
       setIsDragging(false);
+      setDropZoneIndex(null);
     }
+  };
+
+  const findInsertionIndex = (clickX: number, container: HTMLElement): number => {
+    const wordElements = container.querySelectorAll('.draggable-word:not(.dragging-source)');
+    
+    // Get the dragged word's current index to adjust positions correctly
+    const draggedIndex = draggedWord ? words.findIndex(w => w.id === draggedWord.id) : -1;
+    
+    for (let i = 0; i < wordElements.length; i++) {
+      const wordElement = wordElements[i] as HTMLElement;
+      const wordRect = wordElement.getBoundingClientRect();
+      
+      // If click is before the middle of this word, insert before it
+      if (clickX < wordRect.left + wordRect.width / 2) {
+        // Adjust index to account for the dragged word's position
+        const actualIndex = draggedIndex !== -1 && i >= draggedIndex ? i + 1 : i;
+        return actualIndex;
+      }
+    }
+    
+    // If we get here, insert at the end
+    return words.length;
   };
 
   const handleMouseMove = (event: React.MouseEvent) => {
@@ -192,77 +275,26 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
     }
   };
 
-  const swapWords = (draggedWord: Word, targetWord: Word) => {
-    const draggedIndex = words.findIndex(w => w.id === draggedWord.id);
-    const targetIndex = words.findIndex(w => w.id === targetWord.id);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    // Create new words array with swapped positions
-    const newWords = [...words];
-    
-    // Swap the words
-    [newWords[draggedIndex], newWords[targetIndex]] = 
-    [newWords[targetIndex], newWords[draggedIndex]];
-    
-    // Update current indices
-    newWords[draggedIndex].currentIndex = draggedIndex;
-    newWords[targetIndex].currentIndex = targetIndex;
-
-    // Check correctness for each word and manage feedback
-    newWords.forEach((word, index) => {
-      const wasCorrect = word.isCorrect;
-      word.isCorrect = word.originalIndex === index;
-      
-      if (correctFeedbackDuration === 'always') {
-        // For always mode, update showingCorrect to match current correctness
-        if (word.isCorrect) {
-          setShowingCorrect(prev => new Set([...prev, word.id]));
-        } else {
-          setShowingCorrect(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(word.id);
-            return newSet;
-          });
-        }
-      } else {
-        // For momentary mode, show temporary feedback if word just became correct
-        if (!wasCorrect && word.isCorrect) {
-          showTemporaryCorrectFeedback(word.id);
-        }
-      }
-    });
-
-    setWords(newWords);
-    setMoveCount(prev => prev + 1);
-
-    // Check if game is complete
-    const allCorrect = newWords.every(word => word.isCorrect);
-    if (allCorrect && !isComplete) {
-      setIsComplete(true);
-      const endTime = Date.now();
-      const totalTime = startTime ? Math.round((endTime - startTime) / 1000) : 0;
-      
-      setTimeout(() => {
-        onComplete(true, moveCount + 1);
-      }, 1500); // Delay to show the completion state
-    }
-  };
-
-  const moveWordToEnd = (draggedWord: Word) => {
+  const insertWordAtPosition = (draggedWord: Word, targetIndex: number) => {
     const draggedIndex = words.findIndex(w => w.id === draggedWord.id);
     if (draggedIndex === -1) return;
 
-    // Create new words array with the dragged word moved to the end
+    // Create new words array with proper insertion logic
     const newWords = [...words];
+    
+    // Remove the dragged word from its current position
     const wordToMove = newWords.splice(draggedIndex, 1)[0];
-    newWords.push(wordToMove);
+    
+    // Insert the word at the target position
+    // If target was after the original position, adjust for the removal
+    const adjustedTargetIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;
+    newWords.splice(adjustedTargetIndex, 0, wordToMove);
     
     // Update current indices and check correctness
     newWords.forEach((word, index) => {
       const wasCorrect = word.isCorrect;
       word.currentIndex = index;
-      word.isCorrect = word.originalIndex === index;
+      word.isCorrect = isWordCorrectAtPosition(word, index, newWords);
       
       if (correctFeedbackDuration === 'always') {
         // For always mode, update showingCorrect to match current correctness
@@ -286,6 +318,13 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
     setWords(newWords);
     setMoveCount(prev => prev + 1);
 
+    // Check if this move was a miss (moved word is still not in correct position)
+    const movedWord = newWords[adjustedTargetIndex];
+    const moveWasMiss = !movedWord.isCorrect;
+    if (moveWasMiss) {
+      setMissCount(prev => prev + 1);
+    }
+
     // Check if game is complete
     const allCorrect = newWords.every(word => word.isCorrect);
     if (allCorrect && !isComplete) {
@@ -294,9 +333,22 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
       const totalTime = startTime ? Math.round((endTime - startTime) / 1000) : 0;
       
       setTimeout(() => {
-        onComplete(true, moveCount + 1);
+        onComplete(true, missCount + (moveWasMiss ? 1 : 0));
       }, 1500); // Delay to show the completion state
     }
+  };
+
+  const swapWords = (draggedWord: Word, targetWord: Word) => {
+    const targetIndex = words.findIndex(w => w.id === targetWord.id);
+    if (targetIndex === -1) return;
+    
+    // Use insertion logic instead of swapping - insert the dragged word at the target word's position
+    insertWordAtPosition(draggedWord, targetIndex);
+  };
+
+  const moveWordToEnd = (draggedWord: Word) => {
+    // Use the new insertion logic to move word to the end
+    insertWordAtPosition(draggedWord, words.length);
   };
 
   const handleHint = () => {
@@ -362,6 +414,10 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
           <span className="stat-label">Moves:</span>
           <span className="stat-value">{moveCount}</span>
         </div>
+        <div className="stat-item">
+          <span className="stat-label">Misses:</span>
+          <span className="stat-value">{missCount}</span>
+        </div>
         {gameStarted && (
           <div className="stat-item">
             <span className="stat-label">Time:</span>
@@ -374,18 +430,29 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
       <div className="sentence-container" ref={containerRef}>
         <div className="sentence-line">
           {words.map((word, index) => (
-            <span
-              key={word.id}
-              className={getWordClassName(word, index)}
-              onClick={(e) => handleWordClick(word, e)}
-              title={isComplete ? '' : 'Click to pick up, click another word to swap'}
-              style={{
-                opacity: draggedWord && draggedWord.id === word.id ? 0.3 : 1,
-                cursor: isComplete ? 'default' : 'pointer'
-              }}
-            >
-              {word.text}
-            </span>
+            <React.Fragment key={word.id}>
+              {/* Drop zone indicator before this word */}
+              {isDragging && dropZoneIndex === index && (
+                <div className="drop-zone-indicator" />
+              )}
+              
+              <span
+                className={getWordClassName(word, index)}
+                onClick={(e) => handleWordClick(word, e)}
+                title={isComplete ? '' : 'Click to pick up, click another word to swap'}
+                style={{
+                  opacity: draggedWord && draggedWord.id === word.id ? 0.3 : 1,
+                  cursor: isComplete ? 'default' : 'pointer'
+                }}
+              >
+                {word.text}
+              </span>
+              
+              {/* Drop zone indicator after the last word */}
+              {isDragging && dropZoneIndex === words.length && index === words.length - 1 && (
+                <div className="drop-zone-indicator" />
+              )}
+            </React.Fragment>
           ))}
         </div>
       </div>
@@ -419,7 +486,7 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
       {showHint && hintWordIndex !== null && (
         <div className="hint-area">
           <p>
-            💡 The word "<strong>{words[hintWordIndex].text}</strong>" belongs in position {words[hintWordIndex].originalIndex + 1}
+            💡 The word "<strong>{words[hintWordIndex].text}</strong>" needs to be moved to a correct position
           </p>
         </div>
       )}
@@ -449,8 +516,8 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
         <div className="completion-message">
           <h3>🎉 Perfect! You arranged the sentence correctly!</h3>
           <div className="completion-stats">
-            <p>Completed in <strong>{moveCount}</strong> moves and <strong>{getElapsedTime()}</strong> seconds</p>
-            <p><em>Fewer moves = better score!</em></p>
+            <p>Completed with <strong>{missCount}</strong> misses in <strong>{moveCount}</strong> moves and <strong>{getElapsedTime()}</strong> seconds</p>
+            <p><em>Fewer misses = better score!</em></p>
           </div>
         </div>
       )}

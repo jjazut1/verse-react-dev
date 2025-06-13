@@ -85,7 +85,7 @@ service cloud.firestore {
             request.resource.data.configId in ['xOoA0q7ILtrdqdJt1ki5', 'Ua17C8DK6ZFsujj9Z1ZC']
         ) &&
         // Validate game type is one of the supported types
-        request.resource.data.gameType in ['sort-categories-egg', 'whack-a-mole', 'spinner-wheel', 'anagram', 'place-value-showdown'];
+        request.resource.data.gameType in ['sort-categories-egg', 'whack-a-mole', 'spinner-wheel', 'anagram', 'sentence-sense', 'place-value-showdown'];
     }
 
     
@@ -137,9 +137,14 @@ service cloud.firestore {
       request.resource.data.title is string &&
       request.resource.data.title.size() > 0 &&
       request.resource.data.anagrams is list &&
-      request.resource.data.anagrams.size() > 0 &&
-      request.resource.data.gameMode is string &&
-      request.resource.data.gameMode in ['letters-to-word', 'words-to-sentence', 'mixed']) ||
+      request.resource.data.anagrams.size() > 0) ||
+      
+      // Sentence Sense game validation
+      (request.resource.data.type == 'sentence-sense' &&
+      request.resource.data.title is string &&
+      request.resource.data.title.size() > 0 &&
+      request.resource.data.sentences is list &&
+      request.resource.data.sentences.size() > 0) ||
       
       // Place Value Showdown game validation
       (request.resource.data.type == 'place-value-showdown' &&

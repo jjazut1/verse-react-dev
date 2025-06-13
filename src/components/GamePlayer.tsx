@@ -7,6 +7,7 @@ import SortCategoriesEggRevealAdapter from './games/sort-categories-egg-reveal/S
 import WhackAMole from './games/whack-a-mole/WhackAMole';
 import SpinnerWheel from './games/spinner-wheel/SpinnerWheel';
 import AnagramAdapter from './games/anagram/AnagramAdapter';
+import SentenceSenseAdapter from './games/sentence-sense/SentenceSenseAdapter';
 import PlaceValueShowdownAdapter from './games/place-value-showdown/PlaceValueShowdownAdapter';
 import { useCustomToast } from '../hooks/useCustomToast';
 import { GameConfig } from '../types/game';
@@ -112,6 +113,14 @@ const GamePlayer = () => {
       case 'anagram':
         return (
           <AnagramAdapter
+            playerName="Player"
+            onGameComplete={handleGameComplete}
+            config={gameConfig}
+          />
+        );
+      case 'sentence-sense':
+        return (
+          <SentenceSenseAdapter
             playerName="Player"
             onGameComplete={handleGameComplete}
             config={gameConfig}

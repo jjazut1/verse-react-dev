@@ -21,6 +21,7 @@ import AdminPage from './pages/AdminPage'
 import SetAdminPage from './pages/SetAdminPage'
 import SpinnerWheelConfig from './pages/configurations/SpinnerWheelConfig'
 import AnagramConfig from './pages/configurations/AnagramConfig'
+import SentenceSenseConfig from './pages/configurations/SentenceSenseConfig'
 import PlaceValueShowdownConfig from './pages/configurations/PlaceValueShowdownConfig'
 import { useEffect } from 'react'
 
@@ -401,6 +402,14 @@ const router = createBrowserRouter([
       {
         path: "anagram/:templateId",
         element: <AnagramConfig />
+      },
+      {
+        path: "sentence-sense",
+        element: <SentenceSenseConfig />
+      },
+      {
+        path: "sentence-sense/:templateId",
+        element: <SentenceSenseConfig />
       },
       {
         path: "place-value-showdown",

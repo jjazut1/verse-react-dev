@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import WordSentenceMode from './WordSentenceMode';
 import {
   Box,
   VStack,
@@ -63,17 +62,10 @@ interface AnagramItem {
   id: string;
   original: string;
   definition?: string;
-  type: 'word' | 'sentence';
   difficulty: 'easy' | 'medium' | 'hard';
   scrambled: string[];
   currentAnswer: string[];
   isCompleted: boolean;
-}
-
-interface DraggedLetter {
-  letter: string;
-  fromIndex: number;
-  fromType: 'scrambled' | 'answer';
 }
 
 interface GameStats {
@@ -102,39 +94,18 @@ const Anagram: React.FC<AnagramProps> = ({
     timeElapsed: 0,
     hintsUsed: 0
   });
-  const [draggedLetter, setDraggedLetter] = useState<DraggedLetter | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [showDefinition, setShowDefinition] = useState(false);
   const [highScores, setHighScores] = useState<HighScore[]>([]);
   const [showHighScoreModal, setShowHighScoreModal] = useState(false);
   const [isNewHighScore, setIsNewHighScore] = useState(false);
   const [feedback, setFeedback] = useState<string>('');
-  const [feedbackType, setFeedbackType] = useState<'success' | 'error' | ''>('');
+  const [feedbackType, setFeedbackType] = useState<'success' | 'error' | 'info'>('info');
   const [showIncorrectFeedback, setShowIncorrectFeedback] = useState<boolean>(false);
-
-  // Click-move-click state
-  const [selectedItem, setSelectedItem] = useState<{
-    item: string;
-    index: number;
-    fromType: 'scrambled' | 'answer';
-  } | null>(null);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   const gameTimerRef = useRef<NodeJS.Timeout | null>(null);
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const incorrectFeedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Global mouse move handler
-  useEffect(() => {
-    if (selectedItem) {
-      const handleGlobalMouseMove = (event: MouseEvent) => {
-        setMousePosition({ x: event.clientX, y: event.clientY });
-      };
-      
-      document.addEventListener('mousemove', handleGlobalMouseMove);
-      return () => document.removeEventListener('mousemove', handleGlobalMouseMove);
-    }
-  }, [selectedItem]);
 
   // Chakra UI hooks
   const toast = useToast();
@@ -192,42 +163,20 @@ const Anagram: React.FC<AnagramProps> = ({
         id: anagram.id || index.toString(),
         original: anagram.original, // Preserve original case from database
         definition: anagram.definition,
-        type: anagram.type,
         difficulty: anagram.difficulty,
         scrambled: scrambled,
-        currentAnswer: new Array(getTargetLength(anagram.original, anagram.type)).fill(''),
+        currentAnswer: new Array(anagram.original.length).fill(''),
         isCompleted: false
       };
     });
     setAnagrams(initializedAnagrams);
   };
 
-  const getTargetLength = (text: string, type: 'word' | 'sentence'): number => {
-    if (type === 'sentence') {
-      return text.split(' ').length;
-    }
-    return text.length;
-  };
-
   const scrambleText = (text: string, intensity: 'low' | 'medium' | 'high'): string[] => {
-    if (config.gameMode === 'words-to-sentence') {
-      // For words-to-sentence mode, preserve original case and punctuation
-      const words = text.trim().split(/\s+/).filter(word => word.length > 0);
-      return shuffleArray([...words], intensity);
-    } else {
-      // For other modes, clean but preserve original case
-      const cleanText = text.replace(/[^\w\s]/g, '');
-      
-      if (text.includes(' ')) {
-        // Sentence mode - scramble words
-        const words = cleanText.split(' ').filter(word => word.length > 0);
-        return shuffleArray([...words], intensity);
-      } else {
-        // Word mode - scramble letters
-        const letters = cleanText.split('');
-        return shuffleArray([...letters], intensity);
-      }
-    }
+    // Only handle letters-to-word mode (clean text and scramble letters)
+    const cleanText = text.replace(/[^\w]/g, '');
+    const letters = cleanText.split('');
+    return shuffleArray([...letters], intensity);
   };
 
   const shuffleArray = (array: string[], intensity: 'low' | 'medium' | 'high'): string[] => {
@@ -244,173 +193,85 @@ const Anagram: React.FC<AnagramProps> = ({
     return result;
   };
 
-  const handleLetterClick = (letter: string, index: number, fromType: 'scrambled' | 'answer', event?: React.MouseEvent) => {
+  const handleLetterClick = (letter: string, index: number, fromType: 'scrambled' | 'answer') => {
     if (gameCompleted) return;
 
     const currentAnagram = anagrams[currentAnagramIndex];
     if (currentAnagram.isCompleted) return;
 
-    // For letters-to-word mode, implement sequential correct placement
-    if (currentAnagram.type === 'word') {
-      if (fromType === 'scrambled' && letter) {
-        // Find the next empty position from left to right
-        const nextEmptyIndex = currentAnagram.currentAnswer.findIndex(slot => slot === '');
+    // Implement sequential correct placement for letters-to-word mode
+    if (fromType === 'scrambled' && letter) {
+      // Find the next empty position from left to right
+      const nextEmptyIndex = currentAnagram.currentAnswer.findIndex(slot => slot === '');
+      
+      if (nextEmptyIndex === -1) {
+        // All slots filled, don't allow more placements
+        return;
+      }
+
+      // Check if this is the correct letter for the next position
+      const correctLetter = currentAnagram.original[nextEmptyIndex];
+      
+      if (letter.toLowerCase() === correctLetter.toLowerCase()) {
+        // Correct letter! Place it in the next position
+        const updatedAnagrams = [...anagrams];
+        updatedAnagrams[currentAnagramIndex].currentAnswer[nextEmptyIndex] = letter;
+        updatedAnagrams[currentAnagramIndex].scrambled[index] = '';
+        setAnagrams(updatedAnagrams);
+
+        // Check if word is now complete
+        const isWordComplete = updatedAnagrams[currentAnagramIndex].currentAnswer.every(slot => slot !== '');
+        if (isWordComplete) {
+          // Auto-check the completed word
+          setTimeout(() => {
+            checkAnswer();
+          }, 500);
+        }
+      } else {
+        // Incorrect letter! Show X feedback and count as miss
+        setShowIncorrectFeedback(true);
         
-        if (nextEmptyIndex === -1) {
-          // All slots filled, don't allow more placements
-          return;
-        }
-
-        // Check if this is the correct letter for the next position
-        const correctLetter = currentAnagram.original[nextEmptyIndex];
+        // Increment miss counter
+        setGameStats(prev => ({
+          ...prev,
+          totalMisses: prev.totalMisses + 1
+        }));
         
-        if (letter === correctLetter) {
-          // Correct letter! Place it in the next position
-          const updatedAnagrams = [...anagrams];
-          updatedAnagrams[currentAnagramIndex].currentAnswer[nextEmptyIndex] = letter;
-          updatedAnagrams[currentAnagramIndex].scrambled[index] = '';
-          setAnagrams(updatedAnagrams);
-
-          // Check if word is now complete
-          const isWordComplete = updatedAnagrams[currentAnagramIndex].currentAnswer.every(slot => slot !== '');
-          if (isWordComplete) {
-            // Auto-check the completed word
-            setTimeout(() => {
-              checkAnswer();
-            }, 500);
-          }
-        } else {
-          // Incorrect letter! Show X feedback and count as miss
-          setShowIncorrectFeedback(true);
-          
-          // Increment miss counter
-          setGameStats(prev => ({
-            ...prev,
-            totalMisses: prev.totalMisses + 1
-          }));
-          
-          // Clear the feedback after 250ms
-          if (incorrectFeedbackTimeoutRef.current) {
-            clearTimeout(incorrectFeedbackTimeoutRef.current);
-          }
-          incorrectFeedbackTimeoutRef.current = setTimeout(() => {
-            setShowIncorrectFeedback(false);
-          }, 250);
+        // Clear the feedback after 250ms
+        if (incorrectFeedbackTimeoutRef.current) {
+          clearTimeout(incorrectFeedbackTimeoutRef.current);
         }
-        return;
+        incorrectFeedbackTimeoutRef.current = setTimeout(() => {
+          setShowIncorrectFeedback(false);
+        }, 250);
       }
-
-      // Allow removing letters from answer back to scrambled
-      if (fromType === 'answer' && letter) {
-        // Find an empty slot in scrambled area
-        const emptyScrambledIndex = currentAnagram.scrambled.findIndex(slot => slot === '');
-        if (emptyScrambledIndex !== -1) {
-          const updatedAnagrams = [...anagrams];
-          updatedAnagrams[currentAnagramIndex].scrambled[emptyScrambledIndex] = letter;
-          updatedAnagrams[currentAnagramIndex].currentAnswer[index] = '';
-          setAnagrams(updatedAnagrams);
-        }
-        return;
-      }
-    } else {
-      // For sentence mode, keep the original logic
-      // If no item is currently selected and this slot has content, select it
-      if (!selectedItem && letter) {
-        setSelectedItem({ item: letter, index, fromType });
-        if (event) {
-          setMousePosition({ x: event.clientX, y: event.clientY });
-        }
-        return;
-      }
-
-      // If clicking on the same item that's selected, deselect it
-      if (selectedItem && selectedItem.index === index && selectedItem.fromType === fromType) {
-        setSelectedItem(null);
-        return;
-      }
-
-      // If an item is selected and we're clicking on a valid target
-      if (selectedItem) {
-        const targetFromType = fromType;
-        const selectedFromType = selectedItem.fromType;
-
-        // Move from scrambled to answer
-        if (selectedFromType === 'scrambled' && targetFromType === 'answer') {
-          if (!letter) { // Only allow dropping in empty slots
-            const updatedAnagrams = [...anagrams];
-            updatedAnagrams[currentAnagramIndex].currentAnswer[index] = selectedItem.item;
-            updatedAnagrams[currentAnagramIndex].scrambled[selectedItem.index] = '';
-            setAnagrams(updatedAnagrams);
-          }
-        }
-        // Move from answer back to scrambled
-        else if (selectedFromType === 'answer' && targetFromType === 'scrambled') {
-          if (!letter) { // Only allow dropping in empty slots
-            const updatedAnagrams = [...anagrams];
-            updatedAnagrams[currentAnagramIndex].scrambled[index] = selectedItem.item;
-            updatedAnagrams[currentAnagramIndex].currentAnswer[selectedItem.index] = '';
-            setAnagrams(updatedAnagrams);
-          }
-        }
-        // Swap items within the same area or between different areas with content
-        else if (letter) {
-          const updatedAnagrams = [...anagrams];
-          
-          if (selectedFromType === 'scrambled' && targetFromType === 'scrambled') {
-            // Swap within scrambled area
-            updatedAnagrams[currentAnagramIndex].scrambled[selectedItem.index] = letter;
-            updatedAnagrams[currentAnagramIndex].scrambled[index] = selectedItem.item;
-          } else if (selectedFromType === 'answer' && targetFromType === 'answer') {
-            // Swap within answer area
-            updatedAnagrams[currentAnagramIndex].currentAnswer[selectedItem.index] = letter;
-            updatedAnagrams[currentAnagramIndex].currentAnswer[index] = selectedItem.item;
-          } else if (selectedFromType === 'scrambled' && targetFromType === 'answer') {
-            // Swap between scrambled and answer
-            updatedAnagrams[currentAnagramIndex].scrambled[selectedItem.index] = letter;
-            updatedAnagrams[currentAnagramIndex].currentAnswer[index] = selectedItem.item;
-          } else if (selectedFromType === 'answer' && targetFromType === 'scrambled') {
-            // Swap between answer and scrambled
-            updatedAnagrams[currentAnagramIndex].currentAnswer[selectedItem.index] = letter;
-            updatedAnagrams[currentAnagramIndex].scrambled[index] = selectedItem.item;
-          }
-          
-          setAnagrams(updatedAnagrams);
-        }
-
-        // Clear selection after any action
-        setSelectedItem(null);
-      }
+      return;
     }
-  };
 
-  // Handle clicking outside to cancel selection
-  const handleContainerClick = () => {
-    if (selectedItem) {
-      setSelectedItem(null);
+    // Allow removing letters from answer back to scrambled
+    if (fromType === 'answer' && letter) {
+      // Find an empty slot in scrambled area
+      const emptyScrambledIndex = currentAnagram.scrambled.findIndex(slot => slot === '');
+      if (emptyScrambledIndex !== -1) {
+        const updatedAnagrams = [...anagrams];
+        updatedAnagrams[currentAnagramIndex].scrambled[emptyScrambledIndex] = letter;
+        updatedAnagrams[currentAnagramIndex].currentAnswer[index] = '';
+        setAnagrams(updatedAnagrams);
+      }
+      return;
     }
-  };
-
-  // Helper function to check if an item is currently selected
-  const isItemSelected = (index: number, fromType: 'scrambled' | 'answer'): boolean => {
-    return selectedItem?.index === index && selectedItem?.fromType === fromType;
   };
 
   const checkAnswer = () => {
     const currentAnagram = anagrams[currentAnagramIndex];
-    // For word type, join letters without spaces. For sentence type, join words with spaces.
-    const joinCharacter = currentAnagram.type === 'word' ? '' : ' ';
-    const playerAnswer = currentAnagram.currentAnswer.filter(item => item !== '').join(joinCharacter);
+    const playerAnswer = currentAnagram.currentAnswer.filter(item => item !== '').join('');
     const correctAnswer = currentAnagram.original;
 
     const updatedAnagrams = [...anagrams];
 
-    // Normalize answers for comparison
+    // Normalize answers for comparison (case insensitive)
     const normalizeAnswer = (answer: string): string => {
-      return answer
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-        .replace(/[^\w\s]/g, ''); // Remove punctuation for comparison
+      return answer.toLowerCase().replace(/[^\w]/g, '');
     };
 
     const normalizedPlayerAnswer = normalizeAnswer(playerAnswer);
@@ -420,7 +281,7 @@ const Anagram: React.FC<AnagramProps> = ({
       // Correct answer
       updatedAnagrams[currentAnagramIndex].isCompleted = true;
       
-      setFeedback(`Correct!`);
+      setFeedback(`Correct! The word is "${correctAnswer}"`);
       setFeedbackType('success');
       
       setGameStats(prev => ({
@@ -461,15 +322,8 @@ const Anagram: React.FC<AnagramProps> = ({
     }
     feedbackTimeoutRef.current = setTimeout(() => {
       setFeedback('');
-      setFeedbackType('');
+      setFeedbackType('info');
     }, 3000);
-  };
-
-  const calculatePoints = (anagram: AnagramItem): number => {
-    // For move-based scoring, we don't calculate points per anagram
-    // Instead, we track total moves across all anagrams
-    // This function is kept for compatibility but returns 0
-    return 0;
   };
 
   const useHint = () => {
@@ -488,7 +342,7 @@ const Anagram: React.FC<AnagramProps> = ({
 
   const completeGame = async () => {
     setGameCompleted(true);
-    const totalMisses = gameStats.totalMisses; // Use total misses instead of moves
+    const totalMisses = gameStats.totalMisses;
     
     // Update final stats
     setGameStats(prev => ({
@@ -578,10 +432,6 @@ const Anagram: React.FC<AnagramProps> = ({
       timeElapsed: 0,
       hintsUsed: 0
     });
-    setShowHint(false);
-    setShowDefinition(false);
-    setFeedback('');
-    setFeedbackType('');
     initializeGame();
   };
 
@@ -593,37 +443,27 @@ const Anagram: React.FC<AnagramProps> = ({
 
   const currentAnagram = anagrams[currentAnagramIndex];
 
-  // Memoize the anagram object to prevent unnecessary re-renders
-  const memoizedAnagram = useMemo(() => {
-    if (!currentAnagram) return null;
-    return {
-      id: currentAnagram.id,
-      original: currentAnagram.original,
-      definition: currentAnagram.definition
-    };
-  }, [currentAnagram?.id, currentAnagram?.original, currentAnagram?.definition]);
-
   if (!gameStarted) {
     return (
       <Box minH="100vh" bg={bgColor} p={6}>
         <Center>
           <Card maxW="md" w="full" bg={cardBg}>
             <CardHeader textAlign="center">
-              <Heading size="lg" color="blue.500" mb={2}>
-                🧩 Meaning in Motion
+              <Heading size="lg" color="purple.500" mb={2}>
+                🧩 Anagram
               </Heading>
             </CardHeader>
             <CardBody>
               <VStack spacing={4}>
                 <Grid templateColumns="1fr 1fr" gap={4} w="full">
                   <Stat textAlign="center">
-                    <StatLabel fontSize="sm">Puzzles</StatLabel>
-                    <StatNumber color="blue.500">{anagrams.length}</StatNumber>
+                    <StatLabel fontSize="sm">Words</StatLabel>
+                    <StatNumber color="purple.500">{anagrams.length}</StatNumber>
                   </Stat>
                   <Stat textAlign="center">
                     <StatLabel fontSize="sm">Mode</StatLabel>
                     <StatNumber fontSize="md" color="green.500">
-                      {config.gameMode.replace('-', ' to ')}
+                      Letter Scramble
                     </StatNumber>
                   </Stat>
                 </Grid>
@@ -637,21 +477,21 @@ const Anagram: React.FC<AnagramProps> = ({
                       🎯 Fewer misses is better
                     </Badge>
                   </HStack>
-                  {config.showDefinitions && (
-                    <Badge colorScheme="purple" variant="outline">
-                      💡 Definitions available
-                    </Badge>
-                  )}
                   {config.enableHints && (
                     <Badge colorScheme="cyan" variant="outline">
                       🔍 Hints available
+                    </Badge>
+                  )}
+                  {config.showDefinitions && (
+                    <Badge colorScheme="blue" variant="outline">
+                      📚 Definitions included
                     </Badge>
                   )}
                 </VStack>
 
                 <Button
                   onClick={startGame}
-                  colorScheme="blue"
+                  colorScheme="purple"
                   size="lg"
                   w="full"
                   mt={4}
@@ -682,7 +522,7 @@ const Anagram: React.FC<AnagramProps> = ({
                 <Grid templateColumns="1fr 1fr" gap={6} w="full">
                   <Stat textAlign="center">
                     <StatLabel>Total Misses</StatLabel>
-                    <StatNumber color="blue.500" fontSize="3xl">{score}</StatNumber>
+                    <StatNumber color="purple.500" fontSize="3xl">{score}</StatNumber>
                     <StatHelpText>Fewer misses = better score!</StatHelpText>
                   </Stat>
                   <Stat textAlign="center">
@@ -698,11 +538,11 @@ const Anagram: React.FC<AnagramProps> = ({
                     <StatNumber color="green.500" fontSize="2xl">
                       {gameStats.correctAnswers} / {anagrams.length}
                     </StatNumber>
-                    <StatHelpText>Puzzles solved</StatHelpText>
+                    <StatHelpText>Words solved</StatHelpText>
                   </Stat>
                   <Stat textAlign="center">
                     <StatLabel>Accuracy</StatLabel>
-                    <StatNumber color="purple.500" fontSize="2xl">
+                    <StatNumber color="blue.500" fontSize="2xl">
                       {gameStats.totalMisses + gameStats.correctAnswers > 0 ? Math.round((gameStats.correctAnswers / (gameStats.totalMisses + gameStats.correctAnswers)) * 100) : 100}%
                     </StatNumber>
                     <StatHelpText>Success rate</StatHelpText>
@@ -712,7 +552,7 @@ const Anagram: React.FC<AnagramProps> = ({
                 <HStack spacing={4} w="full" justify="center">
                   <Button
                     onClick={resetGame}
-                    colorScheme="blue"
+                    colorScheme="purple"
                     size="lg"
                     leftIcon={<RepeatIcon />}
                   >
@@ -732,8 +572,8 @@ const Anagram: React.FC<AnagramProps> = ({
       <Box minH="100vh" bg={bgColor}>
         <Center h="100vh">
           <VStack spacing={4}>
-            <Spinner size="xl" color="blue.500" thickness="4px" />
-            <Text color="gray.600">Loading puzzle...</Text>
+            <Spinner size="xl" color="purple.500" thickness="4px" />
+            <Text color="gray.600">Loading word...</Text>
           </VStack>
         </Center>
       </Box>
@@ -741,15 +581,15 @@ const Anagram: React.FC<AnagramProps> = ({
   }
 
   return (
-    <Box minH="100vh" bg={bgColor} p={4} onClick={handleContainerClick}>
+    <Box minH="100vh" bg={bgColor} p={4} onClick={() => {}}>
       <VStack spacing={6} maxW="4xl" mx="auto">
         {/* Game Header */}
         <Card w="full" bg={cardBg}>
           <CardBody p={4}>
             <VStack spacing={3}>
               <HStack w="full" justify="space-between">
-                <Badge colorScheme="blue" variant="outline">
-                  Puzzle {currentAnagramIndex + 1} of {anagrams.length}
+                <Badge colorScheme="purple" variant="outline">
+                  Word {currentAnagramIndex + 1} of {anagrams.length}
                 </Badge>
                 <Badge colorScheme="green" variant="outline">
                   Misses: {gameStats.totalMisses}
@@ -763,7 +603,7 @@ const Anagram: React.FC<AnagramProps> = ({
                 <Text fontSize="sm" mb={1} color="gray.600">Progress</Text>
                 <Progress 
                   value={(currentAnagramIndex / anagrams.length) * 100} 
-                  colorScheme="blue" 
+                  colorScheme="purple" 
                   size="md"
                   borderRadius="full"
                 />
@@ -772,243 +612,144 @@ const Anagram: React.FC<AnagramProps> = ({
           </CardBody>
         </Card>
 
-        {/* Main Puzzle */}
-        {config.gameMode === 'words-to-sentence' ? (
-          // Use the new WordSentenceMode component for sentence arrangement
-          <Box w="full">
-            <WordSentenceMode
-              anagram={memoizedAnagram!}
-              onComplete={(isCorrect, misses) => {
-                // Update the current anagram
-                const updatedAnagrams = [...anagrams];
-                
-                if (isCorrect) {
-                  updatedAnagrams[currentAnagramIndex].isCompleted = true;
-                  
-                  setGameStats(prev => ({
-                    ...prev,
-                    correctAnswers: prev.correctAnswers + 1,
-                    totalMisses: prev.totalMisses + misses
-                  }));
+        {/* Feedback Display */}
+        {(feedback || showIncorrectFeedback) && (
+          <Alert status={showIncorrectFeedback ? 'error' : feedbackType} borderRadius="md" w="auto">
+            <AlertIcon />
+            {showIncorrectFeedback ? '❌ Try the next letter in order!' : feedback}
+          </Alert>
+        )}
 
-                  // Check if game is complete
-                  if (currentAnagramIndex === anagrams.length - 1) {
-                    setTimeout(() => completeGame(), 2000);
-                  } else {
-                    setTimeout(() => {
-                      setCurrentAnagramIndex(prev => prev + 1);
-                      setShowHint(false);
-                      setShowDefinition(false);
-                    }, 2000);
-                  }
-                } else {
-                  setGameStats(prev => ({
-                    ...prev,
-                    totalMisses: prev.totalMisses + misses
-                  }));
-                }
-                
-                setAnagrams(updatedAnagrams);
-              }}
-              onHintUsed={() => {
-                setGameStats(prev => ({
-                  ...prev,
-                  hintsUsed: prev.hintsUsed + 1
-                }));
-              }}
-              showDefinition={showDefinition}
-              enableHints={config.enableHints}
-              correctFeedbackDuration={config.correctFeedbackDuration}
-            />
-          </Box>
-        ) : (
-          // Original letter/word scramble interface
-          <Card w="full" bg={cardBg}>
-            <CardHeader textAlign="center">
-              <Heading size="md" color="gray.700">
-                {currentAnagram.type === 'word' ? '🔤 Unscramble the letters:' : '📝 Arrange the words:'}
-              </Heading>
-            </CardHeader>
-            <CardBody onClick={(e) => e.stopPropagation()}>
-              <VStack spacing={6}>
-                {/* Scrambled Items */}
-                <Box>
-                  {currentAnagram.type === 'word' ? (
-                    <Text fontSize="sm" color="gray.600" mb={3} textAlign="center">
-                      Click letters in the correct order to spell the word
-                    </Text>
-                  ) : (
-                    <Text fontSize="sm" color="gray.600" mb={3} textAlign="center">
-                      Click to select, then click another position to move words
-                    </Text>
+        {/* Main Anagram Area */}
+        <Card w="full" bg={cardBg}>
+          <CardBody p={6}>
+            <VStack spacing={8}>
+              {/* Scrambled Letters */}
+              <VStack spacing={3} w="full">
+                <Heading size="sm" color="gray.600">Scrambled Letters</Heading>
+                <Flex wrap="wrap" gap={2} justify="center" minH="60px" p={4} bg={scrambledBg} border="2px dashed" borderColor={scrambledBorder} borderRadius="md">
+                  {currentAnagram.scrambled.map((letter, index) => (
+                    <Box
+                      key={index}
+                      w="50px"
+                      h="50px"
+                      border="2px solid"
+                      borderColor={letter ? "blue.300" : "gray.300"}
+                      borderRadius="md"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      bg={letter ? "white" : "gray.100"}
+                      cursor={letter ? "pointer" : "default"}
+                      onClick={() => handleLetterClick(letter, index, 'scrambled')}
+                      _hover={letter ? { transform: "translateY(-2px)", boxShadow: "md" } : {}}
+                      transition="all 0.2s"
+                      fontSize="xl"
+                      fontWeight="bold"
+                      color={letter ? "blue.600" : "gray.400"}
+                    >
+                      {letter}
+                    </Box>
+                  ))}
+                </Flex>
+              </VStack>
+
+              {/* Answer Slots */}
+              <VStack spacing={3} w="full">
+                <Heading size="sm" color="gray.600">Your Answer</Heading>
+                <Flex wrap="wrap" gap={2} justify="center" minH="60px" p={4} bg={answerBg} border="2px dashed" borderColor={answerBorder} borderRadius="md">
+                  {currentAnagram.currentAnswer.map((letter, index) => (
+                    <Box
+                      key={index}
+                      w="50px"
+                      h="50px"
+                      border="2px solid"
+                      borderColor={letter ? "green.300" : "gray.300"}
+                      borderRadius="md"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      bg={letter ? "white" : "gray.100"}
+                      cursor={letter ? "pointer" : "default"}
+                      onClick={() => handleLetterClick(letter, index, 'answer')}
+                      _hover={letter ? { transform: "translateY(-2px)", boxShadow: "md" } : {}}
+                      transition="all 0.2s"
+                      fontSize="xl"
+                      fontWeight="bold"
+                      color={letter ? "green.600" : "gray.400"}
+                    >
+                      {letter}
+                    </Box>
+                  ))}
+                </Flex>
+              </VStack>
+
+              {/* Hint and Definition Section */}
+              <VStack spacing={3} w="full">
+                <HStack spacing={4}>
+                  {config.enableHints && (
+                    <Button
+                      onClick={useHint}
+                      colorScheme="cyan"
+                      variant="outline"
+                      size="sm"
+                      isDisabled={showHint}
+                    >
+                      {showHint ? '🔍 Hint Shown' : '🔍 Show Hint'}
+                    </Button>
                   )}
-                  <Flex wrap="wrap" justify="center" gap={2}>
-                    {currentAnagram.scrambled.map((item, index) => (
-                      <Button
-                        key={index}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleLetterClick(item, index, 'scrambled', event);
-                        }}
-                        bg={isItemSelected(index, 'scrambled') ? 'blue.200' : item ? scrambledBg : 'gray.100'}
-                        border="2px solid"
-                        borderColor={isItemSelected(index, 'scrambled') ? 'blue.500' : item ? scrambledBorder : 'gray.300'}
-                        color={item ? 'blue.700' : 'gray.400'}
-                        minW="50px"
-                        h="50px"
-                        fontSize="lg"
-                        fontWeight="bold"
-                        isDisabled={!item}
-                        opacity={isItemSelected(index, 'scrambled') ? 0.6 : 1}
-                        transform={isItemSelected(index, 'scrambled') ? 'scale(0.95)' : 'scale(1)'}
-                        _hover={item ? { transform: isItemSelected(index, 'scrambled') ? 'scale(0.95)' : 'translateY(-2px)', shadow: 'md' } : {}}
-                        transition="all 0.2s"
-                      >
-                        {item || '·'}
-                      </Button>
-                    ))}
-                  </Flex>
-                </Box>
+                  
+                  {config.showDefinitions && currentAnagram.definition && (
+                    <Button
+                      onClick={toggleDefinition}
+                      colorScheme="blue"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={showDefinition ? <ChevronDownIcon /> : <ChevronRightIcon />}
+                    >
+                      Definition
+                    </Button>
+                  )}
+                </HStack>
 
-                {/* Arrow */}
-                <Text fontSize="2xl">⬇️</Text>
-
-                {/* Answer Area */}
-                <Box>
-                  <Text fontSize="sm" color="gray.600" mb={3} textAlign="center">
-                    Your answer
-                  </Text>
-                  <Flex wrap="wrap" justify="center" gap={2}>
-                    {currentAnagram.currentAnswer.map((item, index) => (
-                      <Button
-                        key={index}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleLetterClick(item, index, 'answer', event);
-                        }}
-                        bg={isItemSelected(index, 'answer') ? 'green.200' : item ? answerBg : 'gray.50'}
-                        border="2px solid"
-                        borderColor={isItemSelected(index, 'answer') ? 'green.500' : item ? answerBorder : 'gray.300'}
-                        color={item ? 'green.700' : 'gray.400'}
-                        minW="50px"
-                        h="50px"
-                        fontSize="lg"
-                        fontWeight="bold"
-                        opacity={isItemSelected(index, 'answer') ? 0.6 : 1}
-                        transform={isItemSelected(index, 'answer') ? 'scale(0.95)' : 'scale(1)'}
-                        _hover={item ? { transform: isItemSelected(index, 'answer') ? 'scale(0.95)' : 'translateY(-2px)', shadow: 'md' } : {}}
-                        transition="all 0.2s"
-                      >
-                        {item || '_'}
-                      </Button>
-                    ))}
-                  </Flex>
-                </Box>
-
-                {/* Game Controls */}
-                <VStack spacing={4}>
-                  <HStack spacing={4}>
-                    {currentAnagram.type !== 'word' && (
-                      <Button
-                        onClick={checkAnswer}
-                        colorScheme="blue"
-                        size="lg"
-                        isDisabled={currentAnagram.currentAnswer.every(slot => slot === '')}
-                        leftIcon={<span>✓</span>}
-                      >
-                        Check Answer
-                      </Button>
-                    )}
-
-                    {config.enableHints && !showHint && (
-                      <Button 
-                        onClick={useHint} 
-                        colorScheme="yellow" 
-                        variant="outline"
-                        leftIcon={<span>💡</span>}
-                      >
-                        Use Hint
-                      </Button>
-                    )}
-
-                    {currentAnagram.type === 'word' && (
-                      <Text fontSize="sm" color="gray.600" fontStyle="italic">
-                        Word will be checked automatically when complete
-                      </Text>
-                    )}
-                  </HStack>
-
-                  {/* Hint Display */}
-                  {showHint && (
+                {/* Hint Display */}
+                {config.enableHints && (
+                  <Collapse in={showHint}>
                     <Alert status="info" borderRadius="md">
                       <AlertIcon />
-                      💡 First {currentAnagram.type === 'word' ? 'letter' : 'word'}: "{currentAnagram.original.split(currentAnagram.type === 'word' ? '' : ' ')[0]}"
+                      <Text fontSize="sm">
+                        💡 First letter: <strong>{currentAnagram.original[0]}</strong>
+                      </Text>
                     </Alert>
-                  )}
+                  </Collapse>
+                )}
 
-                  {/* Incorrect Letter Feedback */}
-                  {showIncorrectFeedback && (
-                    <Box 
-                      position="fixed"
-                      top="50%"
-                      left="50%"
-                      transform="translate(-50%, -50%)"
-                      zIndex={1001}
-                      fontSize="6xl"
-                      color="red.500"
-                      fontWeight="bold"
-                      pointerEvents="none"
-                      sx={{
-                        '@keyframes incorrectPulse': {
-                          '0%': { transform: 'translate(-50%, -50%) scale(0.5)', opacity: 0 },
-                          '50%': { transform: 'translate(-50%, -50%) scale(1.2)', opacity: 1 },
-                          '100%': { transform: 'translate(-50%, -50%) scale(1)', opacity: 0.8 }
-                        },
-                        animation: 'incorrectPulse 0.25s ease-out'
-                      }}
-                    >
-                      ❌
-                    </Box>
-                  )}
-
-                  {/* Feedback */}
-                  {feedback && (
-                    <Alert 
-                      status={feedbackType === 'success' ? 'success' : 'error'} 
-                      borderRadius="md"
-                    >
+                {/* Definition Display */}
+                {config.showDefinitions && currentAnagram.definition && (
+                  <Collapse in={showDefinition}>
+                    <Alert status="info" borderRadius="md">
                       <AlertIcon />
-                      {feedback}
+                      <Text fontSize="sm">
+                        📚 <strong>Definition:</strong> {currentAnagram.definition}
+                      </Text>
                     </Alert>
-                  )}
-                </VStack>
+                  </Collapse>
+                )}
               </VStack>
-            </CardBody>
-          </Card>
-        )}
 
-        {/* Ghost item that follows mouse */}
-        {selectedItem && (
-          <Box
-            position="fixed"
-            left={`${mousePosition.x - 25}px`}
-            top={`${mousePosition.y - 25}px`}
-            bg="rgba(255, 255, 255, 0.95)"
-            border="2px solid #007bff"
-            borderRadius="md"
-            padding="8px 12px"
-            fontSize="lg"
-            fontWeight="bold"
-            color="#007bff"
-            pointerEvents="none"
-            zIndex={1000}
-            boxShadow="0 4px 12px rgba(0, 0, 0, 0.3)"
-            transform="rotate(-2deg)"
-            whiteSpace="nowrap"
-          >
-            {selectedItem.item}
-          </Box>
-        )}
+              {/* Manual Check Button (for testing) */}
+              <Button
+                onClick={checkAnswer}
+                colorScheme="green"
+                size="lg"
+                isDisabled={currentAnagram.currentAnswer.every(slot => slot === '')}
+                leftIcon={<span>✓</span>}
+              >
+                Check Answer
+              </Button>
+            </VStack>
+          </CardBody>
+        </Card>
       </VStack>
 
       {/* High Score Modal */}
@@ -1030,7 +771,7 @@ const Anagram: React.FC<AnagramProps> = ({
                     <HStack key={highScore.id} w="full" justify="space-between" p={2} bg="gray.50" borderRadius="md">
                       <Text fontWeight="bold">#{index + 1}</Text>
                       <Text>{highScore.playerName}</Text>
-                      <Badge colorScheme="blue">{highScore.score} misses</Badge>
+                      <Badge colorScheme="purple">{highScore.score} misses</Badge>
                     </HStack>
                   ))}
                 </VStack>
@@ -1038,7 +779,7 @@ const Anagram: React.FC<AnagramProps> = ({
             </VStack>
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="blue" onClick={() => setShowHighScoreModal(false)}>
+            <Button colorScheme="purple" onClick={() => setShowHighScoreModal(false)}>
               Close
             </Button>
           </ModalFooter>

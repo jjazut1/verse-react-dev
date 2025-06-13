@@ -1,0 +1,414 @@
+/* ==========================================================================
+   SENTENCE SENSE GAME STYLES
+   ========================================================================== */
+
+/* ==========================================================================
+   CONFIGURATION LAYOUT
+   ========================================================================== */
+
+/* Configuration Layout */
+.sentence-sense-config {
+  min-height: 100vh;
+  padding: 1.5rem;
+  max-width: 64rem;
+  margin: 0 auto;
+}
+
+.config-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+/* ==========================================================================
+   HEADER SECTION
+   ========================================================================== */
+
+/* Header Section */
+.config-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+.config-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.config-title h1 {
+  font-size: 1.875rem;
+  color: #3182ce;
+}
+
+.config-title p {
+  color: #718096;
+  font-size: 0.875rem;
+}
+
+/* Warning Alert */
+.unsaved-warning {
+  border-radius: 0.375rem;
+}
+
+/* ==========================================================================
+   CARD COMPONENTS
+   ========================================================================== */
+
+/* Card Sections */
+.config-card {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.config-card-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.config-card-body {
+  padding: 1.5rem;
+}
+
+/* ==========================================================================
+   FORM ELEMENTS
+   ========================================================================== */
+
+/* Form Elements */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.form-control {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #2d3748;
+}
+
+.form-input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  font-size: 1rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3182ce;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}
+
+.form-textarea {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: #3182ce;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}
+
+/* ==========================================================================
+   SENTENCE EDITOR
+   ========================================================================== */
+
+/* Sentence Editor */
+.sentence-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sentence-editor-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.sentence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.sentence-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+.sentence-item-header {
+  padding: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.sentence-item-header:hover {
+  background-color: #f7fafc;
+}
+
+.sentence-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sentence-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.sentence-title {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sentence-preview {
+  font-size: 0.875rem;
+  color: #718096;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.sentence-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sentence-panel {
+  padding: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.sentence-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+/* ==========================================================================
+   PREVIEW SECTION
+   ========================================================================== */
+
+/* Preview Section */
+.sentence-preview-box {
+  background-color: #f7fafc;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+}
+
+.preview-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.preview-content {
+  font-size: 0.875rem;
+  color: #718096;
+}
+
+.word-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  margin: 0 0.25rem 0.25rem 0;
+  background-color: #ebf8ff;
+  color: #3182ce;
+  border: 1px solid #bee3f8;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+}
+
+/* ==========================================================================
+   SUMMARY SECTION
+   ========================================================================== */
+
+/* Summary Section */
+.config-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.summary-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.summary-badge.blue {
+  background-color: #ebf8ff;
+  color: #3182ce;
+}
+
+.summary-badge.green {
+  background-color: #f0fff4;
+  color: #38a169;
+}
+
+.summary-badge.gray {
+  background-color: #f7fafc;
+  color: #718096;
+}
+
+/* ==========================================================================
+   ACTION BUTTONS
+   ========================================================================== */
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-size: 1rem;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #718096;
+}
+
+.btn-ghost:hover {
+  background-color: #f7fafc;
+}
+
+.btn-primary {
+  background-color: #3182ce;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #2c5aa0;
+}
+
+.btn-primary:disabled {
+  background-color: #a0aec0;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   LOADING STATES
+   ========================================================================== */
+
+/* Loading States */
+.loading-container {
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 1rem;
+}
+
+.spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #3182ce;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .sentence-sense-config {
+    padding: 1rem;
+  }
+  
+  .config-card-body {
+    padding: 1rem;
+  }
+  
+  .sentence-editor-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .sentence-preview {
+    max-width: 200px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .sentence-sense-config {
+    padding: 0.5rem;
+  }
+  
+  .config-container {
+    gap: 1rem;
+  }
+  
+  .sentence-item-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .sentence-actions {
+    align-self: flex-end;
+  }
+} 

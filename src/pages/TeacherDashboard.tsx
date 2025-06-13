@@ -561,6 +561,10 @@ const TeacherDashboard = () => {
 
   // Handle template click to navigate to game configuration page
   const handleTemplateClick = (template: GameTemplate) => {
+    console.log('🎯 handleTemplateClick called with template:', template);
+    console.log('🎯 Template type:', template.type);
+    console.log('🎯 Template ID:', template.id);
+    
     // Store the template ID in sessionStorage for auto-selection
     if (template.id) {
       sessionStorage.setItem('selectedTemplateId', template.id);
@@ -602,7 +606,18 @@ const TeacherDashboard = () => {
       } else {
         navigate('/configure/place-value-showdown');
       }
+    } else if (template.type === 'sentence-sense') {
+      console.log('🎯 Navigating to sentence-sense configuration');
+      // If there's a template ID for editing, include it in the path
+      if (template.id) {
+        console.log('🎯 Navigating with template ID:', template.id);
+        navigate(`/configure/sentence-sense/${template.id}`);
+      } else {
+        console.log('🎯 Navigating without template ID');
+        navigate('/configure/sentence-sense');
+      }
     } else {
+      console.log('🎯 Unknown template type, navigating to default /configure');
       // Default to the configuration router for unknown types
       navigate('/configure');
     }
@@ -627,6 +642,8 @@ const TeacherDashboard = () => {
           return { bgColor: '#e6f3ff', icon: '🧩' };
         case 'place-value-showdown':
           return { bgColor: '#ffe6e6', icon: '🎯' };
+        case 'sentence-sense':
+          return { bgColor: '#e8f5e8', icon: '📝' };
         default:
           return { bgColor: '#f0f0f0', icon: '🎮' };
       }
@@ -1128,6 +1145,8 @@ const TeacherDashboard = () => {
       configRoute = '/configure/spinner-wheel';
     } else if (gameType === 'anagram') {
       configRoute = '/configure/anagram';
+    } else if (gameType === 'sentence-sense') {
+      configRoute = '/configure/sentence-sense';
     } else if (gameType === 'place-value-showdown') {
       configRoute = '/configure/place-value-showdown';
     }
@@ -1490,7 +1509,10 @@ const TeacherDashboard = () => {
                     {blankTemplates.map((template) => (
                     <div 
                         key={template.id} 
-                        onClick={() => handleTemplateClick(template)}
+                        onClick={() => {
+                          console.log('🎯 Template card clicked:', template);
+                          handleTemplateClick(template);
+                        }}
                       style={{ 
                         backgroundColor: 'white',
                         borderRadius: '12px',
@@ -1517,7 +1539,9 @@ const TeacherDashboard = () => {
                         height: '80px', 
                         backgroundColor: template.type === 'whack-a-mole' ? '#C6F6D5' : 
                                         template.type === 'spinner-wheel' ? '#FED7D7' : 
-                                        template.type === 'anagram' ? '#BFDBFE' : '#E9D8FD',
+                                        template.type === 'anagram' ? '#BFDBFE' : 
+                                        template.type === 'sentence-sense' ? '#E8F5E8' :
+                                        template.type === 'place-value-showdown' ? '#FFE6E6' : '#E9D8FD',
                         borderRadius: '12px',
                         display: 'flex',
                         alignItems: 'center',
@@ -1539,7 +1563,9 @@ const TeacherDashboard = () => {
                         ) : (
                           template.type === 'whack-a-mole' ? '🔨' : 
                           template.type === 'spinner-wheel' ? '🎡' : 
-                          template.type === 'anagram' ? '🧩' : '🥚'
+                          template.type === 'anagram' ? '🧩' : 
+                          template.type === 'sentence-sense' ? '📝' :
+                          template.type === 'place-value-showdown' ? '🎯' : '🥚'
                         )}
                       </div>
                       
@@ -1715,6 +1741,8 @@ const TeacherDashboard = () => {
                           <option value="spinner">🎡 Spinner Wheel</option>
                           <option value="sort">🥚 Sort Categories</option>
                           <option value="anagram">🧩 Anagram</option>
+                          <option value="sentence">📝 Sentence Sense</option>
+                          <option value="place">🎯 Place Value Showdown</option>
                         </select>
                       </div>
                       
@@ -2073,7 +2101,9 @@ const TeacherDashboard = () => {
                               height: '64px', 
                               backgroundColor: (game.gameType || '').includes('whack') ? '#C6F6D5' : 
                                               (game.gameType || '').includes('spinner') ? '#FED7D7' : 
-                                              (game.gameType || '').includes('anagram') ? '#BFDBFE' : '#E9D8FD',
+                                              (game.gameType || '').includes('anagram') ? '#BFDBFE' : 
+                                              (game.gameType || '').includes('sentence') ? '#E0F2FE' : 
+                                              (game.gameType || '').includes('place') ? '#FFEBE6' : '#E9D8FD',
                               borderRadius: '8px',
                               display: 'flex',
                               alignItems: 'center',
@@ -2092,7 +2122,9 @@ const TeacherDashboard = () => {
                                 <div style={{ fontSize: '24px', color: '#718096' }}>
                                   {(game.gameType || '').includes('whack') ? '🔨' : 
                                    (game.gameType || '').includes('spinner') ? '🎡' : 
-                                   (game.gameType || '').includes('anagram') ? '🧩' : '🥚'}
+                                   (game.gameType || '').includes('anagram') ? '🧩' : 
+                                   (game.gameType || '').includes('sentence') ? '📝' : 
+                                   (game.gameType || '').includes('place') ? '🎯' : '🥚'}
                                 </div>
                               )}
                             </div>
@@ -2346,7 +2378,9 @@ const TeacherDashboard = () => {
                           height: '64px', 
                           backgroundColor: (game.gameType || '').includes('whack') ? '#C6F6D5' : 
                                           (game.gameType || '').includes('spinner') ? '#FED7D7' : 
-                                          (game.gameType || '').includes('anagram') ? '#BFDBFE' : '#E9D8FD',
+                                          (game.gameType || '').includes('anagram') ? '#BFDBFE' : 
+                                          (game.gameType || '').includes('sentence') ? '#E0F2FE' : 
+                                          (game.gameType || '').includes('place') ? '#FFEBE6' : '#E9D8FD',
                           borderRadius: '8px',
                           display: 'flex',
                           alignItems: 'center',
@@ -2365,7 +2399,9 @@ const TeacherDashboard = () => {
                             <div style={{ fontSize: '24px', color: '#718096' }}>
                               {(game.gameType || '').includes('whack') ? '🔨' : 
                                (game.gameType || '').includes('spinner') ? '🎡' : 
-                               (game.gameType || '').includes('anagram') ? '🧩' : '🥚'}
+                               (game.gameType || '').includes('anagram') ? '🧩' : 
+                               (game.gameType || '').includes('sentence') ? '📝' : 
+                               (game.gameType || '').includes('place') ? '🎯' : '🥚'}
                             </div>
                           )}
                         </div>
@@ -2445,6 +2481,8 @@ const TeacherDashboard = () => {
                                   configRoute = '/configure/spinner-wheel';
                                 } else if (gameType === 'anagram') {
                                   configRoute = '/configure/anagram';
+                                } else if (gameType === 'sentence-sense') {
+                                  configRoute = '/configure/sentence-sense';
                                 } else if (gameType === 'place-value-showdown') {
                                   configRoute = '/configure/place-value-showdown';
                                 }

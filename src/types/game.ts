@@ -76,17 +76,27 @@ interface SpinnerWheelConfig extends BaseGameConfig {
 
 export interface AnagramConfig extends BaseGameConfig {
   type: 'anagram';
-  gameMode: 'letters-to-word' | 'words-to-sentence' | 'mixed';
   showDefinitions: boolean;
   enableHints: boolean;
   maxAttempts: number;
   shuffleIntensity: 'low' | 'medium' | 'high';
-  correctFeedbackDuration: 'always' | 'momentary';
   anagrams: Array<{
     id: string;
-    original: string; // The correct word or sentence
+    original: string; // The correct word
     definition?: string; // Optional definition/hint
-    type: 'word' | 'sentence'; // Whether this is a word or sentence anagram
+    difficulty: 'easy' | 'medium' | 'hard';
+  }>;
+}
+
+export interface SentenceSenseConfig extends BaseGameConfig {
+  type: 'sentence-sense';
+  enableHints: boolean;
+  maxAttempts: number;
+  correctFeedbackDuration: 'always' | 'momentary';
+  sentences: Array<{
+    id: string;
+    original: string; // The correct sentence
+    definition?: string; // Optional context/hint
     difficulty: 'easy' | 'medium' | 'hard';
   }>;
 }
@@ -103,7 +113,7 @@ export interface PlaceValueShowdownConfig extends BaseGameConfig {
   gameMode: 'student-vs-teacher' | 'practice'; // Competition vs practice mode
 }
 
-export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig | AnagramConfig | PlaceValueShowdownConfig;
+export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig | AnagramConfig | SentenceSenseConfig | PlaceValueShowdownConfig;
 
 export interface Word {
   text: string;

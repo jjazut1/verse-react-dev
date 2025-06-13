@@ -113,7 +113,7 @@ const AnagramConfig = () => {
   const toast = useToast();
   
   const [title, setTitle] = useState('Anagram Game');
-  const [gameMode, setGameMode] = useState<'letters-to-word' | 'words-to-sentence'>('letters-to-word');
+  const [gameMode] = useState<'letters-to-word'>('letters-to-word');
   const [withClues, setWithClues] = useState(true);
 
   const [anagrams, setAnagrams] = useState<AnagramItem[]>([
@@ -181,8 +181,6 @@ const AnagramConfig = () => {
           if (templateDoc.exists()) {
             const templateData = templateDoc.data();
             setTitle(templateData.title || 'New Anagram Game');
-            const mode = templateData.gameMode as 'letters-to-word' | 'words-to-sentence' | 'mixed';
-            setGameMode(mode === 'mixed' ? 'letters-to-word' : (mode || 'letters-to-word'));
             setWithClues((templateData.showDefinitions ?? true) || (templateData.enableHints ?? false));
             if (templateData.anagrams) {
               setAnagrams(templateData.anagrams);
@@ -222,8 +220,6 @@ const AnagramConfig = () => {
       if (templateDoc.exists()) {
         const templateData = templateDoc.data() as AnagramTemplate;
         setTitle(templateData.title);
-        const mode = templateData.gameMode as 'letters-to-word' | 'words-to-sentence' | 'mixed';
-        setGameMode(mode === 'mixed' ? 'letters-to-word' : mode);
         setWithClues(templateData.showDefinitions || templateData.enableHints);
         setCorrectFeedbackDuration(templateData.correctFeedbackDuration || 'momentary');
         setAnagrams(templateData.anagrams);
@@ -246,17 +242,11 @@ const AnagramConfig = () => {
   };
 
   const handleAddAnagram = () => {
-    const getTypeFromGameMode = () => {
-      if (gameMode === 'letters-to-word') return 'word';
-      if (gameMode === 'words-to-sentence') return 'sentence';
-      return 'word';
-    };
-
     const newAnagram: AnagramItem = {
       id: Date.now().toString(),
       original: '',
       definition: '',
-      type: getTypeFromGameMode()
+      type: 'word'
     };
     setAnagrams([...anagrams, newAnagram]);
   };
@@ -331,15 +321,8 @@ const AnagramConfig = () => {
 
     setIsLoading(true);
     try {
-      // Ensure all anagrams have the correct type based on game mode
-      const getCorrectType = () => {
-        if (gameMode === 'letters-to-word') return 'word';
-        if (gameMode === 'words-to-sentence') return 'sentence';
-        return 'word';
-      };
-
-      const correctType = getCorrectType();
-      const finalAnagrams = anagrams.map(anagram => ({ ...anagram, type: correctType as 'word' | 'sentence' }));
+      // Ensure all anagrams have the correct type
+      const finalAnagrams = anagrams.map(anagram => ({ ...anagram, type: 'word' as const }));
 
       const gameConfig = {
         title,
@@ -468,16 +451,7 @@ const AnagramConfig = () => {
                   />
                 </FormControl>
 
-                <FormControl>
-                  <FormLabel>Game Mode</FormLabel>
-                  <Select
-                    value={gameMode}
-                    onChange={(e) => setGameMode(e.target.value as typeof gameMode)}
-                  >
-                    <option value="letters-to-word">Letters to Word</option>
-                    <option value="words-to-sentence">Words to Sentence</option>
-                  </Select>
-                </FormControl>
+
 
                 <FormControl>
                   <FormLabel>Correct Answer Feedback</FormLabel>
@@ -531,32 +505,25 @@ const AnagramConfig = () => {
                   <RadioGroup
                     value={withClues ? 'with' : 'without'}
                     onChange={(value) => setWithClues(value === 'with')}
-                    isDisabled={gameMode === 'words-to-sentence'}
                   >
                     <HStack spacing={6}>
-                      <Radio value="without" isDisabled={gameMode === 'words-to-sentence'}>Without clues</Radio>
-                      <Radio value="with" isDisabled={gameMode === 'words-to-sentence'}>With clues</Radio>
+                      <Radio value="without">Without clues</Radio>
+                      <Radio value="with">With clues</Radio>
                     </HStack>
                   </RadioGroup>
                 </FormControl>
 
                 {/* Table header */}
-                {gameMode === 'letters-to-word' && withClues && (
+                {withClues && (
                   <HStack spacing={4} w="full">
                     <Text fontWeight="bold" fontSize="md" flex="1">Word</Text>
                     <Text fontWeight="bold" fontSize="md" flex="1">Clue</Text>
                   </HStack>
                 )}
 
-                {gameMode === 'letters-to-word' && !withClues && (
+                {!withClues && (
                   <HStack spacing={4} w="full">
                     <Text fontWeight="bold" fontSize="md" flex="1">Word</Text>
-                  </HStack>
-                )}
-
-                {gameMode === 'words-to-sentence' && (
-                  <HStack spacing={4} w="full">
-                    <Text fontWeight="bold" fontSize="md" flex="1">Sentence</Text>
                   </HStack>
                 )}
 
@@ -567,7 +534,7 @@ const AnagramConfig = () => {
                       {index + 1}.
                     </Text>
                     
-                    {gameMode === 'letters-to-word' && withClues && (
+                    {withClues && (
                       <>
                         <Box flex="1">
                           <Input
@@ -591,24 +558,12 @@ const AnagramConfig = () => {
                       </>
                     )}
 
-                    {gameMode === 'letters-to-word' && !withClues && (
+                    {!withClues && (
                       <Box flex="1">
                         <Input
                           value={anagram.original}
                           onChange={(e) => handleAnagramChange(index, 'original', e.target.value)}
                           placeholder="Enter the word"
-                          isInvalid={saveAttempted && !anagram.original.trim()}
-                          className="apple-input"
-                        />
-                      </Box>
-                    )}
-
-                    {gameMode === 'words-to-sentence' && (
-                      <Box flex="1">
-                        <Input
-                          value={anagram.original}
-                          onChange={(e) => handleAnagramChange(index, 'original', e.target.value)}
-                          placeholder="Enter the sentence"
                           isInvalid={saveAttempted && !anagram.original.trim()}
                           className="apple-input"
                         />
@@ -654,11 +609,11 @@ const AnagramConfig = () => {
                       size="sm"
                       color="gray.600"
                     >
-                      {gameMode === 'letters-to-word' ? 'Add a new word' : 'Add a sentence'}
+                      Add a new word
                     </Button>
                   </HStack>
                   <Text fontSize="sm" color="gray.500">
-                    min 1 {gameMode === 'letters-to-word' ? 'max 100' : 'max 50'}
+                    min 1 max 100
                   </Text>
                 </HStack>
 
