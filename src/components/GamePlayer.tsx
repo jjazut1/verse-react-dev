@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Container, Center, Spinner, Text } from '@chakra-ui/react';
 import { doc, getDoc } from 'firebase/firestore';
@@ -62,14 +62,17 @@ const GamePlayer = () => {
     loadGameConfig();
   }, [configId, showToast]);
 
-  const handleGameComplete = (score: number) => {
+  const handleGameComplete = useCallback((score: number) => {
     showToast({
       title: 'Game Complete!',
       description: `You scored ${score} points!`,
       status: 'success',
       duration: 5000,
     });
-  };
+    
+    // Let the game handle its own completion flow (high score modal, etc.)
+    // Navigation will be handled by the game's close button or modal close
+  }, [showToast]);
 
   if (isLoading) {
     return (
