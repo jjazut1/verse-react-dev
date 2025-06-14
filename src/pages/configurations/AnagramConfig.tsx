@@ -412,10 +412,10 @@ const AnagramConfig = () => {
             </Text>
           </Box>
 
-          {/* Basic Settings */}
+          {/* Game Settings */}
           <Card>
             <CardHeader>
-              <Heading size="md">Basic Settings</Heading>
+              <Heading size="md">Game Settings</Heading>
             </CardHeader>
             <CardBody>
               <VStack spacing={4}>
@@ -440,7 +440,7 @@ const AnagramConfig = () => {
                   </FormControl>
                 )}
 
-                <FormControl isRequired>
+                <FormControl>
                   <FormLabel>Title</FormLabel>
                   <Input
                     value={title}
@@ -450,8 +450,6 @@ const AnagramConfig = () => {
                     className="apple-input"
                   />
                 </FormControl>
-
-
 
                 <FormControl>
                   <FormLabel>Correct Answer Feedback</FormLabel>

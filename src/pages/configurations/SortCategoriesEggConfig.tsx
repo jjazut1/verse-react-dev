@@ -973,152 +973,6 @@ const SortCategoriesEggConfig = () => {
     loadTemplate();
   }, [templateId, currentUser, navigate, toast, onError]);
 
-  // Handler for template selection
-  const handleTemplateChange = (template: string) => {
-    setTemplateKey(template);
-    
-    console.log('Selected template ID:', template);
-    
-    // Check if template exists in either database templates or fallbacks
-    const templateData = dbTemplates[template];
-    
-    if (templateData) {
-      console.log('Found template data:', templateData);
-      // If this is a new config or user confirms, update title and categories
-      if (!title || window.confirm("Do you want to replace the current title and categories with this preset?")) {
-        // Apply the template data to the form
-        applyTemplate(templateData);
-        
-        // Update URL fragment to save the selected template for later
-        window.location.hash = template;
-      }
-    } else {
-      console.log('No template found with ID:', template);
-    }
-  };
-
-  // Save the current configuration as a template in the database
-  const handleSaveAsTemplate = async () => {
-    if (!currentUser) {
-      if (onError) onError("You must be logged in to save a template");
-      return;
-    }
-    
-    if (!isAdmin && !isTeacher) {
-      if (onError) onError("You must be an admin or teacher to save templates");
-      return;
-    }
-
-    // Check if we have a title and at least one category with items
-    if (!title.trim()) {
-      toast({
-        title: "Error",
-        description: "Please provide a title for your template",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
-      return;
-    }
-
-    // Process categories to filter out empty items
-    const processedCategories = categories.map(category => {
-      console.log(`Category "${category.name}": item count before filtering:`, category.items.length);
-      const filtered = {
-      name: (category.name || '').trim(),
-      items: Array.isArray(category.items) 
-          ? category.items.filter(item => {
-              console.log(`Checking item in category "${category.name}":`);
-              const isValid = debugItemContent(item);
-              if (!isValid) console.log(`  - Found empty item in category "${category.name}"`);
-              return isValid;
-            })
-          : []
-      };
-      console.log(`Category "${category.name}": item count after filtering:`, filtered.items.length);
-      return filtered;
-    });
-
-    console.log("Processed categories:", processedCategories);
-
-    if (processedCategories.length === 0) {
-      console.log("Error: No categories found after processing");
-      toast({
-        title: "Missing Categories",
-        description: "Please add at least one category with items.",
-        status: "warning",
-        duration: 5000,
-      });
-      return;
-    }
-
-    // Validate each category has at least 3 items
-    const categoriesWithTooFewItems = processedCategories.filter(cat => {
-      const hasTooFew = cat.items.length < 3;
-      if (hasTooFew) {
-        console.log(`Category "${cat.name}" has too few items: ${cat.items.length}`);
-      }
-      return hasTooFew;
-    });
-    
-    if (categoriesWithTooFewItems.length > 0) {
-      console.log("Categories with too few items:", categoriesWithTooFewItems);
-      toast({
-        title: "Not Enough Items",
-        description: "Each category must have at least 3 items.",
-        status: "warning",
-        duration: 5000,
-      });
-      return;
-    }
-
-    try {
-      // Prepare the template data
-      const templateData = {
-        type: 'sort-categories-egg',
-        title: title.trim(),
-        categories: processedCategories,
-        eggQty: eggQty,
-        userId: currentUser.uid,
-        share: true, // Add sharing option for templates
-        email: currentUser.email,
-        createdAt: serverTimestamp()
-      };
-
-      // Save to the categoryTemplates collection
-      const docRef = await addDoc(collection(db, 'categoryTemplates'), templateData);
-      
-      // Add the new template to the state
-      setDbTemplates({
-        ...dbTemplates,
-        [docRef.id]: {
-          title: templateData.title,
-          categories: processedCategories,
-          eggQty: eggQty
-        }
-      });
-      
-      toast({
-        title: "Template Saved",
-        description: "Your template has been saved and will be available for future use.",
-        status: "success",
-        duration: 3000,
-      });
-      
-      // Set the template key to the new template
-      setTemplateKey(docRef.id);
-      
-    } catch (error) {
-      console.error("Error saving template:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save the template. Please try again.",
-        status: "error",
-        duration: 5000,
-      });
-    }
-  };
-
   // Category management handlers
   const handleAddCategory = () => {
     // Check for maximum limit (10 categories)
@@ -2081,76 +1935,7 @@ const SortCategoriesEggConfig = () => {
           </div>
           
           <FormControl mb={4}>
-            <FormLabel>Category Template</FormLabel>
-            {loadingTemplates ? (
-              <HStack>
-                <Spinner size="sm" />
-                <Text>Loading templates...</Text>
-              </HStack>
-            ) : (
-              <Box>
-                <select 
-                  className="chakra-select apple-input"
-                  value={templateKey}
-                  onChange={(e) => handleTemplateChange(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '0.375rem',
-                    borderWidth: '1px',
-                    borderColor: 'inherit'
-                  }}
-                >
-                  <option value="">Select a template (optional)</option>
-                  
-                  {showOnlyBlankTemplates ? (
-                    <>
-                      {/* Display blank templates only */}
-                      <optgroup label="Blank Templates">
-                        {Object.entries(blankTemplates).map(([key, template]) => (
-                          <option key={key} value={key}>
-                            {template.title}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </>
-                  ) : (
-                    <>
-                      {/* Display blank templates first */}
-                      {Object.keys(blankTemplates).length > 0 && (
-                        <optgroup label="Blank Templates">
-                          {Object.entries(blankTemplates).map(([key, template]) => (
-                            <option key={key} value={key}>
-                              {template.title}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      
-                      {/* Then display category templates */}
-                      {Object.keys(categoryTemplates).length > 0 && (
-                        <optgroup label="Category Templates">
-                          {Object.entries(categoryTemplates).map(([key, template]) => (
-                            <option key={key} value={key}>
-                              {template.title}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </>
-                  )}
-                </select>
-              </Box>
-            )}
-            <FormHelperText>
-              {showOnlyBlankTemplates 
-                ? "Select a blank template to use as a starting point" 
-                : "Select a preset template to quickly populate the game with common categories"}
-            </FormHelperText>
-          </FormControl>
-
-          <FormControl mb={4}>
-            <FormLabel>Configuration Title</FormLabel>
+            <FormLabel>Title</FormLabel>
             <Input
               className="apple-input"
               value={title}
@@ -2464,25 +2249,6 @@ const SortCategoriesEggConfig = () => {
 
         <Box className="apple-section">
           <div className="apple-section-header">
-            <Text as="h2" fontSize="xl" fontWeight="semibold">Templates</Text>
-          </div>
-          
-          {(isAdmin || isTeacher) && (
-            <Button
-              width="100%"
-              mb={4}
-              onClick={handleSaveAsTemplate}
-              className="apple-button apple-button-primary"
-            >
-              Save as Template
-            </Button>
-          )}
-          
-          <Text fontSize="sm">Save your current word category as a reusable template for future games</Text>
-        </Box>
-
-        <Box className="apple-section">
-          <div className="apple-section-header">
             <Heading size="md">Sharing</Heading>
           </div>
           <FormControl display="flex" alignItems="center" mb={4}>
@@ -2499,15 +2265,12 @@ const SortCategoriesEggConfig = () => {
 
         <Divider my={4} />
         
-        <Flex justify="space-between" align="center">
+        <HStack spacing={4} justify="flex-end">
           <Button 
-            colorScheme="blue" 
-            size="lg" 
             onClick={() => navigate('/teacher')}
-            className="apple-button apple-button-secondary"
-            mr={4}
+            variant="ghost"
           >
-            Return to Dashboard
+            Cancel
           </Button>
           
           <Button 
@@ -2521,7 +2284,7 @@ const SortCategoriesEggConfig = () => {
           >
             {isEditing ? "Update Configuration" : "Save Configuration"}
           </Button>
-        </Flex>
+        </HStack>
       </VStack>
     </EditorSelectionContext.Provider>
   );

@@ -15,11 +15,11 @@ import { ConfigSectionProps } from './types';
 export const BasicSettings: React.FC<ConfigSectionProps> = ({ config, onUpdate }) => (
   <Card>
     <CardHeader>
-      <Heading size="md">Basic Settings</Heading>
+      <Heading size="md">Game Settings</Heading>
     </CardHeader>
     <CardBody>
       <VStack spacing={4} align="stretch">
-        <FormControl isRequired>
+        <FormControl>
           <FormLabel>Game Title</FormLabel>
           <Input
             value={config.title}

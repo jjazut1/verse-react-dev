@@ -411,14 +411,6 @@ const SpinnerWheelConfig: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Template management state
-  const [templateKey, setTemplateKey] = useState('');
-  const [dbTemplates, setDbTemplates] = useState<Record<string, any>>({});
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
-  const [blankTemplates, setBlankTemplates] = useState<Record<string, any>>({});
-  const [categoryTemplates, setCategoryTemplates] = useState<Record<string, any>>({});
-  const [showOnlyBlankTemplates, setShowOnlyBlankTemplates] = useState(false);
-
   // Store initial form values for comparison
   const initialFormValuesRef = useRef({
     title: 'My Spinner Wheel',
@@ -464,130 +456,12 @@ const SpinnerWheelConfig: React.FC = () => {
     }
   }, [currentUser, navigate, toast]);
 
-  // Check if user came from home page with a blank template
-  useEffect(() => {
-    if (templateId) {
-      // Check if the template is from blankGameTemplates collection
-      const checkTemplateSource = async () => {
-        try {
-          const blankTemplateRef = doc(db, 'blankGameTemplates', templateId);
-          const blankTemplateSnap = await getDoc(blankTemplateRef);
-          
-          if (blankTemplateSnap.exists()) {
-            console.log('Template is from blankGameTemplates, showing only blank templates in dropdown');
-            setShowOnlyBlankTemplates(true);
-          } else {
-            console.log('Template not found in blankGameTemplates, checking userGameConfigs');
-            setShowOnlyBlankTemplates(false);
-          }
-        } catch (error) {
-          console.error('Error checking template source:', error);
-          setShowOnlyBlankTemplates(false);
-        }
-      };
-      
-      checkTemplateSource();
-    }
-  }, [templateId]);
-
-  // Load templates from database
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      setLoadingTemplates(true);
-      try {
-        // Query both collections for templates
-        const [categoryTemplatesSnapshot, blankTemplatesSnapshot] = await Promise.all([
-          // Query the categoryTemplates collection for 'spinner-wheel' type templates
-          getDocs(query(
-            collection(db, 'categoryTemplates'),
-            where('type', '==', 'spinner-wheel')
-          )),
-          // Query all blankGameTemplates
-          getDocs(collection(db, 'blankGameTemplates'))
-        ]);
-        
-        console.log('Category templates count:', categoryTemplatesSnapshot.size);
-        console.log('Blank templates count:', blankTemplatesSnapshot.size);
-        
-        const categoryTemplatesMap: Record<string, any> = {};
-        const blankTemplatesMap: Record<string, any> = {};
-        
-        // Process category templates
-        categoryTemplatesSnapshot.forEach((doc) => {
-          const data = doc.data();
-          categoryTemplatesMap[doc.id] = {
-            title: data.title || 'Untitled Template',
-            items: Array.isArray(data.items) ? data.items : [],
-            removeOnSelect: data.removeOnSelect || false,
-            wheelTheme: data.wheelTheme || 'primaryColors',
-            customColors: data.customColors || ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'],
-            soundEnabled: data.soundEnabled ?? true,
-            maxSpins: data.maxSpins || 0,
-            instructions: data.instructions || 'Click the SPIN button to randomly select an item from the wheel!',
-            share: data.share || false
-          };
-          console.log('Loaded category template:', doc.id, data.title);
-        });
-        
-        // Process blank templates - filter for spinner-wheel type
-        blankTemplatesSnapshot.forEach((doc) => {
-          const data = doc.data();
-          console.log('Raw blank template data:', doc.id, data);
-          
-          // Include the template if it's spinner-wheel type or has no type specified
-          if (!data.type || data.type === 'spinner-wheel') {
-            blankTemplatesMap[doc.id] = {
-              title: data.title || 'Untitled Template',
-              items: Array.isArray(data.items) ? data.items : [],
-              removeOnSelect: data.removeOnSelect || false,
-              wheelTheme: data.wheelTheme || 'primaryColors',
-              customColors: data.customColors || ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'],
-              soundEnabled: data.soundEnabled ?? true,
-              maxSpins: data.maxSpins || 0,
-              instructions: data.instructions || 'Click the SPIN button to randomly select an item from the wheel!',
-              share: data.share || false
-            };
-            console.log('Loaded blank template:', doc.id, data.title || 'Untitled');
-          } else {
-            console.log('Skipped blank template with incorrect type:', doc.id, data.type);
-          }
-        });
-        
-        // Store templates separately
-        setCategoryTemplates(categoryTemplatesMap);
-        setBlankTemplates(blankTemplatesMap);
-        
-        // Combine templates based on whether to show only blank templates
-        const allTemplates = showOnlyBlankTemplates 
-          ? blankTemplatesMap 
-          : {...categoryTemplatesMap, ...blankTemplatesMap};
-          
-        console.log('Total templates loaded:', Object.keys(allTemplates).length);
-        console.log('All template IDs:', Object.keys(allTemplates));
-        
-        setDbTemplates(allTemplates);
-      } catch (error) {
-        console.error('Error fetching templates:', error);
-        toast({
-          title: 'Error loading templates',
-          description: 'Using default values instead.',
-          status: 'warning',
-          duration: 3000,
-        });
-      } finally {
-        setLoadingTemplates(false);
-      }
-    };
-    
-    fetchTemplates();
-  }, [toast, showOnlyBlankTemplates]);
-
   // Load existing configuration if templateId is provided
   useEffect(() => {
     if (templateId && currentUser) {
       loadTemplate();
     }
-  }, [templateId, currentUser, showOnlyBlankTemplates]);
+  }, [templateId, currentUser]);
 
   const loadTemplate = async () => {
     if (!templateId) return;
@@ -595,77 +469,9 @@ const SpinnerWheelConfig: React.FC = () => {
     console.log('=== LOADING TEMPLATE ===');
     console.log('Template ID:', templateId);
     console.log('Current user:', currentUser?.uid);
-    console.log('Show only blank templates:', showOnlyBlankTemplates);
 
     setIsLoading(true);
     try {
-      // If user came from blank templates section, prioritize blankGameTemplates
-      if (showOnlyBlankTemplates) {
-        console.log('Prioritizing blankGameTemplates due to blank template source...');
-        const blankTemplateRef = doc(db, 'blankGameTemplates', templateId);
-        const blankTemplateSnap = await getDoc(blankTemplateRef);
-        
-        if (blankTemplateSnap.exists()) {
-          const templateData = blankTemplateSnap.data();
-          console.log('Found in blankGameTemplates (prioritized)');
-          console.log('Blank template data:', templateData);
-          console.log('Blank template title:', templateData.title);
-          console.log('Blank template items:', templateData.items);
-          
-          // Populate form fields from blank template
-          console.log('Setting title to:', templateData.title || 'My Spinner Wheel');
-          setTitle(templateData.title || 'My Spinner Wheel');
-          
-          console.log('Setting items to:', templateData.items?.map((item: any) => ({
-            ...item,
-            id: item.id || generateId(),
-            content: item.content || item.text || ''
-          })) || []);
-          setItems(templateData.items?.map((item: any) => ({
-            ...item,
-            id: item.id || generateId(),
-            content: item.content || item.text || ''
-          })) || []);
-          
-          setRemoveOnSelect(templateData.removeOnSelect || false);
-          // Map old 'rainbow' theme to new 'primaryColors'
-          const mappedTheme = templateData.wheelTheme === 'rainbow' ? 'primaryColors' : templateData.wheelTheme;
-          setWheelTheme(mappedTheme || 'primaryColors');
-          setCustomColors(templateData.customColors || ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']);
-          setSoundEnabled(templateData.soundEnabled ?? true);
-          setMaxSpins(templateData.maxSpins || 0);
-          setInstructions(templateData.instructions || 'Click the SPIN button to randomly select an item from the wheel!');
-          setShareConfig(templateData.share || false);
-          setIsEditing(false); // This is a new configuration based on a template
-          
-          // Update initial values for comparison
-          initialFormValuesRef.current = {
-            title: templateData.title || 'My Spinner Wheel',
-            items: templateData.items?.map((item: any) => ({
-              ...item,
-              id: item.id || generateId(),
-              content: item.content || item.text || ''
-            })) || [],
-            removeOnSelect: templateData.removeOnSelect || false,
-            wheelTheme: mappedTheme || 'primaryColors',
-            customColors: templateData.customColors || ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'],
-            soundEnabled: templateData.soundEnabled ?? true,
-            maxSpins: templateData.maxSpins || 0,
-            instructions: templateData.instructions || 'Click the SPIN button to randomly select an item from the wheel!',
-            shareConfig: templateData.share || false
-          };
-          
-          // Reset unsaved changes flag after loading
-          setHasUnsavedChanges(false);
-          
-          console.log('Template loading complete - blankGameTemplates (prioritized)');
-          setIsLoading(false);
-          return;
-        } else {
-          console.log('Not found in blankGameTemplates, falling back to userGameConfigs...');
-        }
-      }
-
       // Standard loading: try userGameConfigs first (for saved configurations)
       console.log('Trying to load from userGameConfigs...');
       const docRef = doc(db, 'userGameConfigs', templateId);
@@ -1217,56 +1023,6 @@ const SpinnerWheelConfig: React.FC = () => {
     });
   }, [items]);
 
-  // Handle template selection
-  const handleTemplateSelect = (templateId: string) => {
-    if (!templateId || templateId === '') {
-      setTemplateKey('');
-      return;
-    }
-    
-    setTemplateKey(templateId);
-    
-    const template = dbTemplates[templateId];
-    if (template) {
-      console.log('Loading template:', templateId, template);
-      
-      // Update form state with template data
-      setTitle(template.title || 'My Spinner Wheel');
-      setItems(template.items?.map((item: any) => ({
-        ...item,
-        id: item.id || generateId(),
-        content: item.content || item.text || ''
-      })) || []);
-      setRemoveOnSelect(template.removeOnSelect || false);
-      setWheelTheme(template.wheelTheme || 'primaryColors');
-      setCustomColors(template.customColors || ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']);
-      setSoundEnabled(template.soundEnabled ?? true);
-      setMaxSpins(template.maxSpins || 0);
-      setInstructions(template.instructions || 'Click the SPIN button to randomly select an item from the wheel!');
-      setShareConfig(template.share || false);
-      
-      // Update initial values for comparison
-      initialFormValuesRef.current = {
-        title: template.title || 'My Spinner Wheel',
-        items: template.items?.map((item: any) => ({
-          ...item,
-          id: item.id || generateId(),
-          content: item.content || item.text || ''
-        })) || [],
-        removeOnSelect: template.removeOnSelect || false,
-        wheelTheme: template.wheelTheme || 'primaryColors',
-        customColors: template.customColors || ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'],
-        soundEnabled: template.soundEnabled ?? true,
-        maxSpins: template.maxSpins || 0,
-        instructions: template.instructions || 'Click the SPIN button to randomly select an item from the wheel!',
-        shareConfig: template.share || false
-      };
-      
-      // Reset unsaved changes flag after loading template
-      setHasUnsavedChanges(false);
-    }
-  };
-
   if (isLoading) {
     return (
       <Center p={8}>
@@ -1294,42 +1050,14 @@ const SpinnerWheelConfig: React.FC = () => {
             </Text>
           </Box>
 
-          {/* Basic Settings */}
+          {/* Game Settings */}
           <Card>
             <CardHeader>
-              <Heading size="md">Basic Settings</Heading>
+              <Heading size="md">Game Settings</Heading>
             </CardHeader>
             <CardBody>
               <VStack spacing={4}>
-                {/* Template Selection */}
-                {!isEditing && Object.keys(dbTemplates).length > 0 && (
-                  <FormControl>
-                    <FormLabel>
-                      Choose a Template
-                      {loadingTemplates && <Spinner size="sm" ml={2} />}
-                    </FormLabel>
-                    <Select
-                      value={templateKey}
-                      onChange={(e) => handleTemplateSelect(e.target.value)}
-                      placeholder="Select a template (optional)"
-                      isDisabled={loadingTemplates}
-                    >
-                      {Object.entries(dbTemplates).map(([id, template]) => (
-                        <option key={id} value={id}>
-                          {template.title}
-                        </option>
-                      ))}
-                    </Select>
-                    <Text fontSize="sm" color="gray.600" mt={1}>
-                      {showOnlyBlankTemplates 
-                        ? "Showing blank templates only" 
-                        : `${Object.keys(categoryTemplates).length} category templates, ${Object.keys(blankTemplates).length} blank templates`
-                      }
-                    </Text>
-                  </FormControl>
-                )}
-
-                <FormControl isRequired>
+                <FormControl>
                   <FormLabel>Title</FormLabel>
                   <Input
                     value={title}
@@ -1477,10 +1205,10 @@ const SpinnerWheelConfig: React.FC = () => {
             </CardBody>
           </Card>
 
-          {/* Game Settings */}
+          {/* Advanced Settings */}
           <Card>
             <CardHeader>
-              <Heading size="md">Game Settings</Heading>
+              <Heading size="md">Advanced Settings</Heading>
             </CardHeader>
             <CardBody>
               <VStack spacing={4}>

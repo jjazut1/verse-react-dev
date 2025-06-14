@@ -1572,20 +1572,11 @@ const TeacherDashboard = () => {
                       <h3 style={{ 
                         fontSize: '18px', 
                         fontWeight: '600', 
-                        marginBottom: '8px',
+                        marginBottom: '16px',
                         color: '#2D3748'
                       }}>
                         {template.title}
                       </h3>
-                      
-                      <p style={{ 
-                        color: '#718096', 
-                        fontSize: '14px',
-                        marginBottom: '16px',
-                        textTransform: 'capitalize'
-                      }}>
-                        {(template.type || 'Unknown').replace('-', ' ')}
-                      </p>
                       
                       <div style={{
                         padding: '8px 16px',

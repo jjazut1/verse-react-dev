@@ -18,13 +18,35 @@ class Confetti {
   lifespan: number;
 
   constructor(scene: THREE.Scene, position: THREE.Vector3) {
-    const geometry = new THREE.PlaneGeometry(0.2, 0.2); // Slightly larger confetti
+    // Create varied confetti shapes instead of just squares
+    const shapeType = Math.random();
+    let geometry: THREE.BufferGeometry;
     
-    // Red, white, and blue colors only
+    if (shapeType < 0.4) {
+      // Rectangular confetti (40% chance)
+      const width = 0.15 + Math.random() * 0.1;
+      const height = 0.08 + Math.random() * 0.06;
+      geometry = new THREE.PlaneGeometry(width, height);
+    } else if (shapeType < 0.7) {
+      // Circular confetti (30% chance)
+      const radius = 0.06 + Math.random() * 0.04;
+      geometry = new THREE.CircleGeometry(radius, 8);
+    } else {
+      // Triangular confetti (30% chance)
+      const size = 0.08 + Math.random() * 0.04;
+      geometry = new THREE.ConeGeometry(size, size * 1.5, 3);
+    }
+    
+    // Enhanced color palette with more festive colors
     const colors = [
       new THREE.Color(0xFF0000), // Red
       new THREE.Color(0xFFFFFF), // White
-      new THREE.Color(0x0000FF)  // Blue
+      new THREE.Color(0x0000FF), // Blue
+      new THREE.Color(0xFFD700), // Gold
+      new THREE.Color(0xFF69B4), // Hot Pink
+      new THREE.Color(0x00FF00), // Lime Green
+      new THREE.Color(0xFF4500), // Orange Red
+      new THREE.Color(0x9370DB)  // Medium Purple
     ];
     
     const material = new THREE.MeshBasicMaterial({
@@ -35,25 +57,35 @@ class Confetti {
     });
 
     this.mesh = new THREE.Mesh(geometry, material);
-    this.mesh.position.copy(position);
     
-    // More energetic initial velocity but constrained to a halo pattern around the hit point
+    // Add random offset to starting position for more natural scatter
+    const positionOffset = new THREE.Vector3(
+      (Math.random() - 0.5) * 0.3,
+      Math.random() * 0.2,
+      (Math.random() - 0.5) * 0.3
+    );
+    this.mesh.position.copy(position).add(positionOffset);
+    
+    // More natural explosion pattern - not rigid circular
     const angle = Math.random() * Math.PI * 2;
-    const speed = 0.3 + Math.random() * 0.2;
+    const elevation = Math.random() * Math.PI * 0.3; // 0 to 54 degrees upward
+    const speed = 0.4 + Math.random() * 0.3; // More varied speed
     
+    // Create 3D velocity vector with upward bias
     this.velocity = new THREE.Vector3(
-      Math.cos(angle) * speed,    // Circular outward pattern
-      Math.sin(angle) * speed,    // Circular outward pattern
-      (Math.random() - 0.5) * 0.2 // Slight random Z movement
+      Math.cos(angle) * Math.cos(elevation) * speed,
+      Math.sin(elevation) * speed + 0.2, // Always some upward velocity
+      Math.sin(angle) * Math.cos(elevation) * speed
     );
     
+    // More dramatic rotation for better visual effect
     this.rotationSpeed = new THREE.Vector3(
-      Math.random() * 0.4,
-      Math.random() * 0.4,
-      Math.random() * 0.4
+      (Math.random() - 0.5) * 0.8,
+      (Math.random() - 0.5) * 0.8,
+      (Math.random() - 0.5) * 0.8
     );
 
-    // Shorter lifespan for quicker disappearance (1.0 = normal, lower = shorter)
+    // Keep the same lifespan to maintain duration
     this.lifespan = 0.6;
     
     this.scene = scene;
@@ -3201,18 +3233,29 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
             // Create particle explosion effect
             createExplosionEffect(mole.position.clone());
             
-            // Add more confetti pieces in a circular pattern
-            const confettiCount = 20; // More confetti pieces
+            // Add more confetti pieces in a natural scattered pattern
+            const confettiCount = 25; // Slightly more confetti pieces for better effect
             for (let i = 0; i < confettiCount; i++) {
-              const angle = (i / confettiCount) * Math.PI * 2;
-              const radius = 0.5;
+              // Create more natural, random positioning instead of rigid circular pattern
+              const angle = Math.random() * Math.PI * 2; // Random angle
+              const distance = Math.random() * 0.8; // Random distance from center (0 to 0.8)
+              const height = Math.random() * 0.5 + 0.5; // Random height between 0.5 and 1.0
+              
+              // Add some clustering around the mole but with natural variation
+              const clusterOffset = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.4, // Random X offset
+                0,
+                (Math.random() - 0.5) * 0.4  // Random Z offset
+              );
+              
               const position = mole.position.clone().add(
                 new THREE.Vector3(
-                  Math.cos(angle) * radius,
-                  1,
-                  Math.sin(angle) * radius
+                  Math.cos(angle) * distance,
+                  height,
+                  Math.sin(angle) * distance
                 )
-              );
+              ).add(clusterOffset);
+              
               const confetti = new Confetti(sceneRef.current!, position);
               confettiRef.current.push(confetti);
             }
@@ -3272,7 +3315,7 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
   const createExplosionEffect = (position: THREE.Vector3) => {
     if (!sceneRef.current) return;
     
-    const numParticles = 20; // Reduced particle count
+    const numParticles = 25; // Slightly more particles for better effect
     const particles: { 
       mesh: THREE.Mesh, 
       velocity: THREE.Vector3, 
@@ -3280,16 +3323,32 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
       maxLife: number 
     }[] = [];
     
-    // Red, white, and blue colors
+    // Enhanced color palette to match confetti
     const colors = [
       new THREE.Color(0xFF0000), // Red
       new THREE.Color(0xFFFFFF), // White
-      new THREE.Color(0x0000FF)  // Blue
+      new THREE.Color(0x0000FF), // Blue
+      new THREE.Color(0xFFD700), // Gold
+      new THREE.Color(0xFF69B4), // Hot Pink
+      new THREE.Color(0x00FF00), // Lime Green
     ];
 
     for (let i = 0; i < numParticles; i++) {
-      const size = 0.05 + Math.random() * 0.1;
-      const geometry = new THREE.PlaneGeometry(size, size);
+      // Create varied particle shapes
+      const shapeType = Math.random();
+      let geometry: THREE.BufferGeometry;
+      
+      if (shapeType < 0.5) {
+        // Small squares and rectangles
+        const width = 0.04 + Math.random() * 0.06;
+        const height = 0.04 + Math.random() * 0.06;
+        geometry = new THREE.PlaneGeometry(width, height);
+      } else {
+        // Small circles
+        const radius = 0.02 + Math.random() * 0.04;
+        geometry = new THREE.CircleGeometry(radius, 6);
+      }
+      
       const material = new THREE.MeshBasicMaterial({
         color: colors[Math.floor(Math.random() * colors.length)],
         side: THREE.DoubleSide,
@@ -3298,18 +3357,27 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
       });
 
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.copy(position);
       
-      // Faster initial velocity for more explosive effect
-      const speed = 0.4 + Math.random() * 0.3;
-      const angle = Math.random() * Math.PI * 2;
-      const velocity = new THREE.Vector3(
-        Math.cos(angle) * speed * Math.random(),
-        Math.sin(angle) * speed * Math.random(),
+      // Add slight random offset to starting position
+      const startOffset = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.2,
+        Math.random() * 0.1,
         (Math.random() - 0.5) * 0.2
       );
+      mesh.position.copy(position).add(startOffset);
+      
+      // More natural 3D explosion pattern
+      const angle = Math.random() * Math.PI * 2;
+      const elevation = Math.random() * Math.PI * 0.4; // 0 to 72 degrees upward
+      const speed = 0.3 + Math.random() * 0.4;
+      
+      const velocity = new THREE.Vector3(
+        Math.cos(angle) * Math.cos(elevation) * speed,
+        Math.sin(elevation) * speed + 0.1, // Always some upward velocity
+        Math.sin(angle) * Math.cos(elevation) * speed
+      );
 
-      // Shorter max life for quicker disappearance
+      // Keep the same max life to maintain duration
       const maxLife = 0.5 + Math.random() * 0.3; // Between 0.5 and 0.8 seconds
       
       particles.push({

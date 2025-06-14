@@ -38,7 +38,6 @@ import { useUnsavedChangesContext } from '../../contexts/UnsavedChangesContext';
 import SlateEditor from '../../components/SlateEditor';
 import { isEqual } from 'lodash';
 import TemplateSync from '../../components/TemplateSync';
-import EnhancedTemplateSync from '../../components/EnhancedTemplateSync';
 import { createRoot } from 'react-dom/client';
 import { generateAndUploadThumbnail } from '../../utils/thumbnailGenerator';
 
@@ -627,14 +626,6 @@ const WhackAMoleConfig = () => {
     shareConfig: false,
     categories: [] as Category[]
   });
-
-  const [customTemplateId, setCustomTemplateId] = useState('');
-  const [customGameTitle, setCustomGameTitle] = useState('');
-  const [customTemplateError, setCustomTemplateError] = useState('');
-  const [commonTemplates, setCommonTemplates] = useState([
-    { id: 'pn24sw2vaDmdGjzcbkCb', title: 'short a v5' },
-    // Add other common templates as needed
-  ]);
 
   // Check if user came from home page with a blank template
   useEffect(() => {
@@ -1254,130 +1245,6 @@ const WhackAMoleConfig = () => {
     }
   };
 
-  // Save the current word category as a template in the database
-  const handleSaveAsTemplate = async () => {
-    if (!currentUser) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to save templates.",
-        status: "error",
-        duration: 5000,
-      });
-      return;
-    }
-    
-    if (!isAdmin && !isTeacher) {
-      toast({
-        title: "Permission Denied",
-        description: "You must be an admin or teacher to save templates.",
-        status: "error",
-        duration: 5000,
-      });
-      return;
-    }
-
-    if (!title.trim()) {
-      toast({
-        title: "Missing Title",
-        description: "Please enter a title for your template.",
-        status: "warning",
-        duration: 5000,
-      });
-      return;
-    }
-
-    // Validate categories
-    if (categories.length === 0 || categories[0].items.length === 0) {
-      toast({
-        title: "Missing Words",
-        description: "Please add at least one category with words.",
-        status: "warning",
-        duration: 5000,
-      });
-      return;
-    }
-
-    try {
-      // Convert our rich text categories to the format expected by the database
-      const categoriesForDb = categories.map(convertCategoryToWordCategory);
-      
-      console.log("Saving template with categories:", categoriesForDb);
-      
-      // Prepare the template data
-      const templateData = {
-        type: 'whack-a-mole',
-        title: title.trim(),
-        categories: categoriesForDb, // Use categories instead of words
-        // For backward compatibility, also add the words array from the first category
-        words: categoriesForDb[0]?.words || [],
-        // Include all relevant configuration data
-        gameTime,
-        pointsPerHit,
-        penaltyPoints,
-        bonusPoints,
-        bonusThreshold,
-        speed: gameSpeed,
-        instructions,
-        share: shareConfig,
-        userId: currentUser.uid,
-        email: currentUser.email,
-        createdAt: serverTimestamp()
-      };
-
-      // Save to the categoryTemplates collection
-      const docRef = await addDoc(collection(db, 'categoryTemplates'), templateData);
-      
-      // Create template object with the expected structure
-      const newTemplate: WordCategory = {
-        title: templateData.title,
-        words: categoriesForDb[0]?.words || [], // For backwards compatibility
-        categories: categoriesForDb, // Keep all categories
-        // Include the additional properties for proper rendering
-        gameTime: templateData.gameTime,
-        pointsPerHit: templateData.pointsPerHit,
-        penaltyPoints: templateData.penaltyPoints,
-        bonusPoints: templateData.bonusPoints,
-        bonusThreshold: templateData.bonusThreshold,
-        speed: templateData.speed,
-        instructions: templateData.instructions,
-        share: templateData.share
-      };
-      
-      // Add the new template to the category templates state
-      setCategoryTemplates(prev => ({
-        ...prev,
-        [docRef.id]: newTemplate
-      }));
-      
-      // Also update the combined templates state
-      setDbTemplates(prev => ({
-        ...prev,
-        [docRef.id]: newTemplate
-      }));
-      
-      toast({
-        title: "Template Saved",
-        description: "Your word category template has been saved for future use.",
-        status: "success",
-        duration: 3000,
-      });
-      
-      // Set the game category to the new template
-      setGameCategory(docRef.id);
-      
-      console.log("Saved template with categories:", templateData);
-      
-    } catch (error) {
-      console.error("Error saving template:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save the template. Please try again.",
-        status: "error",
-        duration: 5000,
-      });
-    }
-  };
-
   // Category management handlers
   const handleAddCategory = () => {
     setCategories([...categories, {
@@ -1821,79 +1688,7 @@ const WhackAMoleConfig = () => {
         
           <SimpleGrid columns={[1, null, 2]} spacing={6}>
             <FormControl mb={4}>
-              <FormLabel>Word Category Template</FormLabel>
-              {loadingTemplates ? (
-                <HStack>
-                  <Spinner size="sm" />
-                  <Text>Loading templates...</Text>
-                </HStack>
-              ) : (
-                <>
-                  <Box>
-                    <select 
-                      className="chakra-select apple-input"
-                      value={gameCategory}
-                      onChange={(e) => handleCategoryChange(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        borderRadius: '0.375rem',
-                        borderWidth: '1px',
-                        maxWidth: '400px',
-                        borderColor: 'inherit'
-                      }}
-                    >
-                      <option value="">Select a word category (optional)</option>
-                      
-                      {showOnlyBlankTemplates ? (
-                        <>
-                          {/* Display blank templates only */}
-                          <optgroup label="Blank Templates">
-                            {Object.entries(blankTemplates).map(([key, template]) => (
-                              <option key={key} value={key}>
-                                {template.title}
-                              </option>
-                            ))}
-                          </optgroup>
-                        </>
-                      ) : (
-                        <>
-                          {/* Display blank templates first */}
-                          {Object.keys(blankTemplates).length > 0 && (
-                            <optgroup label="Blank Templates">
-                              {Object.entries(blankTemplates).map(([key, template]) => (
-                                <option key={key} value={key}>
-                                  {template.title}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                          
-                          {/* Then display category templates */}
-                          {Object.keys(categoryTemplates).length > 0 && (
-                            <optgroup label="Word Category Templates">
-                              {Object.entries(categoryTemplates).map(([key, template]) => (
-                                <option key={key} value={key}>
-                                  {template.title}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                        </>
-                      )}
-                    </select>
-                  </Box>
-                  <FormHelperText>
-                    {showOnlyBlankTemplates 
-                      ? "Select a blank template to use as a starting point" 
-                      : "Select a preset word category to quickly populate your game"}
-                  </FormHelperText>
-                </>
-              )}
-            </FormControl>
-
-            <FormControl mb={4}>
-              <FormLabel>Configuration Title</FormLabel>
+              <FormLabel>Title</FormLabel>
                     <Input
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
@@ -2297,26 +2092,6 @@ const WhackAMoleConfig = () => {
 
         <Box className="apple-section">
           <div className="apple-section-header">
-            <Heading size="md" mb={0}>Templates</Heading>
-          </div>
-          
-          {(isAdmin || isTeacher) && (
-            <Button
-              width="100%"
-              colorScheme="teal"
-              size="md"
-              mb={4}
-              onClick={handleSaveAsTemplate}
-            >
-              Save as Word Template
-            </Button>
-          )}
-          
-          <Text fontSize="sm">Save your current word category as a reusable template for future games</Text>
-        </Box>
-
-        <Box className="apple-section">
-          <div className="apple-section-header">
             <Heading size="md" mb={0}>Sharing</Heading>
           </div>
         <FormControl display="flex" alignItems="center" mb={4}>
@@ -2334,15 +2109,12 @@ const WhackAMoleConfig = () => {
 
       <Divider my={4} />
       
-      <Flex justify="space-between" align="center">
+      <HStack spacing={4} justify="flex-end">
         <Button 
-          colorScheme="blue" 
-          size="lg" 
           onClick={() => navigate('/teacher')}
-          className="apple-button apple-button-secondary"
-          mr={4}
+          variant="ghost"
         >
-          Return to Dashboard
+          Cancel
         </Button>
         
         <Button 
@@ -2355,101 +2127,7 @@ const WhackAMoleConfig = () => {
         >
           {isEditing ? "Update Configuration" : "Save Configuration"}
         </Button>
-      </Flex>
-
-      {/* Developer Utility Section - only visible in development */}
-      {import.meta.env.DEV && (
-        <Box mt={8} p={4} borderWidth="1px" borderRadius="md" borderColor="gray.300">
-          <Heading size="md" mb={4}>Developer Utilities</Heading>
-          <Text mb={4} color="gray.600">
-            These tools are only available in development mode and are used for debugging and fixing database issues.
-          </Text>
-          
-          <Stack spacing={4}>
-            <Box
-              border="1px solid"
-              borderColor="gray.200"
-              borderRadius="md"
-              p={4}
-            >
-              <Text fontWeight="bold" mb={4}>
-                Current Template: {title || 'Untitled'}
-              </Text>
-              {templateId && (
-                <EnhancedTemplateSync
-                  templateId={templateId}
-                  gameTitle={title}
-                  gameType="whack-a-mole"
-                  showDescription={true}
-                />
-              )}
-            </Box>
-
-            <Box
-              border="1px solid"
-              borderColor="gray.200"
-              borderRadius="md"
-              p={4}
-            >
-              <Text fontWeight="bold" mb={4}>
-                Common Templates
-              </Text>
-              {commonTemplates.map((template) => (
-                <Box key={template.id} mb={4}>
-                  <Text mb={2}>{template.title}</Text>
-                  <EnhancedTemplateSync
-                    templateId={template.id}
-                    gameTitle={template.title}
-                    gameType="whack-a-mole"
-                    variant="compact"
-                  />
-                </Box>
-              ))}
-            </Box>
-
-            <Box
-              border="1px solid"
-              borderColor="gray.200"
-              borderRadius="md"
-              p={4}
-            >
-              <Text fontWeight="bold" mb={4}>
-                Custom Template
-              </Text>
-              <FormControl isInvalid={Boolean(customTemplateError)}>
-                <FormLabel htmlFor="customTemplateId">Template ID</FormLabel>
-                <Input
-                  id="customTemplateId"
-                  value={customTemplateId}
-                  onChange={(e) => setCustomTemplateId(e.target.value)}
-                  placeholder="Enter template ID"
-                />
-                {customTemplateError && (
-                  <FormErrorMessage>{customTemplateError}</FormErrorMessage>
-                )}
-              </FormControl>
-              <FormControl mt={2}>
-                <FormLabel htmlFor="customGameTitle">Game Title</FormLabel>
-                <Input
-                  id="customGameTitle"
-                  value={customGameTitle}
-                  onChange={(e) => setCustomGameTitle(e.target.value)}
-                  placeholder="Enter game title"
-                />
-              </FormControl>
-              {customTemplateId && customGameTitle && (
-                <Box mt={4}>
-                  <EnhancedTemplateSync
-                    templateId={customTemplateId}
-                    gameTitle={customGameTitle}
-                    gameType="whack-a-mole"
-                  />
-                </Box>
-              )}
-            </Box>
-          </Stack>
-        </Box>
-      )}
+      </HStack>
     </VStack>
     </EditorSelectionContext.Provider>
   );

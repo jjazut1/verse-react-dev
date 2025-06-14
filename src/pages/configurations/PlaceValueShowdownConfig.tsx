@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges';
@@ -56,14 +56,12 @@ const PlaceValueShowdownConfig = () => {
   const [numberOfCards, setNumberOfCards] = useState<2 | 3 | 4 | 5>(3);
   const [objective, setObjective] = useState<'largest' | 'smallest'>('largest');
   const [winningScore, setWinningScore] = useState(5);
-  const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
-  const [playerName, setPlayerName] = useState('Student');
-  const [teacherName, setTeacherName] = useState('Teacher');
   const [enableHints, setEnableHints] = useState(true);
   const [gameMode, setGameMode] = useState<'student-vs-teacher' | 'practice'>('student-vs-teacher');
   const [shareConfig, setShareConfig] = useState(false);
   const [saveAttempted, setSaveAttempted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [teacherName, setTeacherName] = useState('Teacher');
 
   const hasUnsavedChanges = true; // Always assume changes for simplicity
   const { safeNavigate } = useUnsavedChanges(hasUnsavedChanges);
@@ -99,18 +97,27 @@ const PlaceValueShowdownConfig = () => {
     }
   }, []);
 
-  const getDifficultyDescription = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy':
-        return 'Teacher makes random moves';
-      case 'medium':
-        return 'Teacher plays strategically most of the time';
-      case 'hard':
-        return 'Teacher always makes optimal moves';
-      default:
-        return '';
-    }
-  };
+  // Fetch teacher name on component load
+  useEffect(() => {
+    const fetchTeacherName = async () => {
+      if (currentUser?.uid) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // Try different possible name fields in the user document
+            const name = userData.displayName || userData.name || userData.firstName || currentUser.displayName || 'Teacher';
+            setTeacherName(name);
+          }
+        } catch (error) {
+          console.error('Error fetching teacher name:', error);
+          // Keep default 'Teacher' name if fetch fails
+        }
+      }
+    };
+
+    fetchTeacherName();
+  }, [currentUser]);
 
   const getGameModeDescription = (mode: string) => {
     switch (mode) {
@@ -158,8 +165,8 @@ const PlaceValueShowdownConfig = () => {
         numberOfCards,
         objective,
         winningScore,
-        aiDifficulty,
-        playerName,
+        aiDifficulty: 'medium' as const,
+        playerName: 'Student',
         teacherName,
         enableHints,
         gameMode,
@@ -234,8 +241,8 @@ const PlaceValueShowdownConfig = () => {
           </CardHeader>
           <CardBody>
             <VStack spacing={6}>
-              <FormControl isRequired>
-                <FormLabel>Game Title</FormLabel>
+              <FormControl>
+                <FormLabel>Title</FormLabel>
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -317,71 +324,6 @@ const PlaceValueShowdownConfig = () => {
           </CardBody>
         </Card>
 
-        {/* AI Settings */}
-        <Card bg={cardBg} borderColor={borderColor}>
-          <CardHeader>
-            <Heading size="md">AI Teacher Settings</Heading>
-          </CardHeader>
-          <CardBody>
-            <VStack spacing={6}>
-              <FormControl>
-                <FormLabel>
-                  AI Difficulty
-                  <Badge ml={2} colorScheme="blue" variant="outline">
-                    {aiDifficulty.charAt(0).toUpperCase() + aiDifficulty.slice(1)}
-                  </Badge>
-                </FormLabel>
-                <Slider
-                  value={aiDifficulty === 'easy' ? 1 : aiDifficulty === 'medium' ? 2 : 3}
-                  onChange={(value) => {
-                    const difficulties = ['easy', 'medium', 'hard'];
-                    setAiDifficulty(difficulties[value - 1] as 'easy' | 'medium' | 'hard');
-                  }}
-                  min={1}
-                  max={3}
-                  step={1}
-                  colorScheme="blue"
-                >
-                  <SliderTrack>
-                    <SliderFilledTrack />
-                  </SliderTrack>
-                  <SliderThumb boxSize={6} />
-                </Slider>
-                <HStack justify="space-between" mt={2}>
-                  <Text fontSize="sm" color="gray.600">Easy</Text>
-                  <Text fontSize="sm" color="gray.600">Medium</Text>
-                  <Text fontSize="sm" color="gray.600">Hard</Text>
-                </HStack>
-                <Text fontSize="sm" color="gray.600" mt={2}>
-                  {getDifficultyDescription(aiDifficulty)}
-                </Text>
-              </FormControl>
-
-              <HStack spacing={6} w="full">
-                <FormControl flex="1">
-                  <FormLabel>Teacher Name</FormLabel>
-                  <Input
-                    value={teacherName}
-                    onChange={(e) => setTeacherName(e.target.value)}
-                    placeholder="Enter teacher name"
-                    className="apple-input"
-                  />
-                </FormControl>
-
-                <FormControl flex="1">
-                  <FormLabel>Student Name</FormLabel>
-                  <Input
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                    placeholder="Enter student name"
-                    className="apple-input"
-                  />
-                </FormControl>
-              </HStack>
-            </VStack>
-          </CardBody>
-        </Card>
-
         {/* Learning Features */}
         <Card bg={cardBg} borderColor={borderColor}>
           <CardHeader>
@@ -445,8 +387,8 @@ const PlaceValueShowdownConfig = () => {
               <Text><strong>Cards per round:</strong> {numberOfCards} cards</Text>
               <Text><strong>Objective:</strong> Create the {objective} number possible</Text>
               <Text><strong>Winning condition:</strong> First to {winningScore} points</Text>
-              <Text><strong>AI Difficulty:</strong> {aiDifficulty} - {getDifficultyDescription(aiDifficulty)}</Text>
-              <Text><strong>Players:</strong> {playerName} vs {teacherName}</Text>
+              <Text><strong>AI Difficulty:</strong> Medium - Teacher plays strategically most of the time</Text>
+              <Text><strong>Players:</strong> Student vs {teacherName}</Text>
               <Text><strong>Hints:</strong> {enableHints ? 'Enabled' : 'Disabled'}</Text>
             </VStack>
           </CardBody>
