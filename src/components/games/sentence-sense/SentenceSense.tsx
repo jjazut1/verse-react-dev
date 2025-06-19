@@ -14,6 +14,7 @@ import { useGameLogic } from './useGameLogic';
 import { GameHeader } from './GameHeader';
 import { HighScoreModal } from './HighScoreModal';
 import { formatTime } from './utils';
+import PWAGameHeader from '../PWAGameHeader';
 
 const SentenceSense: React.FC<SentenceSenseProps> = ({
   playerName,
@@ -68,6 +69,12 @@ const SentenceSense: React.FC<SentenceSenseProps> = ({
   return (
     <Box minH="100vh" bg={bgColor} p={4}>
       <VStack spacing={6} maxW="4xl" mx="auto">
+        {/* PWA Navigation Header */}
+        <PWAGameHeader 
+          gameTitle="Sentence Sense"
+          variant="compact"
+        />
+        
         {/* Game Header */}
         <GameHeader
           currentSentenceIndex={gameLogic.currentSentenceIndex}

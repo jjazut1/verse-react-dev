@@ -7,6 +7,7 @@ import GameArea from './GameArea';
 import GameControls from './GameControls';
 import HighScoreModal from './HighScoreModal';
 import ConfigModal from './ConfigModal';
+import PWAGameHeader from '../PWAGameHeader';
 
 const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
   playerName,
@@ -25,6 +26,8 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
 
   return (
     <Box width="100vw" maxWidth="100%" overflow="hidden" height="auto">
+      <PWAGameHeader gameTitle="Sort Categories Egg Reveal" variant="compact" />
+      
       <ConfigModal
         gameState={gameLogic.gameState}
         onClose={gameLogic.closeConfigModal}

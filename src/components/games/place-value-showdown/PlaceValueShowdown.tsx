@@ -3,6 +3,7 @@ import { PlaceValueShowdownProps } from './types';
 import { useGameLogic } from './useGameLogic';
 import { GameHeader } from './GameHeader';
 import { PlayerArea } from './PlayerArea';
+import PWAGameHeader from '../PWAGameHeader';
 import './PlaceValueShowdown.css';
 
 /**
@@ -29,8 +30,14 @@ const PlaceValueShowdown: React.FC<PlaceValueShowdownProps> = ({
   const [showExpandedNumbers, setShowExpandedNumbers] = useState(false);
   const [showExpandedWords, setShowExpandedWords] = useState(false);
 
+  // Create a modified config that uses the dynamic playerName
+  const dynamicConfig = React.useMemo(() => ({
+    ...config,
+    playerName: playerName || config.playerName // Use dynamic playerName if available, fallback to original
+  }), [config, playerName]);
+
   // Use custom hook for game logic and state management
-  const { gameState, selectionState, handlers } = useGameLogic(config, onGameComplete);
+  const { gameState, selectionState, handlers } = useGameLogic(dynamicConfig, onGameComplete);
 
   // Handle mouse move for ghost card tracking
   useEffect(() => {
@@ -50,8 +57,22 @@ const PlaceValueShowdown: React.FC<PlaceValueShowdownProps> = ({
 
   return (
     <div className="place-value-showdown" onClick={handlers.handleGameAreaClick}>
+      {/* PWA Navigation Header */}
+      <div style={{ 
+        position: 'absolute', 
+        top: '10px', 
+        left: '10px', 
+        right: '10px', 
+        zIndex: 1000
+      }}>
+        <PWAGameHeader 
+          gameTitle="Place Value Showdown"
+          variant="compact"
+        />
+      </div>
+      
       <GameHeader
-        config={config}
+        config={dynamicConfig}
         gameState={gameState}
         showPlaceValueLabels={showPlaceValueLabels}
         setShowPlaceValueLabels={setShowPlaceValueLabels}
@@ -72,7 +93,7 @@ const PlaceValueShowdown: React.FC<PlaceValueShowdownProps> = ({
         <div className="game-area">
           <PlayerArea
             isTeacher={true}
-            config={config}
+            config={dynamicConfig}
             gameState={gameState}
             showPlaceValueLabels={showPlaceValueLabels}
             showExpandedNumbers={showExpandedNumbers}
@@ -81,7 +102,7 @@ const PlaceValueShowdown: React.FC<PlaceValueShowdownProps> = ({
 
           <PlayerArea
             isTeacher={false}
-            config={config}
+            config={dynamicConfig}
             gameState={gameState}
             showPlaceValueLabels={showPlaceValueLabels}
             showExpandedNumbers={showExpandedNumbers}
@@ -99,8 +120,8 @@ const PlaceValueShowdown: React.FC<PlaceValueShowdownProps> = ({
           <h2>🎉 Game Complete!</h2>
           <div className="final-scores">
             <p><strong>Final Score:</strong></p>
-            <p>{config.teacherName}: {gameState.teacherScore}</p>
-            <p>{config.playerName}: {gameState.studentScore}</p>
+            <p>{dynamicConfig.teacherName}: {gameState.teacherScore}</p>
+            <p>{dynamicConfig.playerName}: {gameState.studentScore}</p>
           </div>
         </div>
       )}

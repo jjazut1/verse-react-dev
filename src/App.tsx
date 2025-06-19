@@ -23,10 +23,101 @@ import SpinnerWheelConfig from './pages/configurations/SpinnerWheelConfig'
 import AnagramConfig from './pages/configurations/AnagramConfig'
 import SentenceSenseConfig from './pages/configurations/SentenceSenseConfig'
 import PlaceValueShowdownConfig from './pages/configurations/PlaceValueShowdownConfig'
+import LinkInterceptor from './components/LinkInterceptor'
 import { useEffect } from 'react'
+import { usePWANavigation } from './hooks/usePWANavigation'
 
 // Create a layout component that includes the Navbar
 const Layout = ({ children }: { children: React.ReactNode }) => {
+  // Enable PWA navigation listening
+  usePWANavigation();
+  
+  // Service Worker-based window management for Layout-wrapped routes (like /student from device icons)
+  useEffect(() => {
+    // Enhanced PWA detection
+    const standaloneMatch = window.matchMedia('(display-mode: standalone)').matches;
+    const navigatorStandalone = (window.navigator as any).standalone === true;
+    const pwaParam = window.location.search.includes('pwa=true');
+    const isStudentRoute = window.location.pathname === '/student';
+    const isTeacherRoute = window.location.pathname === '/teacher';
+    
+    console.log('Layout: PWA Detection Details:', {
+      standaloneMatch,
+      navigatorStandalone, 
+      pwaParam,
+      isStudentRoute,
+      isTeacherRoute,
+      pathname: window.location.pathname,
+      search: window.location.search
+    });
+    
+    // More inclusive PWA detection - if it's student/teacher route, assume it's PWA
+    const isPWA = standaloneMatch || navigatorStandalone || pwaParam || isStudentRoute || isTeacherRoute;
+    
+    console.log('Layout: Final PWA decision:', isPWA);
+    
+    if (isPWA) {
+      console.log(`Layout: 🎯 Service Worker window management for PWA route: ${window.location.pathname}`);
+      
+      // Mark this as a device icon launched PWA window
+      window.name = 'standalone-pwa';
+      const deviceIconOrigin = 'device_icon';
+      localStorage.setItem('pwa_origin', deviceIconOrigin);
+      console.log('Layout: Marked window as device icon launched PWA');
+      console.log('Layout: Verified localStorage pwa_origin:', localStorage.getItem('pwa_origin'));
+      
+      // Tell service worker to close existing PWA windows when this device icon window opens
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        console.log('Layout: 📢 Requesting closure of existing PWA windows');
+        navigator.serviceWorker.controller.postMessage({
+          type: 'CLOSE_EXISTING_ASSIGNMENT_WINDOWS',
+          token: 'device-icon-window',
+          source: 'device-icon',
+          path: window.location.pathname,
+          timestamp: Date.now()
+        });
+      }
+      
+      // Listen for service worker messages
+      const handleServiceWorkerMessage = (event: MessageEvent) => {
+        console.log('Layout: 🎵 Received service worker message:', event.data);
+        
+        if (event.data?.type === 'FORCE_CLOSE_LAUNCHER') {
+          console.log('Layout: 🔄 Service worker requesting window close');
+          
+          const storedOrigin = localStorage.getItem('pwa_origin');
+          console.log('Layout: Stored origin value:', storedOrigin);
+          const wasUserLaunched = storedOrigin === 'device_icon';
+          console.log('Layout: Was user launched (device icon):', wasUserLaunched);
+          console.log('Layout: Window name:', window.name);
+          
+          // Additional check using window.name as backup
+          const isDeviceIconWindow = wasUserLaunched || window.name === 'standalone-pwa';
+          console.log('Layout: Final device icon window determination:', isDeviceIconWindow);
+          
+          if (isDeviceIconWindow) {
+            console.log('Layout: 🚨 Cannot auto-close device icon window, showing user message');
+            alert('Please close this tab manually. A newer game window has been launched.');
+          } else {
+            console.log('Layout: 🔄 Auto-closing JavaScript-opened window');
+            window.close();
+          }
+        }
+      };
+      
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+        
+        // Cleanup function
+        return () => {
+          navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+        };
+      }
+    } else {
+      console.log('Layout: Not a PWA context, skipping window management');
+    }
+  }, []);
+  
   return (
     <>
       <Navbar />
@@ -344,6 +435,11 @@ const router = createBrowserRouter([
   {
     path: "/student",
     element: <Layout><StudentDashboard /></Layout>,
+    errorElement: <ErrorBoundary />,
+  },
+  {
+    path: "/link",
+    element: <LinkInterceptor />,
     errorElement: <ErrorBoundary />,
   },
   {

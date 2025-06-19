@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Modal,
   ModalOverlay,
@@ -15,6 +16,7 @@ import {
   Heading,
   Box
 } from '@chakra-ui/react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { GameState } from './types';
 
 interface HighScoreModalProps {
@@ -23,8 +25,24 @@ interface HighScoreModalProps {
 }
 
 const HighScoreModal: React.FC<HighScoreModalProps> = ({ gameState, onClose }) => {
+  const navigate = useNavigate();
+  const { isTeacher, isStudent } = useAuth();
+
+  const handleClose = () => {
+    onClose();
+    
+    // Navigate based on user role
+    if (isTeacher) {
+      navigate('/teacher');
+    } else if (isStudent) {
+      navigate('/student');
+    } else {
+      navigate('/');
+    }
+  };
+
   return (
-    <Modal isOpen={gameState.showHighScoreModal} onClose={onClose} size="md">
+    <Modal isOpen={gameState.showHighScoreModal} onClose={handleClose} size="md">
       <ModalOverlay />
       <ModalContent>
         <ModalHeader textAlign="center">
@@ -59,7 +77,7 @@ const HighScoreModal: React.FC<HighScoreModalProps> = ({ gameState, onClose }) =
           </VStack>
         </ModalBody>
         <ModalFooter>
-          <Button colorScheme="purple" onClick={onClose}>
+          <Button colorScheme="purple" onClick={handleClose}>
             Close
           </Button>
         </ModalFooter>

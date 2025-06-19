@@ -1,22 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { updateAssignment, createAttempt, getAssignmentByToken } from '../services/assignmentService';
-import { getDoc, doc } from 'firebase/firestore';
+import { getDoc, doc, Timestamp, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Timestamp } from 'firebase/firestore';
 import { sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { usePWA } from '../hooks/usePWA';
+import { usePWANavigation } from '../hooks/usePWANavigation';
+import { usePWAMessageAck } from '../hooks/usePWAMessageAck';
+import { Assignment } from '../types';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 // Game components (import as needed)
-import SortCategoriesEggRevealAdapter from '../components/games/sort-categories-egg-reveal/SortCategoriesEggRevealAdapter';
+import SentenceSenseAdapter from '../components/games/sentence-sense/SentenceSenseAdapter';
+import PlaceValueShowdownAdapter from '../components/games/place-value-showdown/PlaceValueShowdownAdapter';
 import WhackAMoleAdapter from '../components/games/whack-a-mole/WhackAMoleAdapter';
 import SpinnerWheel from '../components/games/spinner-wheel/SpinnerWheel';
-import PlaceValueShowdownAdapter from '../components/games/place-value-showdown/PlaceValueShowdownAdapter';
+import SortCategoriesEggRevealAdapter from '../components/games/sort-categories-egg-reveal/SortCategoriesEggRevealAdapter';
+import AnagramAdapter from '../components/games/anagram/AnagramAdapter';
 
-const GameByToken: React.FC = () => {
+
+interface Props {}
+
+const GameByToken: React.FC<Props> = () => {
+  // Enable PWA navigation listening for assignment focus behavior
+  usePWANavigation();
+  
+  // CRITICAL: Enable dedicated PWA message ACK handler
+  usePWAMessageAck();
+  
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || '';
   const navigate = useNavigate();
+  const location = useLocation();
+  const { currentUser: authContextUser } = useAuth(); // Rename to avoid conflict
+  const { isInstalled } = usePWA(); // Add PWA detection
   
   // Special flag for email link access which skips authentication
   const [isEmailLinkAccess, setIsEmailLinkAccess] = useState(false);
@@ -85,7 +104,7 @@ const GameByToken: React.FC = () => {
     return () => unsubscribe();
   }, [isEmailLinkAccess, assignment, searchParams]);
   
-  // Check for email link parameters on initial load
+  // Enhanced email link and PWA launcher parameter detection
   useEffect(() => {
     // Check if we came from an email link or direct token access route
     const currentUrl = window.location.href;
@@ -95,7 +114,7 @@ const GameByToken: React.FC = () => {
     const hasAssignmentId = referrer.includes('assignmentId=') || searchParams.get('assignmentId');
     const hasModeSignIn = currentUrl.includes('mode=signIn') || searchParams.get('mode') === 'signIn';
     
-    // Check direct token access from Login.tsx (add this check)
+    // Check direct token access from Login.tsx
     const directAccessParam = searchParams.get('directAccess');
     const hasDirectAccess = directAccessParam === 'true' || sessionStorage.getItem('direct_token_access') === 'true';
     
@@ -103,8 +122,14 @@ const GameByToken: React.FC = () => {
     const requireAuthParam = searchParams.get('requireAuth');
     const hasRequireAuth = requireAuthParam === 'true';
     
+    // Enhanced PWA launcher detection with type identification
+    const fromLauncher = searchParams.get('from') === 'launcher';
+    const emailAccess = searchParams.get('emailAccess') === 'true';
+    const pwaParam = searchParams.get('pwa') === 'true';
+    const pwaType = searchParams.get('pwa_type'); // 'game', 'student', 'launcher'
+    
     // Log all parameters to debug the detection
-    console.log('GameByToken: checking for token access mode:', {
+    console.log('GameByToken: Enhanced access mode detection:', {
       hasOobCodeInReferrer, 
       hasOobCodeInUrl, 
       hasAssignmentId, 
@@ -113,21 +138,88 @@ const GameByToken: React.FC = () => {
       hasDirectAccess,
       requireAuthParam,
       hasRequireAuth,
+      fromLauncher,
+      emailAccess,
+      pwaParam,
+      pwaType,
       referrer,
       tokenValue: token
     });
     
+    // Enhanced condition checking for email link access
     if ((hasOobCodeInReferrer || hasOobCodeInUrl) || 
         (hasAssignmentId) || 
         (hasModeSignIn) ||
         (hasDirectAccess) ||
-        (hasRequireAuth)) {
-      console.log('GameByToken: Detected special access mode - bypassing authentication requirement');
+        (hasRequireAuth) ||
+        (fromLauncher && emailAccess) ||
+        (pwaParam && token) ||
+        (pwaType === 'game' && token)) {
+      console.log('GameByToken: ✅ Enhanced special access mode detected - enabling email link access');
       setIsEmailLinkAccess(true);
       
       // Store flag in session storage to persist across page reloads
       sessionStorage.setItem('direct_token_access', 'true');
     }
+    
+    // Check for existing PWA window if this is from email (separate from the above conditions)
+    const fromEmail = searchParams.get('from') === 'email';
+    console.log('GameByToken: Email check debug:', {
+      fromEmail,
+      token,
+      fromParam: searchParams.get('from'),
+      allParams: Object.fromEntries(searchParams.entries())
+    });
+    
+    // Service Worker-based window management - listen for close messages
+    console.log(`GameByToken: 🎯 Service Worker window management enabled`);
+    console.log('GameByToken: Source details:', { fromEmail, token, pwaType, fromParam: searchParams.get('from') });
+    
+    // Mark this as an email/JavaScript launched window (can be auto-closed)
+    window.name = 'assignment-window';
+    localStorage.setItem('pwa_origin', fromEmail ? 'email_link' : 'javascript');
+    console.log('GameByToken: Marked window as email/JS launched (auto-closeable)');
+    
+    // Tell service worker to close existing assignment windows
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'CLOSE_EXISTING_ASSIGNMENT_WINDOWS',
+        token: token,
+        timestamp: Date.now()
+      });
+    }
+    
+    // Listen for service worker messages
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      console.log('GameByToken: 🎵 Received service worker message:', event.data);
+      
+      if (event.data?.type === 'FORCE_CLOSE_LAUNCHER') {
+        console.log('GameByToken: 🔄 Service worker requesting window close');
+        
+        const wasUserLaunched = localStorage.getItem('pwa_origin') === 'device_icon';
+        console.log('GameByToken: Was user launched (device icon):', wasUserLaunched);
+        
+        if (wasUserLaunched) {
+          console.log('GameByToken: 🚨 Cannot auto-close device icon window, showing user message');
+          alert('Please close this tab manually. A newer game window has been launched.');
+        } else {
+          console.log('GameByToken: 🔄 Auto-closing email/JS-opened window');
+          window.close();
+        }
+      }
+      
+      if (event.data?.type === 'NAVIGATE_TO_ASSIGNMENT') {
+        console.log('GameByToken: 🔄 Service worker requesting navigation');
+        // Handle navigation if needed
+      }
+    };
+    
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    
+    // Cleanup function
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+    };
     
     // Additional token check - if token is in URL directly from email link
     const urlParams = new URLSearchParams(window.location.search);
@@ -145,6 +237,29 @@ const GameByToken: React.FC = () => {
       }
     }
   }, [searchParams, token]);
+
+  // Listen for close messages from service worker (DISABLED - using PWA type-based management)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      // New approach: Service worker only manages launchers, not game windows
+      // Game windows manage themselves through BroadcastChannel
+      
+      // Log service worker messages for debugging
+      if (event.data && event.data.type) {
+        console.log('GameByToken: Received service worker message:', event.data.type, event.data);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+    };
+  }, [token]);
+
+  // Removed complex service worker window management - now using simple BroadcastChannel approach
   
   useEffect(() => {
     // Validate token parameter
@@ -264,12 +379,41 @@ const GameByToken: React.FC = () => {
         console.log('Pre-filled auth email:', assignment.studentEmail);
       }
       
-      // Auto-set student name from assignment data
+      // Fetch student name from users collection
       if (assignment.studentEmail) {
-        // Use part of email as student name
-        const fallbackName = assignment.studentEmail.split('@')[0];
-        setStudentName(fallbackName);
-        console.log('Auto-set student name from email:', fallbackName);
+        try {
+          console.log('Fetching student name from users collection for email:', assignment.studentEmail);
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('email', '==', assignment.studentEmail.toLowerCase()),
+            limit(1)
+          );
+          const usersSnapshot = await getDocs(usersQuery);
+          
+          if (!usersSnapshot.empty) {
+            const userData = usersSnapshot.docs[0].data();
+            if (userData.name) {
+              setStudentName(userData.name);
+              console.log('Found student name in users collection:', userData.name);
+            } else {
+              // Fallback to email prefix if no name field
+              const fallbackName = assignment.studentEmail.split('@')[0];
+              setStudentName(fallbackName);
+              console.log('No name field in user document, using email prefix:', fallbackName);
+            }
+          } else {
+            // No user found in collection, use email prefix
+            const fallbackName = assignment.studentEmail.split('@')[0];
+            setStudentName(fallbackName);
+            console.log('No user found in users collection, using email prefix:', fallbackName);
+          }
+        } catch (error) {
+          console.error('Error fetching student name from users collection:', error);
+          // Fallback to email prefix on error
+          const fallbackName = assignment.studentEmail.split('@')[0];
+          setStudentName(fallbackName);
+          console.log('Error fetching student name, using email prefix:', fallbackName);
+        }
       }
     } catch (err) {
       console.error('Error loading game by token:', err);
@@ -391,76 +535,187 @@ const GameByToken: React.FC = () => {
     }
   };
   
-  // Add this new useEffect to automatically start game for email link users
+  // Enhanced auto-start useEffect with comprehensive debugging and better condition checking
   useEffect(() => {
-    console.log('Auto-start effect triggered with:', {
-      isEmailLinkAccess,
-      loading,
-      isPlaying,
-      hasAssignment: !!assignment,
-      hasStudentEmail: assignment?.studentEmail,
-      hasAutoStarted,
-      currentStudentName: studentName
-    });
-    
-    if (
-      isEmailLinkAccess &&
-      !loading &&
-      !isPlaying &&
-      assignment &&
-      assignment.studentEmail &&
-      !hasAutoStarted // Only auto-start once
-    ) {
-      console.log('Auto starting game for email link user with email:', assignment.studentEmail);
+    const handleAutoStart = async () => {
+      const debugInfo = {
+        isEmailLinkAccess,
+        loading,
+        isPlaying,
+        hasAssignment: !!assignment,
+        hasGameConfig: !!gameConfig,
+        hasStudentEmail: assignment?.studentEmail,
+        hasAutoStarted,
+        currentStudentName: studentName,
+        isAuthenticated,
+        hasCurrentUser: !!currentUser,
+        gameType: gameConfig?.type
+      };
       
-      // Set student name immediately
-      let nameToUse = studentName;
-      if (!nameToUse && assignment.studentName) {
-        nameToUse = assignment.studentName;
-        setStudentName(assignment.studentName);
-      } else if (!nameToUse) {
-        nameToUse = assignment.studentEmail.split('@')[0];
-        setStudentName(assignment.studentEmail.split('@')[0]);
+      console.log('GameByToken: Enhanced auto-start effect triggered with:', debugInfo);
+      
+      // Enhanced condition checking with more detailed logging
+      const canAutoStart = (
+        isEmailLinkAccess &&
+        !loading &&
+        !isPlaying &&
+        assignment &&
+        gameConfig &&
+        assignment.studentEmail &&
+        !hasAutoStarted
+      );
+      
+      if (canAutoStart) {
+        console.log('GameByToken: ✅ All auto-start conditions met! Initiating auto-start sequence...');
+        console.log('GameByToken: Starting auto-start for game type:', gameConfig.type);
+        
+        // Set student name immediately with fallback chain
+        let nameToUse = studentName;
+        if (!nameToUse) {
+          // If studentName is not already set, try to get it from users collection
+          try {
+            const usersQuery = query(
+              collection(db, 'users'),
+              where('email', '==', assignment.studentEmail.toLowerCase()),
+              limit(1)
+            );
+            const usersSnapshot = await getDocs(usersQuery);
+            
+            if (!usersSnapshot.empty) {
+              const userData = usersSnapshot.docs[0].data();
+              if (userData.name) {
+                nameToUse = userData.name;
+                setStudentName(userData.name);
+                console.log('GameByToken: Found student name in users collection for auto-start:', userData.name);
+              }
+            }
+          } catch (error) {
+            console.error('GameByToken: Error fetching student name for auto-start:', error);
+          }
+          
+          // If still no name, use fallbacks
+          if (!nameToUse && assignment.studentName) {
+            nameToUse = assignment.studentName;
+            setStudentName(assignment.studentName);
+            console.log('GameByToken: Using assignment student name:', assignment.studentName);
+          } else if (!nameToUse) {
+            nameToUse = assignment.studentEmail.split('@')[0];
+            setStudentName(assignment.studentEmail.split('@')[0]);
+            console.log('GameByToken: Using email prefix as name:', nameToUse);
+          }
+        }
+        
+        // Mark name as submitted to bypass any popup
+        setStudentNameSubmitted(true);
+        
+        // Ensure authentication state is properly set for email access
+        if (!isAuthenticated) {
+          console.log('GameByToken: Setting authentication state for email link access');
+          setIsAuthenticated(true);
+        }
+        
+        // Create synthetic user if needed
+        if (!currentUser) {
+          const syntheticUser = {
+            email: assignment.studentEmail,
+            displayName: assignment.studentName || assignment.studentEmail.split('@')[0]
+          };
+          setCurrentUser(syntheticUser);
+          console.log('GameByToken: Created synthetic user for auto-start:', syntheticUser);
+        }
+        
+        // Enhanced auto-start with better delay and comprehensive debugging
+        setTimeout(() => {
+          console.log('GameByToken: 🚀 Executing enhanced auto-start sequence...');
+          console.log('GameByToken: Final student name for auto-start:', nameToUse);
+          console.log('GameByToken: Game config type:', gameConfig.type);
+          
+          setIsPlaying(true);
+          setStartTime(new Date());
+          setHasAutoStarted(true);
+          
+          console.log('GameByToken: ✅ Enhanced auto-start completed successfully!');
+          console.log('GameByToken: State after auto-start - isPlaying: true, hasAutoStarted: true');
+        }, 200); // Optimized delay for state consistency
+      } else if (isEmailLinkAccess && !hasAutoStarted) {
+        console.log('GameByToken: ❌ Auto-start conditions not satisfied:', {
+          'loading': loading,
+          'isPlaying': isPlaying,
+          'hasAssignment': !!assignment,
+          'hasGameConfig': !!gameConfig,
+          'hasStudentEmail': assignment?.studentEmail,
+          'assignmentType': assignment?.gameType,
+          'gameConfigType': gameConfig?.type
+        });
       }
-      
-      // Mark name as submitted to bypass any popup
-      setStudentNameSubmitted(true);
-      
-      // Auto-start the game with a short delay
-      setTimeout(() => {
-        console.log('GameByToken: Auto-starting game in email link mode with student name:', nameToUse);
-        setIsPlaying(true);
-        setStartTime(new Date());
-        setHasAutoStarted(true); // Prevent future auto-starts
-      }, 100); // Reduced delay to make it faster
-    }
-  }, [isEmailLinkAccess, loading, isPlaying, assignment, studentName, hasAutoStarted]);
+    };
+    
+    handleAutoStart();
+  }, [isEmailLinkAccess, loading, isPlaying, assignment, gameConfig, studentName, hasAutoStarted, isAuthenticated, currentUser]);
   
   // Additional effect to force immediate start for email link users when conditions are met
   useEffect(() => {
-    if (isEmailLinkAccess && assignment && !loading && !hasAutoStarted) {
-      console.log('Forcing immediate setup for email link user');
-      
-      // Immediately set up the student name and bypass the form
-      if (assignment.studentName) {
-        setStudentName(assignment.studentName);
-      } else if (assignment.studentEmail) {
-        setStudentName(assignment.studentEmail.split('@')[0]);
+    const setupStudentName = async () => {
+      if (isEmailLinkAccess && assignment && !loading && !hasAutoStarted) {
+        console.log('Forcing immediate setup for email link user');
+        
+        // Immediately set up the student name from users collection first
+        try {
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('email', '==', assignment.studentEmail.toLowerCase()),
+            limit(1)
+          );
+          const usersSnapshot = await getDocs(usersQuery);
+          
+          if (!usersSnapshot.empty) {
+            const userData = usersSnapshot.docs[0].data();
+            if (userData.name) {
+              setStudentName(userData.name);
+              console.log('GameByToken: Found student name for immediate setup:', userData.name);
+            } else {
+              // Fallback logic if no name field
+              if (assignment.studentName) {
+                setStudentName(assignment.studentName);
+              } else if (assignment.studentEmail) {
+                setStudentName(assignment.studentEmail.split('@')[0]);
+              }
+            }
+          } else {
+            // Fallback logic if no user found
+            if (assignment.studentName) {
+              setStudentName(assignment.studentName);
+            } else if (assignment.studentEmail) {
+              setStudentName(assignment.studentEmail.split('@')[0]);
+            }
+          }
+        } catch (error) {
+          console.error('GameByToken: Error fetching student name for immediate setup:', error);
+          // Fallback logic on error
+          if (assignment.studentName) {
+            setStudentName(assignment.studentName);
+          } else if (assignment.studentEmail) {
+            setStudentName(assignment.studentEmail.split('@')[0]);
+          }
+        }
+        
+        setStudentNameSubmitted(true);
+        
+        // Force authentication state for email link users
+        setIsAuthenticated(true);
+        
+        // Create synthetic user if needed
+        if (!currentUser) {
+          const syntheticUser = {
+            email: assignment.studentEmail,
+            displayName: assignment.studentName || assignment.studentEmail.split('@')[0]
+          };
+          setCurrentUser(syntheticUser);
+        }
       }
-      setStudentNameSubmitted(true);
-      
-      // Force authentication state for email link users
-      setIsAuthenticated(true);
-      
-      // Create synthetic user if needed
-      if (!currentUser) {
-        const syntheticUser = {
-          email: assignment.studentEmail,
-          displayName: assignment.studentName || assignment.studentEmail.split('@')[0]
-        };
-        setCurrentUser(syntheticUser);
-      }
-    }
+    };
+    
+    setupStudentName();
   }, [isEmailLinkAccess, assignment, loading, hasAutoStarted, currentUser]);
   
   // Add a new useEffect at the component top level to force bypassing authentication on direct access
@@ -481,6 +736,22 @@ const GameByToken: React.FC = () => {
       sessionStorage.setItem('direct_token_access', 'true');
     }
   }, []);
+  
+  // Debug effect to track render state
+  useEffect(() => {
+    if (assignment && gameConfig) {
+      console.log('GameByToken: Rendering state update:', {
+        hasAssignment: !!assignment,
+        hasGameConfig: !!gameConfig,
+        gameType: gameConfig?.type,
+        isPlaying: isPlaying,
+        isEmailLinkAccess: isEmailLinkAccess,
+        isAuthenticated: isAuthenticated,
+        hasAutoStarted: hasAutoStarted,
+        loading: loading
+      });
+    }
+  }, [assignment, gameConfig, isPlaying, isEmailLinkAccess, isAuthenticated, hasAutoStarted, loading]);
   
   // Update handleGameComplete to NOT reload immediately after attempt save
   const handleGameComplete = async (score: number) => {
@@ -779,10 +1050,11 @@ const GameByToken: React.FC = () => {
     
     // If playing the game, render the appropriate game component
     if (isPlaying && assignment && gameConfig) {
+      console.log('GameByToken: Rendering game with type:', gameConfig.type);
       switch (gameConfig.type) {
-        case 'sort-categories-egg':
+        case 'sentence-sense':
           return (
-            <SortCategoriesEggRevealAdapter
+            <SentenceSenseAdapter
               config={gameConfig}
               onGameComplete={handleGameComplete}
               playerName={studentName}
@@ -817,9 +1089,31 @@ const GameByToken: React.FC = () => {
               onHighScoreProcessComplete={handleHighScoreProcessComplete}
             />
           );
-        default:
+        case 'sort-categories-egg-reveal':
           return (
-            <div>Unsupported game type</div>
+            <SortCategoriesEggRevealAdapter
+              config={gameConfig}
+              onGameComplete={handleGameComplete}
+              playerName={studentName}
+              onHighScoreProcessStart={handleHighScoreProcessStart}
+              onHighScoreProcessComplete={handleHighScoreProcessComplete}
+            />
+          );
+        case 'anagram':
+          return (
+            <AnagramAdapter
+              config={gameConfig}
+              onGameComplete={handleGameComplete}
+              playerName={studentName}
+              onHighScoreProcessStart={handleHighScoreProcessStart}
+              onHighScoreProcessComplete={handleHighScoreProcessComplete}
+            />
+          );
+
+        default:
+          console.error('GameByToken: Unsupported game type:', gameConfig.type);
+          return (
+            <div>Unsupported game type: {gameConfig.type}</div>
           );
       }
     }
@@ -1530,12 +1824,17 @@ const GameByToken: React.FC = () => {
           
           {/* Only show the game if authenticated or after they've submitted their name */}
           {!isPlaying ? (
+            <div>
+              <p style={{ marginBottom: 'var(--spacing-4)', color: 'var(--color-gray-600)' }}>
+                Ready to start your assignment: <strong>{gameConfig.name}</strong>
+              </p>
               <button
                 onClick={handleStartGame}
-              className="mt-4 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
+                className="mt-4 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold"
               >
                 Start Game
               </button>
+            </div>
           ) : (
             <div style={{ 
               backgroundColor: 'white',

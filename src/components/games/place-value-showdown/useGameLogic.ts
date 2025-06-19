@@ -103,16 +103,34 @@ export const useGameLogic = (
       const teacherNum = calculateNumber(gameState.teacherCards);
       const winner = determineRoundWinner(studentNum, teacherNum, config.objective);
 
+      // Update scores immediately when round is complete
+      const updatedStudentScore = gameState.studentScore + (winner === 'student' ? 1 : 0);
+      const updatedTeacherScore = gameState.teacherScore + (winner === 'teacher' ? 1 : 0);
+
       setGameState(prev => ({
         ...prev,
         phase: 'revealing',
         studentNumber: studentNum,
         teacherNumber: teacherNum,
         roundWinner: winner,
+        studentScore: updatedStudentScore,
+        teacherScore: updatedTeacherScore,
         message: "Let's see who made the better number!"
       }));
+
+      // Check if game is complete
+      if (updatedStudentScore >= config.winningScore || updatedTeacherScore >= config.winningScore) {
+        setTimeout(() => {
+          const gameWinner = updatedStudentScore > updatedTeacherScore ? config.playerName : config.teacherName;
+          setGameState(prev => ({
+            ...prev,
+            phase: 'gameComplete',
+            message: `🎉 That's game! The final score is: ${config.teacherName} ${updatedTeacherScore}, ${config.playerName} ${updatedStudentScore}. And the grand winner is... ${gameWinner}! Great job practicing place value!`
+          }));
+        }, 2000); // Give time to see the round results before showing game complete message
+      }
     }
-  }, [gameState.isStudentReady, gameState.isTeacherReady, gameState.phase, config.objective]);
+  }, [gameState.isStudentReady, gameState.isTeacherReady, gameState.phase, gameState.studentScore, gameState.teacherScore, config.objective, config.winningScore, config.playerName, config.teacherName]);
 
   // Check if student is ready when all cards are placed
   useEffect(() => {
@@ -201,33 +219,19 @@ export const useGameLogic = (
 
   // Handle advancement to next round
   const handleAdvanceToNextRound = useCallback(() => {
-    const winner = gameState.roundWinner;
-    if (!winner) return;
+    if (!gameState.roundWinner) return;
 
-    const updatedStudentScore = gameState.studentScore + (winner === 'student' ? 1 : 0);
-    const updatedTeacherScore = gameState.teacherScore + (winner === 'teacher' ? 1 : 0);
-    
-    if (updatedStudentScore >= config.winningScore || updatedTeacherScore >= config.winningScore) {
-      const gameWinner = updatedStudentScore > updatedTeacherScore ? config.playerName : config.teacherName;
-      setGameState(prev => ({
-        ...prev,
-        phase: 'gameComplete',
-        studentScore: updatedStudentScore,
-        teacherScore: updatedTeacherScore,
-        message: `🎉 That's game! The final score is: ${config.teacherName} ${updatedTeacherScore}, ${config.playerName} ${updatedStudentScore}. And the grand winner is... ${gameWinner}! Great job practicing place value!`
-      }));
+    // Check if game is already complete (scores have been updated in the round completion effect)
+    if (gameState.studentScore >= config.winningScore || gameState.teacherScore >= config.winningScore) {
+      // Game is complete, scores are already updated, no need to start new round
+      return;
     } else {
-      setGameState(prev => ({
-        ...prev,
-        studentScore: updatedStudentScore,
-        teacherScore: updatedTeacherScore
-      }));
-      
+      // Start the next round after a brief delay
       setTimeout(() => {
         startNewRound();
       }, 500);
     }
-  }, [gameState.roundWinner, gameState.studentScore, gameState.teacherScore, config, startNewRound]);
+  }, [gameState.roundWinner, gameState.studentScore, gameState.teacherScore, config.winningScore, startNewRound]);
 
   // Update ghost position on mouse move
   const updateGhostPosition = useCallback((position: { x: number; y: number }) => {

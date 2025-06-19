@@ -142,6 +142,12 @@ export const makeTeacherMove = (cards: Card[], config: PlaceValueShowdownConfig)
   
   let sortedCards = [...cards];
   
+  console.log(`🤖 TEACHER MOVE:`, {
+    objective,
+    aiDifficulty,
+    originalCards: cards.map(c => c.digit)
+  });
+  
   if (aiDifficulty === 'easy') {
     // Random arrangement
     sortedCards = cards.sort(() => Math.random() - 0.5);
@@ -160,6 +166,8 @@ export const makeTeacherMove = (cards: Card[], config: PlaceValueShowdownConfig)
       objective === 'largest' ? b.digit - a.digit : a.digit - b.digit
     );
   }
+  
+  console.log(`🤖 TEACHER ARRANGED:`, sortedCards.map(c => c.digit));
   
   return sortedCards.map((card, index) => ({
     ...card,
@@ -189,6 +197,13 @@ export const determineRoundWinner = (
   teacherNumber: number, 
   objective: 'largest' | 'smallest'
 ): 'student' | 'teacher' | 'tie' => {
+  console.log(`🎯 WINNER DETERMINATION:`, {
+    studentNumber,
+    teacherNumber,
+    objective,
+    studentWins: objective === 'smallest' ? studentNumber < teacherNumber : studentNumber > teacherNumber
+  });
+  
   if (objective === 'largest') {
     return studentNumber > teacherNumber ? 'student' : 
            teacherNumber > studentNumber ? 'teacher' : 'tie';

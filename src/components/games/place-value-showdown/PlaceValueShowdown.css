@@ -10,10 +10,17 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #333;
-  font-family: 'Comic Sans MS', 'Trebuchet MS', cursive, sans-serif;
-  padding: 10px;
+  font-family: 'Comic Neue', 'Comic Sans MS', 'Trebuchet MS', cursive, sans-serif;
+  padding: 60px 10px 10px 10px; /* Added top padding for PWA header */
   position: relative;
   overflow-x: hidden;
+}
+
+/* Ensure all text elements within the game use Comic Neue */
+.place-value-showdown *,
+.place-value-showdown *::before,
+.place-value-showdown *::after {
+  font-family: 'Comic Neue', 'Comic Sans MS', 'Trebuchet MS', cursive, sans-serif !important;
 }
 
 /* Game Area Layout */
@@ -300,13 +307,15 @@
   justify-content: center;
   gap: 12px;
   margin-bottom: 15px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* Changed from wrap to nowrap to prevent multiple rows */
   border: 3px dashed #4ecdc4;
   border-radius: 15px;
   padding: 15px;
   background: rgba(78, 205, 196, 0.05);
   width: fit-content;
   margin: 0 auto 15px auto;
+  max-width: 100%;
+  overflow-x: auto; /* Add horizontal scrolling if needed on very small screens */
 }
 
 .slot-container {
@@ -588,7 +597,7 @@
 
 @media (max-width: 768px) {
   .place-value-showdown {
-    padding: 8px;
+    padding: 55px 8px 8px 8px; /* Adjusted top padding for PWA header on tablet */
   }
 
   .game-header h2 {
@@ -609,19 +618,21 @@
   }
 
   .number-slots {
-    gap: 10px;
-    padding: 12px;
+    gap: 8px; /* Reduced gap for better fit */
+    padding: 10px;
+    min-width: 100%; /* Ensure it takes full width available */
   }
 
   .number-slot {
-    width: 55px;
-    height: 55px;
+    width: 50px; /* Slightly smaller for tablets */
+    height: 50px;
+    flex-shrink: 0; /* Prevent slots from shrinking further */
   }
 
   .card {
-    width: 55px;
-    height: 55px;
-    font-size: 1.4rem;
+    width: 50px; /* Match slot size */
+    height: 50px;
+    font-size: 1.3rem;
   }
 
   .game-message p {
@@ -677,19 +688,21 @@
   }
 
   .number-slots {
-    gap: 8px;
-    padding: 10px;
+    gap: 6px; /* Reduced gap to fit more digits */
+    padding: 8px;
+    min-width: 100%; /* Ensure it takes full width available */
   }
 
   .number-slot {
-    width: 50px;
-    height: 50px;
+    width: 45px; /* Smaller slots for mobile to fit more digits */
+    height: 45px;
+    flex-shrink: 0; /* Prevent slots from shrinking further */
   }
 
   .card {
-    width: 50px;
-    height: 50px;
-    font-size: 1.3rem;
+    width: 45px; /* Match smaller slot size */
+    height: 45px;
+    font-size: 1.2rem; /* Slightly smaller font to fit in smaller cards */
   }
 
   .student-deck {
@@ -730,5 +743,33 @@
 
   .student-deck-container {
     margin: 10px 0;
+  }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN - EXTRA SMALL MOBILE (320px and below)
+   ============================================ */
+
+@media (max-width: 320px) {
+  .number-slots {
+    gap: 4px; /* Even smaller gap for very small screens */
+    padding: 6px;
+    justify-content: flex-start; /* Align to start to allow scrolling */
+  }
+
+  .number-slot {
+    width: 40px; /* Even smaller slots for very small screens */
+    height: 40px;
+  }
+
+  .card {
+    width: 40px; /* Match slot size */
+    height: 40px;
+    font-size: 1.1rem; /* Smaller font for tiny cards */
+  }
+
+  .comma-separator {
+    font-size: 1.5rem; /* Smaller comma for tiny screens */
+    margin: 0 2px;
   }
 } 

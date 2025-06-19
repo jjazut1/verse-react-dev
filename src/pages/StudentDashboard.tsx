@@ -5,6 +5,8 @@ import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Assignment, Attempt } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { PWAInstallBanner } from '../components/PWAInstallBanner';
+import { usePWA } from '../hooks/usePWA';
 
 // Define Game interface based on TeacherDashboard.tsx
 interface Game {
@@ -41,6 +43,10 @@ const StudentDashboard: React.FC = () => {
   const queryParams = new URLSearchParams(location.search);
   const studentId = queryParams.get('id');
   const isTeacherView = queryParams.get('teacherView') === 'true';
+  const pwaInstall = queryParams.get('pwa'); // Check for PWA installation parameter
+  
+  // PWA hook for installation functionality
+  const { installPWA, showInstallPrompt, isInstallable } = usePWA();
   
   const [studentData, setStudentData] = useState<any>(null);
   const [currentUserData, setCurrentUserData] = useState<any>(null);
@@ -51,6 +57,9 @@ const StudentDashboard: React.FC = () => {
   const [gameConfigs, setGameConfigs] = useState<{[key: string]: any}>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('assignments');
+  
+  // PWA installation state
+  const [showPWAPrompt, setShowPWAPrompt] = useState(false);
   
   // Enhanced high scores state
   const [enhancedHighScores, setEnhancedHighScores] = useState<HighScore[]>([]);
@@ -73,6 +82,36 @@ const StudentDashboard: React.FC = () => {
       [key: string]: any;
     } | null;
   }
+
+  // Handle PWA installation from email links
+  useEffect(() => {
+    if (pwaInstall === 'install' && isInstallable) {
+      // Show PWA installation prompt after a brief delay to ensure page is loaded
+      const timer = setTimeout(() => {
+        setShowPWAPrompt(true);
+        console.log('📱 PWA installation prompted from email link');
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [pwaInstall, isInstallable]);
+
+  // Handle PWA installation action
+  const handlePWAInstall = async () => {
+    try {
+      await installPWA();
+      setShowPWAPrompt(false);
+      
+      // Clean up URL parameter after installation attempt
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('pwa');
+      window.history.replaceState({}, '', newUrl.toString());
+      
+      console.log('✅ PWA installation completed from Student Dashboard');
+    } catch (error) {
+      console.error('❌ PWA installation failed:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1666,6 +1705,148 @@ const StudentDashboard: React.FC = () => {
           </p>
         </div>
       </div>
+      
+      {/* PWA Install Banner - Only show for actual students, not teacher view */}
+      {!isTeacherView && <PWAInstallBanner />}
+      
+      {/* PWA Installation Modal - Show when triggered from email */}
+      {showPWAPrompt && !isTeacherView && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '30px',
+            maxWidth: '500px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+            position: 'relative'
+          }}>
+            {/* Header with gradient background */}
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              margin: '-30px -30px 20px -30px',
+              padding: '25px 30px',
+              borderRadius: '16px 16px 0 0'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '10px' }}>📱</div>
+              <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>
+                Install Lumino Learning App
+              </h2>
+            </div>
+            
+            <div style={{ marginBottom: '25px' }}>
+              <p style={{ 
+                fontSize: '18px', 
+                color: colors.text, 
+                marginBottom: '15px',
+                lineHeight: 1.6
+              }}>
+                🚀 <strong>Get the best learning experience!</strong>
+              </p>
+              <p style={{ 
+                fontSize: '16px', 
+                color: colors.textLight,
+                lineHeight: 1.6
+              }}>
+                Install Lumino Learning as an app for faster access, 
+                offline capabilities, and a native app experience!
+              </p>
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '12px', 
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <button
+                onClick={handlePWAInstall}
+                style={{
+                  backgroundColor: colors.primary,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '15px 25px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(66, 153, 225, 0.3)',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3182CE';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = colors.primary;
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                📱 Install App
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowPWAPrompt(false);
+                  // Clean up URL parameter
+                  const newUrl = new URL(window.location.href);
+                  newUrl.searchParams.delete('pwa');
+                  window.history.replaceState({}, '', newUrl.toString());
+                }}
+                style={{
+                  backgroundColor: 'transparent',
+                  color: colors.textLight,
+                  border: `2px solid ${colors.textLight}`,
+                  borderRadius: '12px',
+                  padding: '13px 25px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = colors.textLight;
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = colors.textLight;
+                }}
+              >
+                Maybe Later
+              </button>
+            </div>
+            
+            <div style={{
+              marginTop: '20px',
+              padding: '15px',
+              backgroundColor: '#F0FFF4',
+              borderRadius: '8px',
+              fontSize: '14px',
+              color: '#2F855A'
+            }}>
+              ✨ <strong>Benefits:</strong> Faster loading, works offline, and feels like a native app!
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Tab navigation */}
       <div style={{ 

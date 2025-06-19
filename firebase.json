@@ -41,6 +41,18 @@
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [
         {
+          "source": "/launch**",
+          "destination": "/launch.html"
+        },
+        {
+          "source": "/launcher.html**",
+          "destination": "/launch.html"
+        },
+        {
+          "source": "/launch.html**",
+          "destination": "/launch.html"
+        },
+        {
           "source": "/play/*",
           "destination": "/token-redirect.html"
         },

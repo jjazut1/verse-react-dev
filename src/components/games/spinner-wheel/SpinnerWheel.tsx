@@ -5,6 +5,7 @@ import { useGameLogic } from './useGameLogic';
 import { WheelRenderer } from './WheelRenderer';
 import { ZoomedControls } from './ZoomedControls';
 import { GameControls } from './GameControls';
+import PWAGameHeader from '../PWAGameHeader';
 
 const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   onGameComplete,
@@ -29,11 +30,18 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
       h="100vh" 
       bg="#E6F3FF" 
       display="flex"
-      justifyContent="center"
-      alignItems="center"
+      flexDirection="column"
       zIndex={1}
       overflow="auto"
     >
+      <PWAGameHeader gameTitle="Spinner Wheel" variant="compact" />
+      
+      <Box
+        flex="1"
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+      >
       <Box 
         maxW="600px" 
         p={6} 
@@ -91,6 +99,7 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
             onReset={gameLogic.resetGame}
           />
         </VStack>
+      </Box>
       </Box>
     </Box>
   );

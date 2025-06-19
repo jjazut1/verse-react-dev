@@ -14,6 +14,7 @@ import GameHeader from './GameHeader';
 import GameArea from './GameArea';
 import GameComplete from './GameComplete';
 import HighScoreModal from './HighScoreModal';
+import PWAGameHeader from '../PWAGameHeader';
 
 const Anagram: React.FC<AnagramProps> = ({
   playerName,
@@ -34,17 +35,25 @@ const Anagram: React.FC<AnagramProps> = ({
 
   // Start screen
   if (!gameLogic.gameState.gameStarted) {
-    return <StartScreen config={config} onStartGame={gameLogic.startGame} />;
+    return (
+      <Box>
+        <PWAGameHeader gameTitle="Anagram" variant="compact" />
+        <StartScreen config={config} onStartGame={gameLogic.startGame} />
+      </Box>
+    );
   }
 
   // Game complete screen
   if (gameLogic.gameState.gameCompleted) {
     return (
-      <GameComplete
-        gameState={gameLogic.gameState}
-        formatTime={gameLogic.formatTime}
-        onResetGame={gameLogic.resetGame}
-      />
+      <Box>
+        <PWAGameHeader gameTitle="Anagram" variant="compact" />
+        <GameComplete
+          gameState={gameLogic.gameState}
+          formatTime={gameLogic.formatTime}
+          onResetGame={gameLogic.resetGame}
+        />
+      </Box>
     );
   }
 
@@ -53,6 +62,7 @@ const Anagram: React.FC<AnagramProps> = ({
   if (!currentAnagram) {
     return (
       <Box minH="100vh" bg={bgColor}>
+        <PWAGameHeader gameTitle="Anagram" variant="compact" />
         <Center h="100vh">
           <VStack spacing={4}>
             <Spinner size="xl" color="purple.500" thickness="4px" />
@@ -66,6 +76,8 @@ const Anagram: React.FC<AnagramProps> = ({
   // Main game screen
   return (
     <Box minH="100vh" bg={bgColor} p={4}>
+      <PWAGameHeader gameTitle="Anagram" variant="compact" />
+      
       <VStack spacing={6} maxW="4xl" mx="auto">
         <GameHeader 
           gameState={gameLogic.gameState} 

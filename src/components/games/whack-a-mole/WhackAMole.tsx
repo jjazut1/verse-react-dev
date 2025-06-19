@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Text,
@@ -25,6 +26,7 @@ import Scene from './Scene';
 import { WhackAMoleConfig } from '../../../types/game';
 import { sanitizeName, isValidPlayerName } from '../../../utils/profanityFilter';
 import { useAuth } from '../../../contexts/AuthContext';
+import PWAGameHeader from '../PWAGameHeader';
 
 interface WhackAMoleProps {
   playerName: string;
@@ -51,7 +53,8 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
   onHighScoreProcessStart,
   onHighScoreProcessComplete,
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isTeacher, isStudent } = useAuth();
+  const navigate = useNavigate();
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(config.gameTime);
   const [gameStarted, setGameStarted] = useState(false);
@@ -389,10 +392,21 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
       console.log('Notifying parent: high score process complete (after modal close)');
       onHighScoreProcessComplete();
     }
+    
+    // Navigate based on user role
+    if (isTeacher) {
+      navigate('/teacher');
+    } else if (isStudent) {
+      navigate('/student');
+    } else {
+      navigate('/');
+    }
   };
 
   return (
     <Box width="100%" height="100vh" position="relative">
+      <PWAGameHeader gameTitle="Whack-a-Mole" variant="compact" />
+      
       {/* Game UI */}
       <Box
         position="absolute"

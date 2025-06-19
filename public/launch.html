@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launching Lumino Learning...</title>
+    
+    <!-- Meta refresh fallback for email clients that block JavaScript -->
+    <script>
+        // Immediate meta refresh for token URLs
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (token) {
+            const redirectUrl = window.location.origin + '/play?token=' + encodeURIComponent(token) + '&pwa=true&pwa_type=game&from=launcher&emailAccess=true&metaRefresh=true';
+            document.write('<meta http-equiv="refresh" content="0;url=' + redirectUrl + '">');
+            console.log('META REFRESH REDIRECT to:', redirectUrl);
+        }
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        
+        .status {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 20px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        .fallback-button {
+            display: inline-block; /* Always show the button */
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+        
+        .fallback-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .ios-notice {
+            display: none;
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid rgba(255, 193, 7, 0.5);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📱</div>
+        <div class="title">Launching Lumino Learning</div>
+        <div class="subtitle">Detecting the best way to open your content...</div>
+        <div class="spinner"></div>
+        <div class="status" id="status">Checking for installed app...</div>
+        
+        <a href="#" class="fallback-button" id="fallbackButton">
+            Continue in Browser
+        </a>
+        
+        <!-- Immediately set fallback button URL -->
+        <script>
+            (function() {
+                const params = new URLSearchParams(window.location.search);
+                const token = params.get('token');
+                const target = params.get('target');
+                
+                let fallbackUrl;
+                if (token) {
+                    fallbackUrl = window.location.origin + '/play?token=' + encodeURIComponent(token) + '&pwa=true&pwa_type=game&from=launcher&emailAccess=true&manual=true';
+                } else if (target) {
+                    fallbackUrl = window.location.origin + decodeURIComponent(target);
+                } else {
+                    fallbackUrl = window.location.origin + '/student';
+                }
+                
+                const button = document.getElementById('fallbackButton');
+                if (button) {
+                    button.href = fallbackUrl;
+                    console.log('🔵 Fallback button URL set to:', fallbackUrl);
+                }
+            })();
+        </script>
+        
+        <div class="ios-notice" id="iosNotice">
+            <strong>📱 iOS Users:</strong> If you have the Lumino Learning app installed, 
+            you may need to manually switch to it after this page loads.
+        </div>
+    </div>
+
+    <script>
+        // Immediate logging to confirm script execution
+        console.log('[LAUNCHER INIT] 🚀 Launch script executing immediately!');
+        console.log('[LAUNCHER INIT] 🚀 Location:', window.location.href);
+        console.log('[LAUNCHER INIT] 🚀 User Agent:', navigator.userAgent);
+        console.log('[LAUNCHER INIT] 🚀 Referrer:', document.referrer);
+        
+        // Enhanced debugging without blocking alert
+        console.log('[LAUNCHER DEBUG] Script started! URL: ' + window.location.href);
+        
+        // IMMEDIATE TOKEN REDIRECT - runs before anything else
+        const immediateParams = new URLSearchParams(window.location.search);
+        const immediateToken = immediateParams.get('token');
+        if (immediateToken) {
+            console.log('🚨 IMMEDIATE TOKEN DETECTED:', immediateToken);
+            const immediateUrl = window.location.origin + '/play?token=' + encodeURIComponent(immediateToken) + '&pwa=true&pwa_type=game&from=launcher&emailAccess=true&immediate=true';
+            console.log('🚨 IMMEDIATE REDIRECT STARTING to:', immediateUrl);
+            
+            // Try redirect immediately - no delay
+            console.log('🚨 EXECUTING IMMEDIATE REDIRECT NOW');
+            window.location.href = immediateUrl;
+            
+            // Multiple backup attempts in rapid succession
+            setTimeout(() => {
+                console.log('🚨 BACKUP REDIRECT 1 (replace)');
+                window.location.replace(immediateUrl);
+            }, 50);
+            setTimeout(() => {
+                console.log('🚨 BACKUP REDIRECT 2 (assign)');
+                window.location.assign(immediateUrl);
+            }, 100);
+            setTimeout(() => {
+                console.log('🚨 BACKUP REDIRECT 3 (open)');
+                window.open(immediateUrl, '_self');
+            }, 150);
+        }
+        
+        // Launch interceptor with improved logic
+        (function () {
+            console.log('🚀 IIFE starting...');
+            console.log('🚀 Page URL:', window.location.href);
+            console.log('🚀 Protocol:', window.location.protocol);
+            console.log('🚀 Referrer:', document.referrer);
+            console.log('🚀 Has focus:', document.hasFocus());
+            
+            // EMERGENCY FALLBACK: If this is a token URL, set up immediate redirect as backup
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            if (token) {
+                console.log('🚨 EMERGENCY: Token detected, setting up immediate emergency fallback');
+                const emergencyUrl = window.location.origin + '/play?token=' + encodeURIComponent(token) + '&pwa=true&pwa_type=game&from=launcher&emailAccess=true&emergency=true';
+                
+                // Set up multiple fallback attempts
+                setTimeout(() => {
+                    console.log('🚨 EMERGENCY REDIRECT 1 to:', emergencyUrl);
+                    window.location.href = emergencyUrl;
+                }, 1000); // First emergency fallback after 1 second
+                
+                setTimeout(() => {
+                    console.log('🚨 EMERGENCY REDIRECT 2 (replace) to:', emergencyUrl);
+                    window.location.replace(emergencyUrl);
+                }, 1500); // Second emergency fallback after 1.5 seconds
+                
+                setTimeout(() => {
+                    console.log('🚨 EMERGENCY REDIRECT 3 (assign) to:', emergencyUrl);
+                    window.location.assign(emergencyUrl);
+                }, 2000); // Third emergency fallback after 2 seconds
+            }
+            
+            const CONFIG = {
+                fallbackDelay: 3000,
+                pwaDetectionDelay: 1000,
+                telemetryEndpoint: null, // Optional: Set to your logging server
+            };
+
+            // Global state for ACK handling
+            let ackReceived = false;
+            let focusSucceeded = false;
+            let fallbackTimeout = null;
+
+            // Listen for ACK from PWA via service worker
+            if (navigator.serviceWorker) {
+                navigator.serviceWorker.addEventListener('message', (event) => {
+                    console.log('[LAUNCHER] 📨 Received service worker message:', event.data);
+                    const { type } = event.data || {};
+                    
+                    if (type === 'NAVIGATE_TO_ASSIGNMENT_ACK') {
+                        console.log('[LAUNCHER] ✅ Received ACK from PWA via service worker. Closing launcher.');
+                        debugLog('✅ Received ACK from PWA - closing launcher');
+                        ackReceived = true;
+                        
+                        // Clear fallback timeout since we got confirmation
+                        if (fallbackTimeout) {
+                            clearTimeout(fallbackTimeout);
+                            fallbackTimeout = null;
+                        }
+                        
+                        updateStatus('Confirmed! Closing...');
+                        
+                        setTimeout(() => {
+                            try {
+                                window.close();
+                                console.log('[LAUNCHER] ✅ Launcher window closed successfully after ACK');
+                            } catch (e) {
+                                console.log('[LAUNCHER] Could not close window, hiding UI instead');
+                                document.body.style.display = 'none';
+                                debugLog('Launcher window hidden after ACK (could not close)');
+                            }
+                        }, 300);
+                    }
+                    
+                    if (type === 'FORCE_CLOSE_LAUNCHER') {
+                        console.log('[LAUNCHER] ❌ Received force close message from service worker. Duplicate assignment detected.');
+                        debugLog('❌ Force close - duplicate assignment detected');
+                        updateStatus('Duplicate assignment detected, closing...');
+                        
+                        // Clear any pending timeouts
+                        if (fallbackTimeout) {
+                            clearTimeout(fallbackTimeout);
+                            fallbackTimeout = null;
+                        }
+                        
+                        // Close immediately
+                        setTimeout(() => {
+                            try {
+                                window.close();
+                                console.log('[LAUNCHER] ✅ Launcher window closed due to duplicate assignment');
+                            } catch (e) {
+                                console.log('[LAUNCHER] Could not close window, hiding UI instead');
+                                document.body.style.display = 'none';
+                                debugLog('Launcher window hidden due to duplicate assignment (could not close)');
+                            }
+                        }, 100);
+                    }
+                });
+            }
+
+            // Setup focus-aware fallback timeout
+            function setupFallbackTimeout(targetUrl, timeoutMs = 3000) {
+                console.log('[LAUNCHER] 🕐 Setting up fallback timeout for', timeoutMs + 'ms');
+                
+                fallbackTimeout = setTimeout(() => {
+                    if (!ackReceived) {
+                        console.log('[LAUNCHER] ⏰ Timeout reached, checking if tab is still focused...');
+                        
+                        if (document.hasFocus()) {
+                            console.warn('[LAUNCHER] Still focused — PWA probably opened here. Not redirecting.');
+                            debugLog('⚠️ Timeout but still focused - assuming PWA opened in current tab');
+                            updateStatus('App opened successfully!');
+                            
+                            // Hide launcher UI but don't redirect
+                            setTimeout(() => {
+                                try {
+                                    window.close();
+                                } catch (e) {
+                                    document.body.style.display = 'none';
+                                }
+                            }, 1000);
+                        } else {
+                            console.warn('[LAUNCHER] No ACK and tab not focused — redirecting manually.');
+                            debugLog('⚠️ Timeout and not focused - manual redirect fallback');
+                            updateStatus('Opening in browser...');
+                            window.location.href = targetUrl;
+                        }
+                    } else if (ackReceived && !focusSucceeded) {
+                        // ACK received but focus failed - redirect immediately
+                        console.log('[LAUNCHER] ✅ ACK received but focus failed - redirecting to target URL');
+                        debugLog('✅ ACK received, focus failed - immediate redirect fallback');
+                        updateStatus('Opening in browser...');
+                        window.location.href = targetUrl;
+                    }
+                }, timeoutMs);
+            }
+
+            function debugLog(message, level = 'info') {
+                const tag = '[Launch]';
+                const logMessage = `${tag} ${message}`;
+                console[level](logMessage);
+
+                // Store debug logs in sessionStorage for persistence
+                try {
+                    const debugLogs = JSON.parse(sessionStorage.getItem('pwa_debug_logs') || '[]');
+                    debugLogs.push({
+                        timestamp: new Date().toISOString(),
+                        level: level,
+                        message: logMessage
+                    });
+                    // Keep only last 20 logs
+                    if (debugLogs.length > 20) {
+                        debugLogs.shift();
+                    }
+                    sessionStorage.setItem('pwa_debug_logs', JSON.stringify(debugLogs));
+                } catch (e) {
+                    // Ignore storage errors
+                }
+
+                if (CONFIG.telemetryEndpoint) {
+                    fetch(CONFIG.telemetryEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ level, message, timestamp: Date.now() }),
+                    }).catch(() => {});
+                }
+            }
+
+            function updateStatus(message) {
+                const statusEl = document.getElementById('status');
+                if (statusEl) statusEl.textContent = message;
+                debugLog(message);
+            }
+
+            function isIOS() {
+                return /iPad|iPhone|iPod/.test(navigator.userAgent);
+            }
+
+            function isInStandaloneMode() {
+                const displayMode = window.matchMedia('(display-mode: standalone)').matches;
+                const navStandalone = window.navigator.standalone === true;
+                const androidAppRef = document.referrer.includes('android-app://');
+                return displayMode || navStandalone || androidAppRef;
+            }
+
+            async function checkDesktopPWAInstalled() {
+                try {
+                    debugLog('Checking desktop PWA installation...');
+                    
+                    // Method 1: Check if we can access PWA-specific APIs
+                    if ('BeforeInstallPromptEvent' in window) {
+                        debugLog('BeforeInstallPromptEvent available - PWA environment detected');
+                        return true;
+                    }
+                    
+                    // Method 2: Check window characteristics typical of PWA
+                    const windowFeatures = {
+                        hasMenuBar: window.menubar && window.menubar.visible,
+                        hasToolBar: window.toolbar && window.toolbar.visible,
+                        hasLocationBar: window.locationbar && window.locationbar.visible,
+                        chromeHeight: window.outerHeight - window.innerHeight,
+                        isFullscreen: window.screen.height === window.outerHeight,
+                        ratio: window.devicePixelRatio
+                    };
+                    
+                    debugLog(`Window features: ${JSON.stringify(windowFeatures)}`);
+                    
+                    // PWA typically has minimal chrome (< 100px) and no menu/toolbar
+                    if (windowFeatures.chromeHeight < 100 && 
+                        !windowFeatures.hasMenuBar && 
+                        !windowFeatures.hasToolBar) {
+                        debugLog('Desktop PWA detected via window characteristics');
+                        return true;
+                    }
+                    
+                    // Method 3: Enhanced macOS Chrome PWA detection
+                    // Check if this looks like a PWA launch on macOS Chrome
+                    const isMacOS = navigator.platform.includes('Mac');
+                    const isChrome = navigator.userAgent.includes('Chrome') && !navigator.userAgent.includes('Edge');
+                    const isHTTPS = window.location.protocol === 'https:';
+                    
+                    if (isMacOS && isChrome && isHTTPS) {
+                        // On macOS Chrome, PWAs often have these characteristics:
+                        const macPWAIndicators = {
+                            minimalChrome: windowFeatures.chromeHeight < 200, // More generous threshold
+                            noMenuBar: !windowFeatures.hasMenuBar,
+                            emptyReferrer: document.referrer === '',
+                            standaloneQuery: window.location.search.includes('pwa='),
+                            hasServiceWorker: 'serviceWorker' in navigator
+                        };
+                        
+                        debugLog(`macOS PWA indicators: ${JSON.stringify(macPWAIndicators)}`);
+                        
+                        // If multiple indicators suggest PWA, return true
+                        const pwaScore = Object.values(macPWAIndicators).filter(Boolean).length;
+                        if (pwaScore >= 2) {
+                            debugLog(`macOS PWA detected with score ${pwaScore}/5`);
+                            return true;
+                        }
+                    }
+                    
+                    // Method 4: Check for PWA manifest accessibility with relaxed criteria
+                    const manifestElement = document.querySelector('link[rel="manifest"]');
+                    if (manifestElement) {
+                        try {
+                            console.log('[LAUNCHER] 🔍 About to fetch manifest:', manifestElement.href);
+                            
+                            // Add timeout to prevent hanging
+                            const fetchWithTimeout = Promise.race([
+                                fetch(manifestElement.href),
+                                new Promise((_, reject) => 
+                                    setTimeout(() => reject(new Error('Manifest fetch timeout')), 2000)
+                                )
+                            ]);
+                            
+                            const manifestResponse = await fetchWithTimeout;
+                            console.log('[LAUNCHER] 🔍 Manifest fetch completed:', manifestResponse.status);
+                            
+                            if (manifestResponse.ok) {
+                                const manifest = await manifestResponse.json();
+                                console.log('[LAUNCHER] 🔍 Manifest parsed:', manifest);
+                                debugLog(`Manifest loaded: ${manifest.name || 'Unknown'}`);
+                                
+                                // If we can load manifest and we're in HTTPS with Chrome,
+                                // and have some PWA characteristics, likely installed
+                                if (manifest.display === 'standalone' && 
+                                    isHTTPS && 
+                                    isChrome && 
+                                    windowFeatures.chromeHeight < 250) { // More generous
+                                    debugLog('Desktop PWA detected via manifest + environment');
+                                    return true;
+                                }
+                            }
+                        } catch (e) {
+                            console.log('[LAUNCHER] 🔍 Manifest fetch error:', e.message);
+                            debugLog(`Error loading manifest: ${e.message}`, 'warn');
+                        }
+                    }
+                    
+                } catch (e) {
+                    debugLog(`Error in desktop PWA check: ${e.message}`, 'warn');
+                }
+                
+                return false;
+            }
+
+            async function isPWAInstalled() {
+                debugLog('Starting PWA detection...');
+                
+                // Check for force PWA parameter (for testing)
+                const params = getUrlParams();
+                if (params.forcePWA === 'true') {
+                    debugLog('Force PWA parameter detected - returning true');
+                    window.lastPWADetectionResult = {
+                        detected: true,
+                        method: 'force_parameter',
+                        details: 'forcePWA=true parameter used'
+                    };
+                    return true;
+                }
+                
+                // Enhanced production environment check
+                const isProduction = window.location.hostname.includes('verse-dev-central.web.app') || 
+                                   window.location.hostname.includes('verse-central.web.app') ||
+                                   (window.location.protocol === 'https:' && 
+                                    window.location.hostname !== 'localhost');
+                
+                debugLog(`Environment: ${isProduction ? 'Production' : 'Development'}`);
+                
+                // Method 1: Check if currently in standalone mode
+                const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+                const isIOSStandalone = window.navigator.standalone === true;
+                const isAndroidApp = document.referrer.includes('android-app://');
+                
+                debugLog(`Standalone mode check: ${isStandalone}`);
+                debugLog(`iOS standalone: ${isIOSStandalone}`);
+                debugLog(`Android app referrer: ${isAndroidApp}`);
+                
+                if (isStandalone || isIOSStandalone || isAndroidApp) {
+                    debugLog('PWA detected via standalone mode');
+                    window.lastPWADetectionResult = {
+                        detected: true,
+                        method: 'standalone_mode',
+                        details: { isStandalone, isIOSStandalone, isAndroidApp }
+                    };
+                    return true;
+                }
+                
+                // Method 2: Desktop PWA detection (enhanced)
+                console.log('[LAUNCHER] 🔍 About to call checkDesktopPWAInstalled()...');
+                const desktopPWA = await checkDesktopPWAInstalled();
+                console.log('[LAUNCHER] 🔍 checkDesktopPWAInstalled() returned:', desktopPWA);
+                if (desktopPWA) {
+                    debugLog('PWA detected via desktop PWA check');
+                    window.lastPWADetectionResult = {
+                        detected: true,
+                        method: 'desktop_pwa',
+                        details: 'Desktop PWA characteristics detected'
+                    };
+                    return true;
+                }
+                
+                // Method 3: Production environment heuristics (new)
+                if (isProduction) {
+                    debugLog('Running production environment checks...');
+                    
+                    // Check for indicators that suggest PWA was supposed to open
+                    const productionPWAIndicators = {
+                        hasServiceWorker: 'serviceWorker' in navigator,
+                        chromeMinimal: window.outerHeight - window.innerHeight < 300,
+                        httpsSecure: window.location.protocol === 'https:',
+                        noReferrerOrLauncher: document.referrer === '' || document.referrer.includes('launch.html'),
+                        expectedPWAUrl: window.location.pathname.startsWith('/student') || window.location.pathname.startsWith('/play')
+                    };
+                    
+                    debugLog(`Production PWA indicators: ${JSON.stringify(productionPWAIndicators)}`);
+                    
+                    // Score-based detection for production
+                    const prodScore = Object.values(productionPWAIndicators).filter(Boolean).length;
+                    if (prodScore >= 3) {
+                        debugLog(`Production PWA detected with score ${prodScore}/5`);
+                        window.lastPWADetectionResult = {
+                            detected: true,
+                            method: 'production_heuristics',
+                            details: { score: prodScore, indicators: productionPWAIndicators }
+                        };
+                        return true;
+                    }
+                }
+                
+                // Method 4: Check for getInstalledRelatedApps (Chrome/Android)
+                try {
+                    if ('getInstalledRelatedApps' in navigator) {
+                        debugLog('getInstalledRelatedApps available, checking...');
+                        console.log('[LAUNCHER] 🔍 About to call getInstalledRelatedApps()...');
+                        const apps = await navigator.getInstalledRelatedApps();
+                        console.log('[LAUNCHER] 🔍 getInstalledRelatedApps() returned:', apps);
+                        debugLog(`getInstalledRelatedApps found ${apps.length} apps`);
+                        if (apps.length > 0) {
+                            debugLog('PWA detected via getInstalledRelatedApps');
+                            window.lastPWADetectionResult = {
+                                detected: true,
+                                method: 'related_apps',
+                                details: `Found ${apps.length} related apps`
+                            };
+                            return true;
+                        }
+                    } else {
+                        debugLog('getInstalledRelatedApps not available');
+                    }
+                } catch (e) {
+                    debugLog(`Error checking related apps: ${e.message}`, 'warn');
+                }
+                
+                // Method 5: Check for PWA-specific window properties (macOS Chrome)
+                try {
+                    // Check if window was opened by PWA app (has specific properties)
+                    const hasPWAProperties = window.outerHeight - window.innerHeight < 100 && // Minimal chrome
+                                           window.navigator.standalone !== undefined || // iOS PWA property exists
+                                           window.location.protocol === 'https:' && 
+                                           document.referrer === '' && // PWA apps often have empty referrer
+                                           window.screen.availHeight === window.outerHeight; // Fullscreen-like
+                                           
+                    debugLog(`PWA properties check: ${hasPWAProperties}`);
+                    
+                    if (hasPWAProperties) {
+                        debugLog('PWA detected via window properties');
+                        window.lastPWADetectionResult = {
+                            detected: true,
+                            method: 'window_properties',
+                            details: 'PWA-specific window characteristics found'
+                        };
+                        return true;
+                    }
+                } catch (e) {
+                    debugLog(`Error checking PWA properties: ${e.message}`, 'warn');
+                }
+                
+                // Method 6: Check for service worker registration (indicates PWA capability)
+                try {
+                    if ('serviceWorker' in navigator) {
+                        console.log('[LAUNCHER] 🔍 About to call getRegistrations()...');
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        console.log('[LAUNCHER] 🔍 getRegistrations() returned:', registrations);
+                        debugLog(`Service worker registrations: ${registrations.length}`);
+                        
+                        // If we have SW registrations and we're in a minimal chrome environment,
+                        // it's likely a PWA (especially on macOS)
+                        if (registrations.length > 0 && window.outerHeight - window.innerHeight < 150) {
+                            debugLog('PWA detected via service worker + minimal chrome');
+                            window.lastPWADetectionResult = {
+                                detected: true,
+                                method: 'serviceWorker_minimal_chrome',
+                                details: `${registrations.length} SW registrations with minimal chrome`
+                            };
+                            return true;
+                        }
+                    }
+                } catch (e) {
+                    debugLog(`Error checking service worker: ${e.message}`, 'warn');
+                }
+                
+                debugLog('No PWA installation detected');
+                window.lastPWADetectionResult = {
+                    detected: false,
+                    methods: {
+                        standalone: isStandalone,
+                        iOSStandalone: isIOSStandalone,
+                        androidApp: isAndroidApp,
+                        desktopPWA: desktopPWA,
+                        getInstalledRelatedApps: false,
+                        pwaProperties: false,
+                        serviceWorkerMinimalChrome: false,
+                        productionHeuristics: false
+                    }
+                };
+                return false;
+            }
+
+            function getUrlParams() {
+                const params = new URLSearchParams(window.location.search);
+                return {
+                    target: params.get('target'),
+                    token: params.get('token'),
+                    pwa: params.get('pwa'),
+                    action: params.get('action'),
+                    forcePWA: params.get('forcePWA'), // For testing
+                };
+            }
+
+            function buildTargetUrl({ target, token, pwa }) {
+                let url = window.location.origin;
+
+                if (target) {
+                    target = decodeURIComponent(target);
+                    if (!target.startsWith('/')) target = '/' + target;
+                    url += target;
+                    debugLog(`Using target parameter: ${target}`);
+                } else if (token) {
+                    // Enhanced PWA deep link restoration - always go to /play for tokens
+                    url += `/play`;
+                    debugLog(`Enhanced PWA deep link: Using /play route for token: ${token}`);
+                } else if (pwa === 'install') {
+                    url += `/student`;
+                    debugLog(`Using PWA install route: /student`);
+                } else {
+                    // Default fallback - but prefer /play if we detect assignment context
+                    url += `/student`;
+                    debugLog(`Using default route: /student`);
+                }
+
+                // Add query parameters
+                const separator = url.includes('?') ? '&' : '?';
+                if (token && !url.includes('token=')) {
+                    url += `${separator}token=${token}`;
+                    debugLog(`Added token parameter: ${token}`);
+                }
+                if (pwa && !url.includes('pwa=')) {
+                    const sep = url.includes('?') ? '&' : '?';
+                    url += `${sep}pwa=${pwa}`;
+                    debugLog(`Added PWA parameter: ${pwa}`);
+                }
+                if (isInStandaloneMode()) {
+                    const sep = url.includes('?') ? '&' : '?';
+                    url += `${sep}pwa=true`;
+                    debugLog(`Added standalone mode parameter`);
+                }
+
+                debugLog(`Built target URL: ${url}`);
+                return url;
+            }
+
+            function attemptCustomProtocol(token) {
+                if (!token) return;
+
+                const protocolUrl = `web+lumino://play?token=${token}`;
+                debugLog(`Attempting custom protocol: ${protocolUrl}`);
+
+                try {
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = protocolUrl;
+                    document.body.appendChild(iframe);
+
+                    setTimeout(() => {
+                        if (iframe.parentNode) {
+                            iframe.parentNode.removeChild(iframe);
+                        }
+                    }, 1000);
+                } catch (e) {
+                    debugLog(`Custom protocol error: ${e.message}`, 'warn');
+                }
+            }
+
+            function setupVisibilityListener(callback) {
+                const listener = () => {
+                    if (document.visibilityState === 'hidden') {
+                        debugLog('User likely switched to app.');
+                        callback();
+                    }
+                };
+                document.addEventListener('visibilitychange', listener);
+                return () => document.removeEventListener('visibilitychange', listener);
+            }
+
+            async function focusExistingPWA(targetUrl, token) {
+                console.log('[LAUNCHER] 🚀 focusExistingPWA called with:', { targetUrl, token });
+                debugLog(`🚀 focusExistingPWA called with: ${JSON.stringify({ targetUrl, token })}`);
+                
+                try {
+                    const registration = await navigator.serviceWorker.ready;
+                    const sw = registration.active;
+                    
+                    if (!sw) {
+                        console.log('[LAUNCHER] ❌ No active SW to communicate with');
+                        debugLog('🔧 No active SW to communicate with');
+                        return false;
+                    }
+
+                    console.log('[Launcher] Active SW available:', sw);
+
+                    return new Promise((resolve) => {
+                        console.log('[Launcher] Setting up message listener and timeout');
+                        debugLog('🔍 Attempting to focus existing PWA via service worker...');
+                        
+                        const timeout = setTimeout(() => {
+                            console.log('[Launcher] ⏰ Timeout reached - no response from service worker');
+                            debugLog('⏰ Service worker focus attempt timed out');
+                            navigator.serviceWorker.removeEventListener('message', handleAck);
+                            resolve(false);
+                        }, 3000); // Increased to 3 second timeout for debugging
+
+                        function handleAck(event) {
+                            console.log('[Launcher] Received SW message:', event.data);
+                            
+                            if (event.data && event.data.type === 'NAVIGATE_TO_ASSIGNMENT_ACK') {
+                                console.log('[Launcher] ✅ Received ACK from service worker:', event.data);
+                                debugLog(`📨 Received ACK from service worker: ${JSON.stringify(event.data)}`);
+                                clearTimeout(timeout);
+                                navigator.serviceWorker.removeEventListener('message', handleAck);
+                                
+                                // Set global tracking variables
+                                ackReceived = true;
+                                focusSucceeded = event.data.success;
+                                
+                                if (event.data.success) {
+                                    if (event.data.focused) {
+                                        console.log('[Launcher] 🎉 Service worker successfully found and focused existing PWA');
+                                        debugLog('✅ Service worker successfully found and focused existing PWA');
+                                    } else {
+                                        console.log('[Launcher] 🎯 Service worker found existing PWA and sent navigation (focus blocked by browser security)');
+                                        debugLog('✅ Service worker found existing PWA and sent navigation (focus blocked by browser security)');
+                                    }
+                                    resolve(true); // Both cases are success - PWA was found and navigation was sent
+                                } else {
+                                    console.log('[Launcher] ❌ Service worker could not find existing PWA');
+                                    debugLog('❌ Service worker could not find existing PWA');
+                                    resolve(false);
+                                }
+                            } else {
+                                console.log('[Launcher] Ignoring non-ACK message:', event.data);
+                            }
+                        }
+
+                        // Listen for acknowledgment from service worker
+                        console.log('[Launcher] Adding message event listener');
+                        navigator.serviceWorker.addEventListener('message', handleAck);
+                        
+                        // Send focus request to service worker
+                        const message = {
+                            type: 'FOCUS_EXISTING_PWA',
+                            url: targetUrl,
+                            token: token
+                        };
+                        console.log('[LAUNCHER] 🚀 Sending message to service worker:', message);
+                        debugLog(`🚀 Sending FOCUS_EXISTING_PWA message to service worker: ${JSON.stringify(message)}`);
+                        
+                        try {
+                            console.log('[LAUNCHER] 🔧 About to call postMessage on active service worker...');
+                            sw.postMessage(message);
+                            console.log('[LAUNCHER] ✅ Message sent to service worker successfully');
+                        } catch (error) {
+                            console.error('[Launcher] ❌ Error sending message to service worker:', error);
+                            clearTimeout(timeout);
+                            navigator.serviceWorker.removeEventListener('message', handleAck);
+                            resolve(false);
+                        }
+                    });
+                } catch (swError) {
+                    console.error('[LAUNCHER] ❌ Service worker registration error:', swError);
+                    debugLog(`❌ Service worker registration error: ${swError.message}`);
+                    return false;
+                }
+            }
+
+            async function redirectFlow() {
+                console.log('[LAUNCHER] ⭐ redirectFlow() started');
+                console.log('[LAUNCHER] 🔍 Current URL:', window.location.href);
+                console.log('[LAUNCHER] 🔍 Current pathname:', window.location.pathname);
+                console.log('[LAUNCHER] 🔍 Current search:', window.location.search);
+                
+                const params = getUrlParams();
+                console.log('[LAUNCHER] URL parameters:', params);
+                debugLog(`URL parameters: ${JSON.stringify(params)}`);
+                
+                // HYBRID APPROACH: Focus-first with direct redirection fallback
+                // When token is detected, first try to focus existing PWA, then fallback to direct redirect
+                if (params.token) {
+                    console.log('[LAUNCHER] 🎯 ASSIGNMENT TOKEN DETECTED - Starting focus-first approach:', params.token);
+                    const baseUrl = window.location.origin;
+                    const assignmentUrl = baseUrl + '/play?token=' + encodeURIComponent(params.token) + '&pwa=true&pwa_type=game&from=launcher&emailAccess=true';
+                    
+                    debugLog(`🎯 Assignment URL: ${assignmentUrl}`);
+                    updateStatus('Checking for existing app...');
+                    
+                    // Immediate fallback for email-launched windows
+                    const emailLaunchIndicators = {
+                        emptyReferrer: document.referrer === '',
+                        mailtoReferrer: document.referrer.includes('mailto:'),
+                        fromEmailParam: window.location.search.includes('from=email'),
+                        noFocus: !document.hasFocus(),
+                        isProtocolHandler: window.location.href.includes('@ps://') || window.location.protocol === 'web+lumino:'
+                    };
+                    
+                    const isEmailLaunch = Object.values(emailLaunchIndicators).some(Boolean);
+                    
+                    console.log('[LAUNCHER] 📧 Email launch detection:', emailLaunchIndicators);
+                    console.log('[LAUNCHER] 📧 Is email launch:', isEmailLaunch);
+                    console.log('[LAUNCHER] 📧 Current referrer:', document.referrer);
+                    console.log('[LAUNCHER] 📧 Current URL:', window.location.href);
+                    console.log('[LAUNCHER] 📧 Has focus:', document.hasFocus());
+                    
+                    if (isEmailLaunch) {
+                        console.log('[LAUNCHER] 📧 EMAIL LAUNCH DETECTED - IMMEDIATE REDIRECT');
+                        debugLog('📧 Email launch detected - immediate redirect flow');
+                        updateStatus('Opening assignment from email...');
+                        
+                        // IMMEDIATE redirect for email launches - no delay
+                        console.log('[LAUNCHER] 📧 IMMEDIATE redirect to:', assignmentUrl);
+                        window.location.href = assignmentUrl;
+                        
+                        // Also try replace in case href doesn't work
+                        setTimeout(() => {
+                            console.log('[LAUNCHER] 📧 Backup redirect attempt');
+                            window.location.replace(assignmentUrl);
+                        }, 100);
+                        
+                        return;
+                    }
+                    
+                    // Standard flow for browser launches
+                    console.log('[LAUNCHER] 🌐 Browser launch detected - using standard focus-first approach');
+                    
+                    // First, try to focus existing PWA window
+                    console.log('[LAUNCHER] 🔍 Checking service worker availability...');
+                    console.log('[LAUNCHER] 🔍 navigator.serviceWorker exists:', !!navigator.serviceWorker);
+                    
+                    if (navigator.serviceWorker) {
+                        console.log('[LAUNCHER] 🔍 Service worker API available, checking for active registration...');
+                        updateStatus('Focusing existing app...');
+                        
+                        try {
+                            const registration = await navigator.serviceWorker.ready;
+                            const sw = registration.active;
+                            
+                            if (sw) {
+                                console.log('[LAUNCHER] 🔍 Active service worker found, attempting PWA focus...');
+                                console.log('[LAUNCHER] 🔍 Calling focusExistingPWA with:', { assignmentUrl, token: params.token });
+                                const focusedExisting = await focusExistingPWA(assignmentUrl, params.token);
+                                console.log('[LAUNCHER] 🔍 focusExistingPWA returned:', focusedExisting);
+                                console.log('[LAUNCHER] 🔍 Global state after focus attempt:', { ackReceived, focusSucceeded });
+                                
+                                if (focusedExisting) {
+                                    console.log('[LAUNCHER] ✅ Successfully found existing PWA and sent navigation!');
+                                    debugLog('✅ Successfully found existing PWA and sent navigation - waiting for ACK or timeout');
+                                    updateStatus('Opened in existing app!');
+                                    
+                                    // Setup focus-aware fallback timeout
+                                    setupFallbackTimeout(assignmentUrl, 3000);
+                                    return;
+                                } else {
+                                    console.log('[LAUNCHER] ❌ Could not focus existing PWA, falling back to direct redirect immediately');
+                                    debugLog('❌ Focus failed, falling back to direct redirect immediately');
+                                    updateStatus('No existing app found, opening in browser...');
+                                    
+                                    // Immediate redirect when no PWA is found - don't wait for timeout
+                                    setTimeout(() => {
+                                        window.location.href = assignmentUrl;
+                                    }, 300);
+                                    return;
+                                }
+                            } else {
+                                console.warn('[LAUNCHER] ❌ No active Service Worker - PWA is closed, falling back immediately');
+                                debugLog('❌ No active Service Worker - PWA is closed, falling back immediately');
+                                updateStatus('App is closed, opening assignment...');
+                            }
+                        } catch (swError) {
+                            console.warn('[LAUNCHER] ❌ Service worker error:', swError);
+                            debugLog(`❌ Service worker error: ${swError.message}`);
+                            updateStatus('Service worker error, opening assignment...');
+                        }
+                    } else {
+                        console.log('[LAUNCHER] ❌ No service worker API available');
+                        debugLog('❌ No service worker API available');
+                    }
+                    
+                    // FALLBACK: Direct redirection if focus-first fails
+                    console.log('[LAUNCHER] 🔄 Executing direct assignment redirect as fallback...');
+                    updateStatus('Opening assignment...');
+                    debugLog(`🚀 FALLBACK DIRECT REDIRECTION: ${assignmentUrl}`);
+                    
+                    setTimeout(() => {
+                        window.location.href = assignmentUrl;
+                    }, 300);
+                    return;
+                }
+
+                // For non-token scenarios, continue with existing logic
+                const targetUrl = buildTargetUrl(params);
+                console.log('[LAUNCHER] Built target URL:', targetUrl);
+                const fallbackBtn = document.getElementById('fallbackButton');
+                const iosNotice = document.getElementById('iosNotice');
+
+                // Check for duplicate launch prevention (non-token scenarios)
+                const launchKey = 'pwa_launch_' + (params.target || 'default');
+                const lastLaunch = sessionStorage.getItem(launchKey);
+                const now = Date.now();
+                
+                if (lastLaunch) {
+                    const timeSinceLastLaunch = now - parseInt(lastLaunch);
+                    if (timeSinceLastLaunch < 5000) { // 5 second prevention window
+                        debugLog(`Duplicate launch prevented! Last launch was ${timeSinceLastLaunch}ms ago`);
+                        updateStatus('Preventing duplicate launch...');
+                        
+                        // Still redirect but with delay to avoid race condition
+                        setTimeout(() => {
+                            debugLog('Allowing delayed redirect to prevent duplicate PWA windows');
+                            window.location.href = targetUrl;
+                        }, 2000);
+                        return;
+                    }
+                }
+                
+                // Mark this launch attempt
+                sessionStorage.setItem(launchKey, now.toString());
+                debugLog(`Marked launch attempt for key: ${launchKey}`);
+
+                if (!params.target && !params.pwa) {
+                    updateStatus('No target specified');
+                    if (fallbackBtn) {
+                        fallbackBtn.style.display = 'inline-block';
+                        fallbackBtn.href = window.location.origin + '/student';
+                    }
+                    return;
+                }
+
+                if (isIOS() && iosNotice) {
+                    iosNotice.style.display = 'block';
+                }
+
+                updateStatus('Checking for installed app...');
+                debugLog('Starting comprehensive PWA detection...');
+                console.log('[LAUNCHER] 🔍 About to call isPWAInstalled()...');
+                
+                // Enhanced PWA detection with logging
+                const installed = await isPWAInstalled();
+                console.log('[LAUNCHER] 🔍 isPWAInstalled() returned:', installed);
+                debugLog(`PWA detection result: ${installed}`);
+
+                const cleanupVisibility = setupVisibilityListener(() => {
+                    debugLog('Cancelling fallback due to app switch.');
+                    if (fallbackTimeout) clearTimeout(fallbackTimeout);
+                });
+
+                // Enhanced PWA launch logic with focus-first approach for non-token scenarios
+                if (installed) {
+                    updateStatus('App detected! Checking for existing instance...');
+                    debugLog('✅ PWA detected! Attempting to focus existing instance first...');
+                    
+                    // Try to focus and navigate existing PWA instance
+                    updateStatus('Focusing existing app...');
+                    const focusedExisting = await focusExistingPWA(targetUrl, null);
+                    
+                    if (focusedExisting) {
+                        debugLog('✅ Successfully focused existing PWA for non-token scenario');
+                        updateStatus('Opened in existing app!');
+                        setTimeout(() => {
+                            try {
+                                window.close();
+                            } catch (e) {
+                                document.body.style.display = 'none';
+                            }
+                        }, 1000);
+                        return;
+                    }
+                    
+                    // Fallback to original logic for non-token scenarios
+                    setTimeout(() => {
+                        debugLog('🚀 Executing enhanced PWA launch for non-token scenario...');
+                        try {
+                            const enhancedUrl = targetUrl + 
+                                (targetUrl.includes('?') ? '&' : '?') + 
+                                'pwa=true&pwa_type=game&from=launcher&emailAccess=true';
+                            debugLog(`Enhanced PWA launch URL: ${enhancedUrl}`);
+                            window.location.href = enhancedUrl;
+                        } catch (e) {
+                            debugLog(`Error in enhanced PWA launch: ${e.message}`, 'warn');
+                            // Fallback to direct navigation
+                            window.location.href = targetUrl;
+                        }
+                    }, 300);
+                } else {
+                    debugLog('No PWA detected, proceeding with browser launch');
+                }
+
+                // Fallback timeout - always ensure we redirect somewhere
+                const fallbackTimeout = setTimeout(() => {
+                    updateStatus('Opening in browser...');
+                    debugLog(`Fallback triggered, redirecting to browser: ${targetUrl}`);
+                    window.location.href = targetUrl;
+                }, CONFIG.pwaDetectionDelay);
+
+                // Show fallback button after delay
+                setTimeout(() => {
+                    if (fallbackBtn) {
+                        fallbackBtn.style.display = 'inline-block';
+                        fallbackBtn.href = targetUrl;
+                    }
+                    updateStatus('Taking longer than expected...');
+                }, CONFIG.fallbackDelay);
+            }
+
+            // IMMEDIATE EXECUTION TEST
+            console.log('[LAUNCHER IMMEDIATE] 🚀 Script loading - this should appear first!');
+            console.log('[LAUNCHER IMMEDIATE] 🚀 URL:', window.location.href);
+            
+            window.addEventListener('load', () => {
+                console.log('[LAUNCHER INIT] 🚀 Window load event fired, starting redirect flow');
+                console.log('[LAUNCHER INIT] 🚀 Current URL:', window.location.href);
+                console.log('[LAUNCHER INIT] 🚀 Parsed params:', getUrlParams());
+                debugLog('Launch flow starting...');
+                setTimeout(() => {
+                    console.log('[LAUNCHER INIT] 🚀 Executing redirectFlow after 100ms delay');
+                    redirectFlow();
+                }, 100);
+            });
+
+            // Global function to check PWA debug logs (callable from console)
+            window.checkPWADebugLogs = function() {
+                try {
+                    const logs = JSON.parse(sessionStorage.getItem('pwa_debug_logs') || '[]');
+                    console.log('🔍 PWA Debug Logs:', logs);
+                    return logs;
+                } catch (e) {
+                    console.error('Error reading PWA debug logs:', e);
+                    return [];
+                }
+            };
+
+            // Store the detection result for later inspection
+            window.lastPWADetectionResult = null;
+        })();
+    </script>
+</body>
+</html>

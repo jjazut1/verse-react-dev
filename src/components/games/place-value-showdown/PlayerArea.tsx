@@ -33,7 +33,7 @@ export const PlayerArea: React.FC<PlayerAreaProps> = ({
       <div className="number-slots">
         {Array.from({ length: config.numberOfCards }, (_, i) => {
           const cardInSlot = cards.find(card => card.slotIndex === i);
-          const hasComma = config.numberOfCards > 3 && i === 1;
+          const hasComma = config.numberOfCards > 3 && i === config.numberOfCards - 4;
           
           return (
             <SlotContainer

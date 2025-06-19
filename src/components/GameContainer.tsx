@@ -14,7 +14,7 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import MathQuiz from './games/MathQuiz';
-import SyllableEggHuntAdapter from './games/syllable-egg-hunt/SyllableEggHuntAdapter';
+
 import SortCategoriesEggRevealAdapter from './games/sort-categories-egg-reveal/SortCategoriesEggRevealAdapter';
 import { useCustomToast, ToastComponent } from '../hooks/useCustomToast';
 import { GameConfig } from '../types/game';
@@ -38,13 +38,6 @@ const games: Game[] = [
     description: 'Test your math skills with this interactive quiz!',
     thumbnail: 'https://placehold.co/300x200?text=Math+Quiz',
     component: MathQuiz as Game['component']
-  },
-  {
-    id: 'syllable-egg-hunt',
-    title: 'Syllable Egg Hunt',
-    description: 'Crack eggs to reveal words and sort them by syllable count!',
-    thumbnail: 'https://placehold.co/300x200?text=Syllable+Egg+Hunt',
-    component: SyllableEggHuntAdapter as Game['component']
   },
   {
     id: 'sort-categories-egg-reveal',

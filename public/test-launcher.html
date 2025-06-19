@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Launcher</title>
+</head>
+<body>
+    <h1>TEST LAUNCHER LOADED!</h1>
+    <p id="url-display"></p>
+    <p id="params-display"></p>
+    
+    <script>
+        console.log('🔥 TEST LAUNCHER SCRIPT RUNNING!');
+        console.log('🔥 URL:', window.location.href);
+        
+        // Show in DOM too
+        document.getElementById('url-display').textContent = 'URL: ' + window.location.href;
+        
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        const target = params.get('target');
+        
+        console.log('🔥 TOKEN:', token);
+        console.log('🔥 TARGET:', target);
+        
+        document.getElementById('params-display').textContent = `Token: ${token}, Target: ${target}`;
+        
+        // Redirect after 3 seconds
+        setTimeout(() => {
+            console.log('🔥 TEST LAUNCHER REDIRECTING...');
+            const redirectUrl = window.location.origin + '/play?token=' + encodeURIComponent(token) + '&pwa=true&from=test-launcher';
+            console.log('🔥 REDIRECT URL:', redirectUrl);
+            window.location.href = redirectUrl;
+        }, 3000);
+    </script>
+</body>
+</html> 

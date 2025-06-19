@@ -6,6 +6,8 @@ const params_1 = require("firebase-functions/params");
 const firebase_functions_1 = require("firebase-functions");
 const admin = require("firebase-admin");
 const sendgridHelper_1 = require("./sendgridHelper");
+// Import the new PWA-aware email templates
+const emailTemplates_1 = require("./emailTemplates");
 // Define the secrets
 exports.SENDGRID_API_KEY = (0, params_1.defineSecret)("SENDGRID_API_KEY");
 exports.SENDER_EMAIL = (0, params_1.defineSecret)("SENDER_EMAIL");
@@ -91,80 +93,16 @@ exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
         console.error("Failed to set up SendGrid properly");
         return;
     }
-    // Create both links
-    const assignmentLink = `${baseUrl}/play?token=${assignment.linkToken}`;
-    const studentPortalLink = `${baseUrl}/student`;
+    // Use the new PWA-aware email template
+    const emailHtml = (0, emailTemplates_1.createAssignmentEmailTemplate)(studentName, assignment.gameTitle || assignment.gameName, formattedDate, assignment.linkToken, baseUrl);
     const msg = {
         to: studentEmail,
         from: {
             email: exports.SENDER_EMAIL.value().trim(),
-            name: "Verse Learning"
+            name: "Lumino Learning"
         },
-        subject: `New Assignment: ${assignment.gameTitle || assignment.gameName}`,
-        html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
-          <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h2 style="color: #2D3748; text-align: center; margin-bottom: 20px;">New Assignment from Verse Learning</h2>
-            
-            <p style="font-size: 16px; color: #4A5568;">Hello ${studentName},</p>
-            
-            <p style="font-size: 16px; color: #4A5568;">You have been assigned a new learning activity:</p>
-            
-            <div style="background-color: #EDF2F7; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #4299E1;">
-              <p style="margin: 0; font-size: 18px;"><strong>Activity:</strong> ${assignment.gameTitle || assignment.gameName}</p>
-              <p style="margin: 10px 0 0 0; font-size: 16px;"><strong>Due Date:</strong> ${formattedDate}</p>
-            </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <div style="margin-bottom: 15px;">
-                <a href="${assignmentLink}" style="display: inline-block; background-color: #4299E1; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); margin-bottom: 10px;">
-                  🎮 Start Activity
-                </a>
-              </div>
-              <div style="margin-top: 15px;">
-                <a href="${studentPortalLink}" style="display: inline-block; background-color: #38B2AC; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                  📚 Visit Student Portal
-                </a>
-              </div>
-            </div>
-            
-            <div style="background-color: #FFF5E6; padding: 20px; border-radius: 8px; border-left: 4px solid #ED8936; margin: 25px 0;">
-              <h3 style="color: #C05621; margin-top: 0; font-size: 16px;">⚡ Quick Access:</h3>
-              <p style="color: #C05621; margin: 10px 0;">Click the "Start Activity" button above to begin your assignment immediately - no login required!</p>
-            </div>
-            
-            <div style="background-color: #E6FFFA; padding: 20px; border-radius: 8px; border-left: 4px solid #38B2AC; margin: 25px 0;">
-              <h3 style="color: #2C7A7B; margin-top: 0; font-size: 16px;">🔐 Two Ways to Access:</h3>
-              <div style="color: #2C7A7B; margin: 10px 0;">
-                <p style="margin: 5px 0;"><strong>Option 1 - Direct to Assignment:</strong></p>
-                <ul style="margin: 5px 0; padding-left: 20px;">
-                  <li>Click "Start Activity" above</li>
-                  <li>Begin your assignment immediately</li>
-                  <li>No login required</li>
-                </ul>
-                
-                <p style="margin: 15px 0 5px 0;"><strong>Option 2 - Student Portal:</strong></p>
-                <ul style="margin: 5px 0; padding-left: 20px;">
-                  <li>Click "Visit Student Portal" above</li>
-                  <li>Sign in with your email and password</li>
-                  <li>View all your assignments and progress</li>
-                  <li>Access this and other assignments</li>
-                </ul>
-              </div>
-            </div>
-            
-            <div style="font-size: 14px; color: #718096; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #E2E8F0;">
-              <p><strong>Direct Assignment Link:</strong></p>
-              <p style="word-break: break-all; background-color: #F7FAFC; padding: 10px; border-radius: 4px; margin: 10px 0;">${assignmentLink}</p>
-              
-              <p><strong>Student Portal Link:</strong></p>
-              <p style="word-break: break-all; background-color: #F7FAFC; padding: 10px; border-radius: 4px; margin: 10px 0;">${studentPortalLink}</p>
-              
-              <p><strong>These links are unique to you. Please do not share them with others.</strong></p>
-            </div>
-          </div>
-        </div>
-      `,
+        subject: `📱 New PWA-Ready Assignment: ${assignment.gameTitle || assignment.gameName}`,
+        html: emailHtml,
     };
     // Use the helper function to send the email
     const isEmailSent = await (0, sendgridHelper_1.sendEmail)(msg);
@@ -232,7 +170,7 @@ exports.sendEmailLinkWithAssignment = (0, firestore_1.onDocumentCreated)({
     catch (e) {
         console.error("Date formatting error", e);
     }
-    // Create both links
+    // Create both links for the email link template
     const assignmentLink = `${baseUrl}/play?token=${assignment.linkToken}&requireAuth=true`;
     const studentPortalLink = `${baseUrl}/student`;
     console.log(`Generated password-required assignment link for assignment ${assignmentId}`);
@@ -241,72 +179,23 @@ exports.sendEmailLinkWithAssignment = (0, firestore_1.onDocumentCreated)({
         console.error("Failed to set up SendGrid properly");
         return;
     }
+    // Use the new PWA-aware email link template
+    const emailHtml = (0, emailTemplates_1.createPWAEmailLinkTemplate)({
+        studentName,
+        gameTitle: assignment.gameTitle || assignment.gameName,
+        formattedDate,
+        assignmentLink,
+        studentPortalLink,
+        baseUrl
+    });
     const msg = {
         to: studentEmail,
         from: {
             email: exports.SENDER_EMAIL.value().trim(),
-            name: "Verse Learning"
+            name: "Lumino Learning"
         },
-        subject: `New Assignment: ${assignment.gameTitle || assignment.gameName}`,
-        html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
-          <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h2 style="color: #2D3748; text-align: center; margin-bottom: 20px;">New Assignment from Verse Learning</h2>
-            
-            <p style="font-size: 16px; color: #4A5568;">Hello ${studentName},</p>
-            
-            <p style="font-size: 16px; color: #4A5568;">You have been assigned a new learning activity:</p>
-            
-            <div style="background-color: #EDF2F7; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #4299E1;">
-              <p style="margin: 0; font-size: 18px;"><strong>Activity:</strong> ${assignment.gameTitle || assignment.gameName}</p>
-              <p style="margin: 10px 0 0 0; font-size: 16px;"><strong>Due Date:</strong> ${formattedDate}</p>
-            </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <div style="margin-bottom: 15px;">
-                <a href="${assignmentLink}" style="display: inline-block; background-color: #4299E1; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); margin-bottom: 10px;">
-                  🎮 Start This Assignment
-                </a>
-              </div>
-              <div style="margin-top: 15px;">
-                <a href="${studentPortalLink}" style="display: inline-block; background-color: #38B2AC; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                  📚 Visit Student Portal
-                </a>
-              </div>
-            </div>
-            
-            <div style="background-color: #E6FFFA; padding: 20px; border-radius: 8px; border-left: 4px solid #38B2AC; margin: 25px 0;">
-              <h3 style="color: #2C7A7B; margin-top: 0; font-size: 16px;">🔐 Two Ways to Access:</h3>
-              <div style="color: #2C7A7B; margin: 10px 0;">
-                <p style="margin: 5px 0;"><strong>Option 1 - Direct to Assignment:</strong></p>
-                <ul style="margin: 5px 0; padding-left: 20px;">
-                  <li>Click "Start This Assignment" above</li>
-                  <li>Sign in with your email and password</li>
-                  <li>Complete your assignment immediately</li>
-                </ul>
-                
-                <p style="margin: 15px 0 5px 0;"><strong>Option 2 - Student Portal:</strong></p>
-                <ul style="margin: 5px 0; padding-left: 20px;">
-                  <li>Click "Visit Student Portal" above</li>
-                  <li>Sign in with your email and password</li>
-                  <li>View all your assignments and progress</li>
-                  <li>Access this and other assignments</li>
-                </ul>
-              </div>
-            </div>
-            
-            <div style="font-size: 14px; color: #718096; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #E2E8F0;">
-              <p><strong>Direct Assignment Link:</strong></p>
-              <p style="word-break: break-all; background-color: #F7FAFC; padding: 10px; border-radius: 4px; margin: 10px 0;">${assignmentLink}</p>
-              
-              <p><strong>Student Portal Link:</strong></p>
-              <p style="word-break: break-all; background-color: #F7FAFC; padding: 10px; border-radius: 4px; margin: 10px 0;">${studentPortalLink}</p>
-              
-              <p><strong>These links are unique to you. Please do not share them with others.</strong></p>
-            </div>
-          </div>
-        </div>
-      `,
+        subject: `🔐📱 Secure PWA Assignment: ${assignment.gameTitle || assignment.gameName}`,
+        html: emailHtml,
     };
     const isEmailSent = await (0, sendgridHelper_1.sendEmail)(msg);
     if (isEmailSent) {

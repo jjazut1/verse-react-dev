@@ -1,0 +1,61 @@
+{
+  "name": "Lumino Learning - Student",
+  "short_name": "Lumino Student",
+  "description": "Educational games and assignments for students",
+  "start_url": "/student",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4299E1",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon-512.png", 
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon-192.png",
+      "sizes": "192x192", 
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png", 
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "form_factor": "wide"
+    }
+  ],
+  "categories": ["education", "games", "learning"],
+  "protocol_handlers": [
+    {
+      "protocol": "web+lumino",
+      "url": "/play?token=%s"
+    }
+  ],
+  "url_handlers": [
+    {
+      "origin": "https://verse-dev-central.web.app"
+    },
+    {
+      "origin": "https://r2process.com" 
+    }
+  ],
+  "handle_links": "preferred",
+  "capture_links": "existing-client-navigate"
+} 

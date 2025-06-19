@@ -816,6 +816,31 @@ const Home = () => {
 
   return (
     <div style={{ width: '100vw', overflow: 'hidden' }}>
+      {/* Debug PWA Status - Temporary for testing */}
+      {currentUser && (
+        <div style={{
+          position: 'fixed',
+          top: '10px',
+          right: '10px',
+          background: 'rgba(0,0,0,0.8)',
+          color: 'white',
+          padding: '10px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          zIndex: 1000
+        }}>
+          <div>🔍 PWA Debug:</div>
+          <div>User: {currentUser.email}</div>
+          <div>Page: Home (/)</div>
+          <div>PWA Banner: Only on /student</div>
+          <div>
+            <a href="/student" style={{ color: '#4299E1' }}>
+              → Go to Student Dashboard
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div style={{ backgroundColor: 'var(--color-primary-500)', color: 'white', padding: 'var(--spacing-20) 0', width: '100%' }}>
         <div style={{ width: '100%', margin: '0 auto', padding: '0 var(--spacing-4)' }}>
@@ -877,6 +902,63 @@ const Home = () => {
           gap: 'var(--spacing-8)',
           width: '100%'
         }}>
+          {/* Student Dashboard Quick Access */}
+          {isStudent && currentUser && (
+            <div style={{
+              maxWidth: '600px',
+              margin: '0 auto 40px auto',
+              textAlign: 'center',
+              padding: 'var(--spacing-6)',
+              backgroundColor: 'linear-gradient(135deg, #4299E1 0%, #3182CE 100%)',
+              background: 'linear-gradient(135deg, #4299E1 0%, #3182CE 100%)',
+              borderRadius: 'var(--border-radius-lg)',
+              boxShadow: '0 4px 12px rgba(66, 153, 225, 0.3)',
+              color: 'white'
+            }}>
+              <div style={{ 
+                fontSize: '2rem', 
+                marginBottom: 'var(--spacing-4)'
+              }}>
+                📱
+              </div>
+              <h2 style={{ 
+                fontSize: 'var(--font-size-xl)',
+                marginBottom: 'var(--spacing-2)',
+                color: 'white'
+              }}>
+                Ready for the App Experience?
+              </h2>
+              <p style={{ 
+                marginBottom: 'var(--spacing-4)',
+                opacity: 0.9
+              }}>
+                Access your assignments and install the Lumino Learning app from your dashboard!
+              </p>
+              <a 
+                href="/student"
+                style={{
+                  display: 'inline-block',
+                  padding: '12px 24px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                }}
+              >
+                Go to My Dashboard →
+              </a>
+            </div>
+          )}
+
           {/* Free Games Column */}
           <div style={{ 
             padding: 'var(--spacing-6)',
