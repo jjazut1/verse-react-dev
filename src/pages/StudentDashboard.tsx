@@ -208,6 +208,47 @@ const StudentDashboard: React.FC = () => {
     }
   };
 
+  // Clean up email link parameters from URL after successful load
+  useEffect(() => {
+    // Only clean up after data has finished loading and component is ready
+    if (!loading && currentUserData) {
+      const cleanupTimer = setTimeout(() => {
+        const currentUrl = new URL(window.location.href);
+        let urlChanged = false;
+
+        // Email link parameters that should be cleaned up for better UX
+        const emailLinkParams = [
+          'studentEmail',  // Student identification (internal use only)
+          'source',        // Source tracking (email/direct)
+          'pwa',           // PWA mode indicator  
+          'from',          // Origin tracking (email/launcher)
+          'emailAccess',   // Email access bypass flag
+          'forceBrowser',  // Browser mode forcing
+          'showInstall',   // Install guide trigger
+          'showGuide'      // Installation guide flag
+        ];
+
+        // Remove email link parameters one by one
+        emailLinkParams.forEach(param => {
+          if (currentUrl.searchParams.has(param)) {
+            console.log(`[StudentDashboard] 🧹 Cleaning URL parameter: ${param}`);
+            currentUrl.searchParams.delete(param);
+            urlChanged = true;
+          }
+        });
+
+        // Update URL without page reload if any parameters were removed
+        if (urlChanged) {
+          const cleanUrl = currentUrl.toString();
+          console.log('[StudentDashboard] ✨ URL cleaned:', cleanUrl);
+          window.history.replaceState({}, '', cleanUrl);
+        }
+      }, 2000); // 2 second delay to ensure everything is loaded
+
+      return () => clearTimeout(cleanupTimer);
+    }
+  }, [loading, currentUserData]); // Trigger when loading completes and user data is available
+
   // Listen for assignment notifications via BroadcastChannel and Service Worker
   useEffect(() => {
     let assignmentChannel: BroadcastChannel | null = null;
