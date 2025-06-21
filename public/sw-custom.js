@@ -89,6 +89,39 @@ self.addEventListener('message', async (event) => {
   }
 });
 
+// NEW: Test if a client window is actually alive and responsive
+async function testClientAlive(client) {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      resolve(false); // Client didn't respond in time, consider it dead
+    }, 1000); // 1 second timeout
+
+    // Listen for response
+    const handleMessage = (event) => {
+      if (event.data?.type === 'CLIENT_ALIVE_RESPONSE' && event.data.clientId === client.id) {
+        clearTimeout(timeout);
+        self.removeEventListener('message', handleMessage);
+        resolve(true); // Client responded, it's alive
+      }
+    };
+
+    self.addEventListener('message', handleMessage);
+
+    // Send ping to client
+    try {
+      client.postMessage({
+        type: 'CLIENT_ALIVE_PING',
+        clientId: client.id,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      clearTimeout(timeout);
+      self.removeEventListener('message', handleMessage);
+      resolve(false); // Failed to send message, client is dead
+    }
+  });
+}
+
 // NEW: Handle single PWA window enforcement (focus-first approach)
 async function handleEnforceSinglePWA(data, requestingClient) {
   const { currentUrl, studentEmail, source = 'pwa_launch' } = data;
@@ -103,9 +136,11 @@ async function handleEnforceSinglePWA(data, requestingClient) {
     });
     
     // Find existing PWA windows (excluding the requesting client)
-    const existingPWAClients = allClients.filter(client => {
+    const existingPWAClients = [];
+    
+    for (const client of allClients) {
       try {
-        if (client.id === requestingClient.id) return false; // Skip requesting client
+        if (client.id === requestingClient.id) continue; // Skip requesting client
         
         const clientUrl = new URL(client.url);
         const isStudentDashboard = clientUrl.pathname.includes('/student');
@@ -118,11 +153,26 @@ async function handleEnforceSinglePWA(data, requestingClient) {
                          clientUrl.searchParams.has('emailAccess') ||
                          isStudentDashboard || isGameWindow || isTeacherDashboard;
         
-        return isPWAContext && isPWAMode;
+        if (isPWAContext && isPWAMode) {
+          // ENHANCED: Test if client is actually responsive/alive
+          try {
+            // Send a ping message and wait for response to verify window is actually alive
+            const isAlive = await testClientAlive(client);
+            if (isAlive) {
+              existingPWAClients.push(client);
+              console.log('[SW] ✅ Found alive PWA client:', clientUrl.pathname);
+            } else {
+              console.log('[SW] 💀 Found dead PWA client (will ignore):', clientUrl.pathname);
+            }
+          } catch (testError) {
+            console.log('[SW] ❌ Client alive test failed:', testError.message);
+            // If test fails, don't include this client
+          }
+        }
       } catch (error) {
-        return false;
+        console.error('[SW] ❌ Error checking client:', error);
       }
-    });
+    }
     
     console.log(`[SW] 🔍 Found ${existingPWAClients.length} existing PWA windows`);
     
@@ -220,20 +270,36 @@ async function handleCheckPWAWindows(data, requestingClient) {
       includeUncontrolled: true 
     });
     
-    // Find PWA windows (student dashboard or game windows)
-    const pwaClients = allClients.filter(client => {
+    // Find PWA windows (student dashboard or game windows) - with alive testing
+    const pwaClients = [];
+    
+    for (const client of allClients) {
       try {
+        if (client.id === requestingClient.id) continue; // Skip requesting client
+        
         const clientUrl = new URL(client.url);
         const isStudentDashboard = clientUrl.pathname.includes('/student');
         const isGameWindow = clientUrl.pathname.includes('/play');
         const isPWAContext = isStudentDashboard || isGameWindow;
-        const isNotRequestingClient = client.id !== requestingClient.id;
         
-        return isPWAContext && isNotRequestingClient;
+        if (isPWAContext) {
+          // Test if client is actually alive before including it
+          try {
+            const isAlive = await testClientAlive(client);
+            if (isAlive) {
+              pwaClients.push(client);
+              console.log('[SW] ✅ Found alive PWA client for email link:', clientUrl.pathname);
+            } else {
+              console.log('[SW] 💀 Found dead PWA client for email link (ignoring):', clientUrl.pathname);
+            }
+          } catch (testError) {
+            console.log('[SW] ❌ Email link client alive test failed:', testError.message);
+          }
+        }
       } catch (error) {
-        return false;
+        console.error('[SW] ❌ Error checking email link client:', error);
       }
-    });
+    }
     
     console.log(`[SW] 📱 Found ${pwaClients.length} existing PWA windows`);
     

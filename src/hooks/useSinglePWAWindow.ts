@@ -123,23 +123,35 @@ export function useSinglePWAWindow(options: SinglePWAWindowOptions = {}) {
     };
   }, [enabled, studentEmail, source, onDuplicateDetected]);
 
-  // Handle PWA activity notifications (when existing PWA receives focus)
+  // Handle PWA activity notifications and client alive pings
   useEffect(() => {
     if (!enabled) return;
 
-    const handlePWAActivityNotification = (event: MessageEvent) => {
+    const handleServiceWorkerMessages = (event: MessageEvent) => {
       if (event.data?.type === 'PWA_ACTIVITY_NOTIFICATION') {
         console.log('[useSinglePWAWindow] 📨 Received PWA activity notification:', event.data);
         
         // Could trigger UI updates here (like showing "New assignment available" notification)
         // This is where you'd handle updating the Student Dashboard if needed
+      } else if (event.data?.type === 'CLIENT_ALIVE_PING') {
+        // CRITICAL: Respond to service worker ping to prove this window is alive
+        console.log('[useSinglePWAWindow] 🏓 Responding to client alive ping');
+        
+        // Send response back to service worker
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'CLIENT_ALIVE_RESPONSE',
+            clientId: event.data.clientId,
+            timestamp: Date.now()
+          });
+        }
       }
     };
 
-    navigator.serviceWorker?.addEventListener('message', handlePWAActivityNotification);
+    navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessages);
 
     return () => {
-      navigator.serviceWorker?.removeEventListener('message', handlePWAActivityNotification);
+      navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessages);
     };
   }, [enabled]);
 
