@@ -7,6 +7,8 @@ import { Assignment, Attempt } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
 import { usePWA } from '../hooks/usePWA';
+import { useCustomToast } from '../hooks/useCustomToast';
+import { useSinglePWAWindow } from '../hooks/useSinglePWAWindow';
 
 // Define Game interface based on TeacherDashboard.tsx
 interface Game {
@@ -46,7 +48,10 @@ const StudentDashboard: React.FC = () => {
   const pwaInstall = queryParams.get('pwa'); // Check for PWA installation parameter
   
   // PWA hook for installation functionality
-  const { installPWA, showInstallPrompt, isInstallable } = usePWA();
+  const { installPWA, showInstallPrompt, isInstallable, isInstalled } = usePWA();
+  
+  // Custom toast hook for notifications
+  const { showToast } = useCustomToast();
   
   const [studentData, setStudentData] = useState<any>(null);
   const [currentUserData, setCurrentUserData] = useState<any>(null);
@@ -64,6 +69,42 @@ const StudentDashboard: React.FC = () => {
   // Enhanced high scores state
   const [enhancedHighScores, setEnhancedHighScores] = useState<HighScore[]>([]);
   const [highScoresLoading, setHighScoresLoading] = useState(false);
+  
+  // Assignment notification state
+  const [hasNewAssignments, setHasNewAssignments] = useState(false);
+  
+  // Single PWA window enforcement (focus-first approach)
+  const [pwaWindowAction, setPwaWindowAction] = useState<string | null>(null);
+  
+  // Determine student email for PWA window management
+  const studentEmail = studentId || currentUser?.email || '';
+  
+  // Enable single PWA window enforcement
+  useSinglePWAWindow({
+    enabled: true,
+    studentEmail: studentEmail,
+    source: 'student_dashboard',
+    onDuplicateDetected: (action) => {
+      console.log('[StudentDashboard] 🎯 PWA duplicate action:', action);
+      setPwaWindowAction(action);
+      
+      if (action === 'focused_existing') {
+        showToast({
+          title: "Opening Existing App 🎯",
+          description: "Switching to your already open Lumino Learning app...",
+          status: "info",
+          duration: 3000,
+        });
+      } else if (action === 'closed_duplicates') {
+        showToast({
+          title: "App Window Cleaned Up ✨",
+          description: "Closed duplicate windows to keep things tidy!",
+          status: "success",
+          duration: 3000,
+        });
+      }
+    }
+  });
   
   // High score interface
   interface HighScore {
@@ -83,18 +124,72 @@ const StudentDashboard: React.FC = () => {
     } | null;
   }
 
-  // Handle PWA installation from email links
+  // Enhanced PWA installation handling from email links
   useEffect(() => {
-    if (pwaInstall === 'install' && isInstallable) {
-      // Show PWA installation prompt after a brief delay to ensure page is loaded
+    const showGuide = queryParams.get('showGuide') === 'true';
+    const alreadyInstalled = queryParams.get('pwa') === 'alreadyInstalled';
+    const forceBrowser = queryParams.get('forceBrowser') === 'true';
+    
+    console.log('StudentDashboard: PWA parameters:', {
+      pwaInstall,
+      showGuide,
+      alreadyInstalled,
+      forceBrowser,
+      isInstallable,
+      isInstalled
+    });
+
+    if (forceBrowser) {
+      console.log('📱 Force browser mode detected - skipping PWA features');
+      return;
+    }
+
+    if (alreadyInstalled) {
+      // Show message that PWA is already installed
       const timer = setTimeout(() => {
-        setShowPWAPrompt(true);
-        console.log('📱 PWA installation prompted from email link');
+        showToast({
+          title: "App Already Installed! 🎉",
+          description: "Lumino Learning is already installed on your device. You can find it on your home screen or in your applications folder.",
+          status: "info",
+          duration: 8000,
+        });
       }, 1000);
-      
       return () => clearTimeout(timer);
     }
-  }, [pwaInstall, isInstallable]);
+
+    if (pwaInstall === 'install' || showGuide) {
+      if (isInstalled) {
+        // PWA is already installed, show guidance on how to access it
+        const timer = setTimeout(() => {
+                  showToast({
+          title: "App Already Installed! 🎉",
+          description: "Lumino Learning is already installed. Look for the app icon on your home screen or in your applications.",
+          status: "success",
+          duration: 8000,
+        });
+        }, 1000);
+        return () => clearTimeout(timer);
+      } else if (isInstallable) {
+        // Show PWA installation prompt
+        const timer = setTimeout(() => {
+          setShowPWAPrompt(true);
+          console.log('📱 PWA installation prompted from email link');
+        }, 1000);
+        return () => clearTimeout(timer);
+      } else {
+        // PWA not installable, show instructions
+        const timer = setTimeout(() => {
+                  showToast({
+          title: "Manual Installation Required",
+          description: "Look for an install button in your browser address bar, or check your browser menu for 'Install Lumino Learning' or 'Add to Home Screen'.",
+          status: "info",
+          duration: 10000,
+        });
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [pwaInstall, isInstallable, isInstalled, queryParams, showToast]);
 
   // Handle PWA installation action
   const handlePWAInstall = async () => {
@@ -112,6 +207,81 @@ const StudentDashboard: React.FC = () => {
       console.error('❌ PWA installation failed:', error);
     }
   };
+
+  // Listen for assignment notifications via BroadcastChannel and Service Worker
+  useEffect(() => {
+    let assignmentChannel: BroadcastChannel | null = null;
+
+    // Initialize BroadcastChannel for assignment notifications
+    try {
+      assignmentChannel = new BroadcastChannel('lumino-assignments');
+      console.log('[StudentDashboard] 📡 BroadcastChannel initialized');
+
+      const handleAssignmentMessage = (event: MessageEvent) => {
+        console.log('[StudentDashboard] 📨 BroadcastChannel message:', event.data);
+        
+        if (event.data?.type === 'ASSIGNMENT_AVAILABLE') {
+          console.log('[StudentDashboard] 🎯 New assignment notification received');
+          setHasNewAssignments(true);
+          
+          // Show toast notification
+          showToast({
+            title: "New Assignment Available! 🎯",
+            description: "A new assignment has been shared with you. Check your assignments tab!",
+            status: "info",
+            duration: 6000,
+          });
+          
+                     // Auto-refresh assignments after a short delay
+           setTimeout(() => {
+             console.log('[StudentDashboard] 🔄 Auto-refreshing assignments');
+             window.location.reload(); // Simple refresh for now
+           }, 2000);
+        }
+      };
+
+             assignmentChannel.onmessage = handleAssignmentMessage;
+    } catch (error) {
+      console.warn('[StudentDashboard] ⚠️ BroadcastChannel not supported:', error);
+    }
+
+    // Listen for Service Worker messages
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      console.log('[StudentDashboard] 🔧 Service Worker message:', event.data);
+      
+      if (event.data?.type === 'ASSIGNMENT_NOTIFICATION') {
+        console.log('[StudentDashboard] 🎯 Assignment notification from Service Worker');
+        setHasNewAssignments(true);
+        
+        showToast({
+          title: "Assignment Ready! 🚀",
+          description: "Your assignment is ready to play. Welcome back!",
+          status: "success",
+          duration: 5000,
+        });
+        
+                 // Refresh data
+         setTimeout(() => {
+           window.location.reload(); // Simple refresh for now
+         }, 1500);
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    }
+
+         // Cleanup function
+     return () => {
+       if (assignmentChannel) {
+         assignmentChannel.close();
+       }
+      
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      }
+    };
+  }, [showToast]);
 
   useEffect(() => {
     const fetchData = async () => {

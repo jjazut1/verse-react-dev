@@ -24,6 +24,8 @@ import AnagramConfig from './pages/configurations/AnagramConfig'
 import SentenceSenseConfig from './pages/configurations/SentenceSenseConfig'
 import PlaceValueShowdownConfig from './pages/configurations/PlaceValueShowdownConfig'
 import LinkInterceptor from './components/LinkInterceptor'
+import SmartRouter from './pages/SmartRouter'
+import EmailLinkRouter from './pages/EmailLinkRouter'
 import { useEffect } from 'react'
 import { usePWANavigation } from './hooks/usePWANavigation'
 
@@ -526,6 +528,23 @@ const router = createBrowserRouter([
   {
     path: "/set-admin",
     element: <Layout><SetAdminPage /></Layout>,
+    errorElement: <ErrorBoundary />,
+  },
+  // Smart routing endpoints for email template 5-link system
+  {
+    path: "/smart-route/assignment",
+    element: <SmartRouter />,
+    errorElement: <ErrorBoundary />,
+  },
+  {
+    path: "/smart-route/dashboard", 
+    element: <SmartRouter />,
+    errorElement: <ErrorBoundary />,
+  },
+  // Email link router for 3-link system with Service Worker + BroadcastChannel
+  {
+    path: "/email-link",
+    element: <EmailLinkRouter />,
     errorElement: <ErrorBoundary />,
   },
   // Add a catch-all route that will handle any undefined paths

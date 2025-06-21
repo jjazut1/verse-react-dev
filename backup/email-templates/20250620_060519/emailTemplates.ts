@@ -14,8 +14,8 @@ interface EmailTemplateData {
 }
 
 /**
- * Enhanced 3-Link Assignment Email Template
- * Uses Service Worker + BroadcastChannel for PWA window coordination
+ * Enhanced 5-Link Assignment Email Template
+ * Includes smart PWA routing and explicit browser/app options
  */
 export const createAssignmentEmailTemplate = (
   studentName: string,
@@ -24,13 +24,20 @@ export const createAssignmentEmailTemplate = (
   assignmentToken: string,
   baseUrl: string = 'https://verse-dev-central.web.app'
 ) => {
-  // Extract student email from assignment token if available
-  const studentEmail = assignmentToken.split('_')[0] || 'student';
+  // Smart routing URLs that detect PWA installation status
+  const smartAssignmentLink = `${baseUrl}/smart-route/assignment?token=${assignmentToken}&from=email`;
+  const smartDashboardLink = `${baseUrl}/smart-route/dashboard?from=email`;
   
-  // Three distinct link types with clear, predictable behavior - all route to Student Dashboard
-  const pwaLink = `${baseUrl}/email-link?type=pwa&target=dashboard&studentEmail=${studentEmail}&source=email`;
-  const browserLink = `${baseUrl}/email-link?type=browser&target=dashboard&studentEmail=${studentEmail}&source=email`;
-  const installLink = `${baseUrl}/email-link?type=install&target=dashboard&studentEmail=${studentEmail}&source=email`;
+  // Explicit mode URLs - Browser mode (always browser)
+  const browserAssignmentLink = `${baseUrl}/play?token=${assignmentToken}&from=email&forceBrowser=true`;
+  const browserDashboardLink = `${baseUrl}/student?from=email&forceBrowser=true`;
+  
+  // Explicit mode URLs - PWA mode (app preferred)
+  const pwaAssignmentLink = `${baseUrl}/smart-route/assignment?token=${assignmentToken}&pwaMode=required&from=email`;
+  const pwaDashboardLink = `${baseUrl}/smart-route/dashboard?pwaMode=required&from=email`;
+  
+  // Install link
+  const installLink = `${baseUrl}/student?pwa=install&from=email&showGuide=true`;
 
   return `
 <!DOCTYPE html>
@@ -156,59 +163,62 @@ export const createAssignmentEmailTemplate = (
             <p><strong>Due Date:</strong> ${dueDate}</p>
         </div>
 
-        <!-- Three Clear Link Options -->
+        <!-- Primary Smart Actions -->
         <div class="primary-actions">
-            <h2 style="margin-top: 0; font-size: 22px;">🎯 Choose How to Access Your Dashboard</h2>
+            <h2 style="margin-top: 0; font-size: 22px;">🎯 Quick Access (Recommended)</h2>
             <p style="margin: 0 0 20px 0; font-size: 16px; opacity: 0.9;">
-                Your assignment will be waiting for you on your Student Dashboard:
+                These smart links automatically choose the best way to open based on your device:
             </p>
+            <a href="${smartAssignmentLink}" class="smart-button">
+                🎮 Start Assignment
+            </a>
+            <br>
+            <a href="${smartDashboardLink}" class="smart-button">
+                📚 Student Dashboard
+            </a>
         </div>
 
-        <!-- Three Link Options -->
+        <!-- Explicit Mode Options -->
         <div class="explicit-options">
-            <div style="margin: 25px 0; text-align: center;">
-                <h3 style="color: #10b981; margin-bottom: 15px;">📱 PWA Link (Recommended)</h3>
-                <a href="${pwaLink}" class="mode-button pwa-button" style="font-size: 16px; padding: 16px 32px;">
-                    🚀 Open Student Dashboard
-                </a>
+            <h3 style="color: #374151; margin-top: 0;">🔧 Choose Your Preferred Way:</h3>
+            
+            <div style="margin: 20px 0;">
+                <h4 style="color: #4b5563; margin-bottom: 10px;">🖥️ Browser Mode (Always opens in browser)</h4>
+                <a href="${browserAssignmentLink}" class="mode-button browser-button">🎮 Assignment in Browser</a>
+                <a href="${browserDashboardLink}" class="mode-button browser-button">📚 Dashboard in Browser</a>
                 <p class="explanatory-text">
-                    <strong>Best choice for most students!</strong> Opens your app if it's already running, 
-                    launches the app if installed, or opens in browser with install option. Your assignment 
-                    will be ready on your dashboard.
+                    <strong>When to use:</strong> If you prefer using your web browser, or if the app isn't working properly.
+                    This will always open in your browser, even if you have the app installed.
                 </p>
             </div>
 
-            <div style="margin: 25px 0; text-align: center;">
-                <h3 style="color: #3b82f6; margin-bottom: 15px;">🌐 Browser Link</h3>
-                <a href="${browserLink}" class="mode-button browser-button" style="font-size: 16px; padding: 16px 32px;">
-                    🖥️ Open in Browser
-                </a>
+            <div style="margin: 20px 0;">
+                <h4 style="color: #4b5563; margin-bottom: 10px;">📱 App Mode (Opens in app if installed)</h4>
+                <a href="${pwaAssignmentLink}" class="mode-button pwa-button">🎮 Assignment in App</a>
+                <a href="${pwaDashboardLink}" class="mode-button pwa-button">📚 Dashboard in App</a>
                 <p class="explanatory-text">
-                    <strong>For browser users:</strong> Always opens your dashboard in a new browser tab, 
-                    even if you have the app installed. Good if you prefer working in your browser.
-                </p>
-            </div>
-
-            <div style="margin: 25px 0; text-align: center;">
-                <h3 style="color: #f59e0b; margin-bottom: 15px;">⬇️ Install App Link</h3>
-                <a href="${installLink}" class="mode-button install-button" style="font-size: 16px; padding: 16px 32px;">
-                    📲 Get the App
-                </a>
-                <p class="explanatory-text">
-                    <strong>Don't have the app yet?</strong> This shows you how to install Lumino Learning as an app 
-                    on your device for the best experience. Works on phones, tablets, and computers!
+                    <strong>When to use:</strong> If you have the Lumino Learning app installed and want to use it.
                     If the app isn't installed, you'll be guided to install it first.
+                </p>
+            </div>
+
+            <div style="margin: 20px 0;">
+                <h4 style="color: #4b5563; margin-bottom: 10px;">⬇️ Install App</h4>
+                <a href="${installLink}" class="mode-button install-button">📱 Install Lumino Learning App</a>
+                <p class="explanatory-text">
+                    <strong>Recommended:</strong> Install the app for faster access, offline capabilities, and a better experience.
+                    Works on phones, tablets, and computers. If already installed, you'll see instructions on how to find it.
                 </p>
             </div>
         </div>
 
         <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
-            <h3 style="color: #047857; margin-top: 0;">💡 How These Links Work:</h3>
+            <h3 style="color: #047857; margin-top: 0;">💡 How the Smart Links Work:</h3>
             <ul style="color: #047857; margin: 10px 0; padding-left: 20px;">
-                <li><strong>PWA Link:</strong> Tries to focus your existing app, or opens the app if installed</li>
-                <li><strong>Browser Link:</strong> Always opens in a new browser tab</li>
-                <li><strong>Install Link:</strong> Shows you how to install the app on your device</li>
-                <li><strong>Need help?</strong> Ask your teacher or use the install guide</li>
+                <li><strong>Have the app?</strong> Smart links open in your app automatically</li>
+                <li><strong>No app?</strong> Smart links open in your browser</li>
+                <li><strong>Want control?</strong> Use the specific mode options above</li>
+                <li><strong>Need help?</strong> Use the install link for step-by-step guidance</li>
             </ul>
         </div>
 
@@ -231,17 +241,10 @@ export const createPWAEmailLinkTemplate = (data: EmailTemplateData): string => {
     gameTitle,
     formattedDate,
     assignmentLink,
-    baseUrl
+    studentPortalLink,
+    baseUrl,
+    pwaInstallUrl = `${baseUrl}/student?pwa=install`
   } = data;
-
-  // Extract token from assignment link for EmailLinkRouter
-  const tokenMatch = assignmentLink.match(/token=([^&]+)/);
-  const token = tokenMatch ? tokenMatch[1] : '';
-  
-  // Build EmailLinkRouter URLs for enhanced 3-link system
-  const pwaLinkUrl = `${baseUrl}/email-link?type=pwa&target=assignment&token=${token}`;
-  const browserLinkUrl = `${baseUrl}/email-link?type=browser&target=assignment&token=${token}`;
-  const installLinkUrl = `${baseUrl}/email-link?type=install&target=dashboard`;
 
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
@@ -249,10 +252,10 @@ export const createPWAEmailLinkTemplate = (data: EmailTemplateData): string => {
         
         <!-- Header with Security Badge -->
         <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #2D3748; margin-bottom: 10px;">Assignment from Lumino Learning</h2>
+          <h2 style="color: #2D3748; margin-bottom: 10px;">Secure Assignment from Lumino Learning</h2>
           <div style="display: inline-flex; gap: 10px; justify-content: center;">
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
-              📱 SMART LINKS
+              📱 PWA READY
             </div>
             <div style="background-color: #48BB78; color: white; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
               🔐 SECURE ACCESS
@@ -262,82 +265,49 @@ export const createPWAEmailLinkTemplate = (data: EmailTemplateData): string => {
         
         <!-- Greeting -->
         <p style="font-size: 16px; color: #4A5568;">Hello ${studentName},</p>
-        <p style="font-size: 16px; color: #4A5568;">You have a new learning assignment waiting for you:</p>
+        <p style="font-size: 16px; color: #4A5568;">You have been assigned a new secure learning activity:</p>
         
         <!-- Assignment Details -->
         <div style="background-color: #EDF2F7; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #4299E1;">
-          <p style="margin: 0; font-size: 18px;"><strong>📚 Activity:</strong> ${gameTitle}</p>
-          <p style="margin: 10px 0 0 0; font-size: 16px;"><strong>📅 Due Date:</strong> ${formattedDate}</p>
+          <p style="margin: 0; font-size: 18px;"><strong>Activity:</strong> ${gameTitle}</p>
+          <p style="margin: 10px 0 0 0; font-size: 16px;"><strong>Due Date:</strong> ${formattedDate}</p>
         </div>
         
-        <!-- Enhanced 3-Link Access Options -->
+        <!-- PWA Installation Priority Section -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 12px; margin: 25px 0; text-align: center;">
+          <h3 style="margin-top: 0; font-size: 20px; margin-bottom: 15px;">🚀 Install App First (Recommended)</h3>
+          <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.5;">
+            For the best secure assignment experience, install Lumino Learning as an app first. 
+            This ensures your authentication persists and assignments load faster!
+          </p>
+          <a href="${pwaInstallUrl}" style="display: inline-block; background-color: rgba(255,255,255,0.2); color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold; border: 2px solid rgba(255,255,255,0.3);">
+            📱 Install App → Then Access Assignment
+          </a>
+        </div>
+        
+        <!-- Primary Action Buttons -->
         <div style="text-align: center; margin: 30px 0;">
-          
-          <!-- PWA Link (Recommended) -->
-          <div style="margin-bottom: 20px;">
-            <div style="background: linear-gradient(135deg, #4299E1 0%, #3182CE 100%); color: white; padding: 20px; border-radius: 12px; margin-bottom: 15px;">
-              <h3 style="margin: 0 0 10px 0; font-size: 18px;">📱 App Link (Recommended)</h3>
-              <p style="margin: 0 0 15px 0; font-size: 14px; opacity: 0.9;">
-                Opens in the app if installed, or browser with app features
-              </p>
-              <a href="${pwaLinkUrl}" style="display: inline-block; background-color: rgba(255,255,255,0.2); color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; border: 2px solid rgba(255,255,255,0.3);">
-                🚀 Open Assignment
-              </a>
-            </div>
+          <div style="margin-bottom: 15px;">
+            <a href="${assignmentLink}" style="display: inline-block; background-color: #4299E1; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); margin-bottom: 10px;">
+              🔐 Access Secure Assignment
+            </a>
           </div>
-          
-          <!-- Browser Link -->
-          <div style="margin-bottom: 20px;">
-            <div style="background-color: #38B2AC; color: white; padding: 15px; border-radius: 8px;">
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">🌐 Browser Link</h3>
-              <p style="margin: 0 0 12px 0; font-size: 13px; opacity: 0.9;">
-                Always opens in a browser tab
-              </p>
-              <a href="${browserLinkUrl}" style="display: inline-block; background-color: rgba(255,255,255,0.2); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold; border: 1px solid rgba(255,255,255,0.3);">
-                📄 Open in Browser
-              </a>
-            </div>
-          </div>
-          
-          <!-- Install App Link -->
-          <div style="margin-bottom: 20px;">
-            <div style="background-color: #9F7AEA; color: white; padding: 15px; border-radius: 8px;">
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">📱 Install App</h3>
-              <p style="margin: 0 0 12px 0; font-size: 13px; opacity: 0.9;">
-                Get the app for faster access to all assignments
-              </p>
-              <a href="${installLinkUrl}" style="display: inline-block; background-color: rgba(255,255,255,0.2); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold; border: 1px solid rgba(255,255,255,0.3);">
-                📲 Install Now
-              </a>
-            </div>
-          </div>
-          
-        </div>
-        
-        <!-- Help Section -->
-        <div style="background-color: #F0FFF4; padding: 20px; border-radius: 8px; border-left: 4px solid #48BB78; margin: 25px 0;">
-          <h3 style="color: #2F855A; margin-top: 0; font-size: 16px;">💡 Which Link Should I Use?</h3>
-          <div style="color: #2F855A; font-size: 14px; line-height: 1.6;">
-            <p style="margin: 8px 0;"><strong>📱 App Link:</strong> Best choice! Works like magic - opens in app if you have it, browser if you don't.</p>
-            <p style="margin: 8px 0;"><strong>🌐 Browser Link:</strong> Always opens in browser, good for shared computers.</p>
-            <p style="margin: 8px 0;"><strong>📲 Install App:</strong> First time? Get the app for faster access to future assignments!</p>
+          <div style="margin-top: 15px;">
+            <a href="${studentPortalLink}" style="display: inline-block; background-color: #38B2AC; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+              📚 Go to Student Dashboard
+            </a>
           </div>
         </div>
         
         <!-- Footer Links -->
-        <div style="font-size: 12px; color: #718096; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #E2E8F0;">
-          <p><strong>🔗 Smart Links (for troubleshooting):</strong></p>
-          <p style="word-break: break-all; background-color: #F7FAFC; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 11px;">
-            App: ${pwaLinkUrl}
-          </p>
-          <p style="word-break: break-all; background-color: #F7FAFC; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 11px;">
-            Browser: ${browserLinkUrl}
-          </p>
-          <p style="word-break: break-all; background-color: #F7FAFC; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 11px;">
-            Install: ${installLinkUrl}
-          </p>
+        <div style="font-size: 14px; color: #718096; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #E2E8F0;">
+          <p><strong>📱 PWA Installation Link:</strong></p>
+          <p style="word-break: break-all; background-color: #F7FAFC; padding: 10px; border-radius: 4px; margin: 10px 0;">${pwaInstallUrl}</p>
           
-          <p style="margin-top: 15px; font-size: 11px;"><strong>These links are unique to you. Please do not share them with others.</strong></p>
+          <p><strong>🔐 Secure Assignment Link:</strong></p>
+          <p style="word-break: break-all; background-color: #F7FAFC; padding: 10px; border-radius: 4px; margin: 10px 0;">${assignmentLink}</p>
+          
+          <p style="margin-top: 20px;"><strong>These secure links are unique to you. Please do not share them with others.</strong></p>
         </div>
         
       </div>

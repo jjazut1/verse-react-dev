@@ -170,24 +170,15 @@ exports.sendEmailLinkWithAssignment = (0, firestore_1.onDocumentCreated)({
     catch (e) {
         console.error("Date formatting error", e);
     }
-    // Create both links for the email link template
-    const assignmentLink = `${baseUrl}/play?token=${assignment.linkToken}&requireAuth=true`;
-    const studentPortalLink = `${baseUrl}/student`;
-    console.log(`Generated password-required assignment link for assignment ${assignmentId}`);
+    // Use the new 3-link email template system instead of the old PWA email link template
+    console.log(`Generating new-format 3-link email for password-required assignment ${assignmentId}`);
     const isSetupSuccessful = (0, sendgridHelper_1.setupSendGrid)(exports.SENDGRID_API_KEY.value());
     if (!isSetupSuccessful) {
         console.error("Failed to set up SendGrid properly");
         return;
     }
-    // Use the new PWA-aware email link template
-    const emailHtml = (0, emailTemplates_1.createPWAEmailLinkTemplate)({
-        studentName,
-        gameTitle: assignment.gameTitle || assignment.gameName,
-        formattedDate,
-        assignmentLink,
-        studentPortalLink,
-        baseUrl
-    });
+    // Use the new 3-link assignment email template (same as regular assignments)
+    const emailHtml = (0, emailTemplates_1.createAssignmentEmailTemplate)(studentName, assignment.gameTitle || assignment.gameName, formattedDate, assignment.linkToken, baseUrl);
     const msg = {
         to: studentEmail,
         from: {

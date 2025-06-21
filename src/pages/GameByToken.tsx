@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePWA } from '../hooks/usePWA';
 import { usePWANavigation } from '../hooks/usePWANavigation';
 import { usePWAMessageAck } from '../hooks/usePWAMessageAck';
+import { useSinglePWAWindow } from '../hooks/useSinglePWAWindow';
 import { Assignment } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -64,6 +65,18 @@ const GameByToken: React.FC<Props> = () => {
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
   const [isHighScoreProcessing, setIsHighScoreProcessing] = useState(false);
   
+  // Single PWA window enforcement for game windows
+  useSinglePWAWindow({
+    enabled: true,
+    studentEmail: assignment?.studentEmail || currentUser?.email || '',
+    source: 'game_window',
+    onDuplicateDetected: (action) => {
+      console.log('[GameByToken] 🎯 PWA duplicate action:', action);
+      // For games, we typically want to allow multiple assignment windows
+      // but this will prevent accidental duplicates of the same game
+    }
+  });
+  
   // Check authentication status on component mount
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -106,6 +119,18 @@ const GameByToken: React.FC<Props> = () => {
   
   // Enhanced email link and PWA launcher parameter detection
   useEffect(() => {
+    // BACKWARD COMPATIBILITY: Detect old email format and redirect to new system
+    const legacyMode = searchParams.get('mode'); // Old parameter name
+    const source = searchParams.get('source');
+    
+    if (legacyMode && source === 'email' && token) {
+      console.log('🔄 Detected legacy email format, redirecting to new EmailLinkRouter system');
+      const newUrl = `/email-link?type=${legacyMode}&target=assignment&token=${token}&source=email`;
+      console.log('🔄 Redirecting to:', newUrl);
+      navigate(newUrl, { replace: true });
+      return;
+    }
+    
     // Check if we came from an email link or direct token access route
     const currentUrl = window.location.href;
     const referrer = document.referrer;
@@ -127,6 +152,7 @@ const GameByToken: React.FC<Props> = () => {
     const emailAccess = searchParams.get('emailAccess') === 'true';
     const pwaParam = searchParams.get('pwa') === 'true';
     const pwaType = searchParams.get('pwa_type'); // 'game', 'student', 'launcher'
+    const forceBrowser = searchParams.get('forceBrowser') === 'true';
     
     // Log all parameters to debug the detection
     console.log('GameByToken: Enhanced access mode detection:', {
@@ -233,8 +259,15 @@ const GameByToken: React.FC<Props> = () => {
       
       // Store email for potential use later
       if (emailParam) {
-        setAuthEmail(emailParam);
+        setAuthEmail(emailParam || '');
       }
+    }
+
+    // Handle force browser mode
+    if (forceBrowser) {
+      console.log('GameByToken: 🖥️ Force browser mode detected - disabling PWA features');
+      // Store browser preference
+      sessionStorage.setItem('force_browser_mode', 'true');
     }
   }, [searchParams, token]);
 
