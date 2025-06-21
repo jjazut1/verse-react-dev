@@ -9,6 +9,8 @@ const EmailLinkRouter: React.FC = () => {
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [message, setMessage] = useState('');
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [autoCloseReason, setAutoCloseReason] = useState<string>('');
 
   // Single PWA window enforcement for email link processing
   useSinglePWAWindow({
@@ -22,6 +24,59 @@ const EmailLinkRouter: React.FC = () => {
       }
     }
   });
+
+  // Auto-close functionality
+  const startAutoClose = (seconds: number, reason: string) => {
+    console.log(`[EmailLinkRouter] 🕐 Starting auto-close in ${seconds} seconds: ${reason}`);
+    setAutoCloseReason(reason);
+    setCountdown(seconds);
+
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countdownInterval);
+          console.log('[EmailLinkRouter] ⏰ Auto-closing window now');
+          
+          // Try multiple close methods
+          try {
+            // Method 1: Standard window.close()
+            window.close();
+            
+            // Method 2: If still open after 500ms, try history back
+            setTimeout(() => {
+              if (!window.closed) {
+                console.log('[EmailLinkRouter] 🔄 window.close() failed, trying history.back()');
+                window.history.back();
+              }
+            }, 500);
+            
+            // Method 3: If still open after 1000ms, try redirect to about:blank
+            setTimeout(() => {
+              if (!window.closed) {
+                console.log('[EmailLinkRouter] 🔄 history.back() failed, redirecting to close page');
+                window.location.href = 'about:blank';
+              }
+            }, 1000);
+            
+          } catch (error) {
+            console.error('[EmailLinkRouter] ❌ Auto-close failed:', error);
+          }
+          
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return countdownInterval;
+  };
+
+  // Cancel auto-close functionality
+  const cancelAutoClose = () => {
+    console.log('[EmailLinkRouter] 🛑 User cancelled auto-close');
+    setCountdown(null);
+    setAutoCloseReason('');
+  };
 
   useEffect(() => {
     const handleEmailLink = async () => {
@@ -79,17 +134,24 @@ const EmailLinkRouter: React.FC = () => {
             await emailLinkHandler.handlePWALink(params);
             console.log('[EmailLinkRouter] ✅ handlePWALink completed - this should not show if redirect works');
             
-            // IMMEDIATE SAFETY FALLBACK: If we're still here after 1 second, force redirect
+            // PWA link processed - should redirect automatically
             setStatus('success');
-            setMessage('Redirecting to assignment...');
+            setMessage('Opening PWA or redirecting...');
             
+            // If we're still here after 2 seconds, start emergency fallback
             setTimeout(() => {
-              console.log('[EmailLinkRouter] 🚨 EMERGENCY FALLBACK: Forcing redirect to Student Dashboard');
-              // Always redirect to Student Dashboard (simplified design)
-              const fallbackUrl = `/student?pwa=true&from=email${studentEmail ? `&studentEmail=${studentEmail}` : ''}${source ? `&source=${source}` : ''}`;
-              console.log('[EmailLinkRouter] 🎯 Emergency fallback URL:', fallbackUrl);
-              window.location.href = fallbackUrl;
-            }, 1000);
+              if (status === 'success') {
+                console.log('[EmailLinkRouter] 🚨 EMERGENCY FALLBACK: Still here, forcing redirect');
+                const fallbackUrl = `/student?pwa=true&from=email${studentEmail ? `&studentEmail=${studentEmail}` : ''}${source ? `&source=${source}` : ''}`;
+                console.log('[EmailLinkRouter] 🎯 Emergency fallback URL:', fallbackUrl);
+                window.location.href = fallbackUrl;
+              }
+            }, 2000);
+            
+            // Auto-close this window after 5 seconds as final cleanup
+            setTimeout(() => {
+              startAutoClose(3, 'PWA link processed - cleaning up');
+            }, 5000);
             break;
 
           case 'browser':
@@ -97,7 +159,11 @@ const EmailLinkRouter: React.FC = () => {
             await emailLinkHandler.handleBrowserLink(params);
             setStatus('success');
             setMessage('Opening in browser...');
-            // Browser links open in new tab, so no fallback needed
+            
+            // Auto-close after opening browser link (2 seconds)
+            setTimeout(() => {
+              startAutoClose(2, 'Browser link opened successfully');
+            }, 1000);
             break;
 
           case 'install':
@@ -105,7 +171,11 @@ const EmailLinkRouter: React.FC = () => {
             await emailLinkHandler.handleInstallLink(params);
             setStatus('success');
             setMessage('Opening installation guide...');
-            // Install links open in new tab, so no fallback needed
+            
+            // Auto-close after opening install guide (3 seconds)
+            setTimeout(() => {
+              startAutoClose(3, 'Installation guide opened successfully');
+            }, 1000);
             break;
 
           default:
@@ -116,6 +186,11 @@ const EmailLinkRouter: React.FC = () => {
         console.error('[EmailLinkRouter] Error handling email link:', error);
         setStatus('error');
         setMessage(error instanceof Error ? error.message : 'Unknown error occurred');
+        
+        // Auto-close errors after 10 seconds to prevent stuck windows
+        setTimeout(() => {
+          startAutoClose(10, 'Error occurred - auto-closing for cleanup');
+        }, 2000);
       }
     };
 
@@ -178,13 +253,43 @@ const EmailLinkRouter: React.FC = () => {
           )}
 
           {status === 'success' && (
-            <Alert status="success" borderRadius="md">
-              <AlertIcon />
-              <Box>
-                <Text fontWeight="bold">Success!</Text>
-                <Text>{message}</Text>
-              </Box>
-            </Alert>
+            <VStack spacing={4}>
+              <Alert status="success" borderRadius="md">
+                <AlertIcon />
+                <Box>
+                  <Text fontWeight="bold">Success!</Text>
+                  <Text>{message}</Text>
+                </Box>
+              </Alert>
+              
+              {countdown !== null && (
+                <Box
+                  bg="blue.50"
+                  p={3}
+                  borderRadius="md"
+                  border="1px solid"
+                  borderColor="blue.200"
+                >
+                  <VStack spacing={2}>
+                    <Text fontSize="sm" color="blue.700" textAlign="center">
+                      <strong>⏰ Auto-closing in {countdown} second{countdown !== 1 ? 's' : ''}</strong>
+                      <br />
+                      <Text fontSize="xs" color="blue.600" mt={1}>
+                        {autoCloseReason}
+                      </Text>
+                    </Text>
+                    <Button 
+                      size="xs" 
+                      variant="outline" 
+                      colorScheme="blue"
+                      onClick={cancelAutoClose}
+                    >
+                      🛑 Keep Window Open
+                    </Button>
+                  </VStack>
+                </Box>
+              )}
+            </VStack>
           )}
 
           {status === 'error' && (
@@ -196,6 +301,34 @@ const EmailLinkRouter: React.FC = () => {
                   <Text>{message}</Text>
                 </Box>
               </Alert>
+
+              {countdown !== null && (
+                <Box
+                  bg="orange.50"
+                  p={3}
+                  borderRadius="md"
+                  border="1px solid"
+                  borderColor="orange.200"
+                >
+                  <VStack spacing={2}>
+                    <Text fontSize="sm" color="orange.700" textAlign="center">
+                      <strong>⏰ Auto-closing in {countdown} second{countdown !== 1 ? 's' : ''}</strong>
+                      <br />
+                      <Text fontSize="xs" color="orange.600" mt={1}>
+                        {autoCloseReason}
+                      </Text>
+                    </Text>
+                    <Button 
+                      size="xs" 
+                      variant="outline" 
+                      colorScheme="orange"
+                      onClick={cancelAutoClose}
+                    >
+                      🛑 Keep Window Open
+                    </Button>
+                  </VStack>
+                </Box>
+              )}
 
               <VStack spacing={3}>
                 <Button colorScheme="blue" onClick={handleRetry}>
