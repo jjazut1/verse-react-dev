@@ -4,7 +4,10 @@
 let launcherSource = null;
 
 self.addEventListener('message', async (event) => {
-  console.log('[SW] Received message:', event.data);
+  // Only log messages that have a type property to reduce noise
+  if (event.data?.type) {
+    console.log('[SW] Received message:', event.data);
+  }
 
   if (event.data?.type === 'NAVIGATE_TO_ASSIGNMENT_ACK') {
     if (launcherSource) {
@@ -36,8 +39,18 @@ self.addEventListener('message', async (event) => {
     return;
   }
 
+  // Handle assignment notifications
+  if (event.data?.type === 'NEW_ASSIGNMENT_NOTIFICATION') {
+    // Just acknowledge - this is used for notification purposes
+    console.log('[SW] 📧 New assignment notification received:', event.data.studentEmail);
+    return;
+  }
+
   if (!event.data || event.data.type !== 'FOCUS_EXISTING_PWA') {
-    console.log('[SW] Ignoring message - not FOCUS_EXISTING_PWA type. Received:', event.data?.type || 'undefined');
+    // Only log if it has a type property to avoid spam from Workbox/browser internals
+    if (event.data?.type) {
+      console.log('[SW] Ignoring message - not FOCUS_EXISTING_PWA type. Received:', event.data.type);
+    }
     return;
   }
 

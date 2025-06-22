@@ -30,7 +30,7 @@ export function useSinglePWAWindow(options: SinglePWAWindowOptions = {}) {
     
     // CRITICAL: If forceBrowser is true, this is explicitly NOT a PWA context
     if (forceBrowser) {
-      console.log('[useSinglePWAWindow] ❌ forceBrowser=true detected, explicitly not a PWA context');
+  
       return;
     }
     
@@ -48,13 +48,11 @@ export function useSinglePWAWindow(options: SinglePWAWindowOptions = {}) {
 
 
     if (!isPWAContext) {
-      console.log('[useSinglePWAWindow] ❌ Not in PWA context, skipping enforcement');
       return;
     }
 
     // Check if service worker is available
     if (!('serviceWorker' in navigator)) {
-      console.log('[useSinglePWAWindow] Service Worker not available');
       return;
     }
 
