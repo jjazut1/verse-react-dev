@@ -2,12 +2,12 @@
   "name": "Lumino Learning - Student",
   "short_name": "Lumino Student",
   "description": "Educational games and assignments for students",
-  "start_url": "/student",
+  "start_url": "/student?pwa=true",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4299E1",
   "orientation": "portrait-primary",
-  "scope": "/",
+  "scope": "/student",
   "icons": [
     {
       "src": "/pwa-icon-192.png",
@@ -42,20 +42,7 @@
     }
   ],
   "categories": ["education", "games", "learning"],
-  "protocol_handlers": [
-    {
-      "protocol": "web+lumino",
-      "url": "/play?token=%s"
-    }
-  ],
-  "url_handlers": [
-    {
-      "origin": "https://verse-dev-central.web.app"
-    },
-    {
-      "origin": "https://r2process.com" 
-    }
-  ],
-  "handle_links": "preferred",
-  "capture_links": "existing-client-navigate"
+
+  "handle_links": "none",
+  "capture_links": "none"
 } 

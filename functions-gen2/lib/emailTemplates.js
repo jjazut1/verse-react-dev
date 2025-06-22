@@ -9,13 +9,14 @@ exports.getPersonalizedInstallInstructions = exports.createPWAPasswordSetupTempl
  * Enhanced 3-Link Assignment Email Template
  * Uses Service Worker + BroadcastChannel for PWA window coordination
  */
-const createAssignmentEmailTemplate = (studentName, activityName, dueDate, assignmentToken, baseUrl = 'https://verse-dev-central.web.app') => {
-    // Extract student email from assignment token if available
-    const studentEmail = assignmentToken.split('_')[0] || 'student';
+const createAssignmentEmailTemplate = (studentName, activityName, dueDate, assignmentToken, baseUrl = 'https://verse-dev-central.web.app', studentEmail = 'student' // Add actual student email parameter
+) => {
+    // Use the provided student email instead of extracting from token
+    // TEMPORARY FIX: Use direct URLs to bypass SendGrid click tracking issues
     // Three distinct link types with clear, predictable behavior - all route to Student Dashboard
-    const pwaLink = `${baseUrl}/email-link?type=pwa&target=dashboard&studentEmail=${studentEmail}&source=email`;
-    const browserLink = `${baseUrl}/email-link?type=browser&target=dashboard&studentEmail=${studentEmail}&source=email`;
-    const installLink = `${baseUrl}/email-link?type=install&target=dashboard&studentEmail=${studentEmail}&source=email`;
+    const pwaLink = `${baseUrl}/student?studentEmail=${studentEmail}&source=email&pwa=true&from=email&emailAccess=true`;
+    const browserLink = `${baseUrl}/student?studentEmail=${studentEmail}&source=email&forceBrowser=true&from=email&browserOnly=true&noPWA=true&emailLink=true&_t=${Date.now()}`;
+    const installLink = `${baseUrl}/student?studentEmail=${studentEmail}&source=email&forceBrowser=true&from=email&showInstall=true`;
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -181,7 +182,6 @@ const createAssignmentEmailTemplate = (studentName, activityName, dueDate, assig
                 <p class="explanatory-text">
                     <strong>Don't have the app yet?</strong> This shows you how to install Lumino Learning as an app 
                     on your device for the best experience. Works on phones, tablets, and computers!
-                    If the app isn't installed, you'll be guided to install it first.
                 </p>
             </div>
         </div>
@@ -216,7 +216,8 @@ const createPWAEmailLinkTemplate = (data) => {
     const token = tokenMatch ? tokenMatch[1] : '';
     // Build EmailLinkRouter URLs for enhanced 3-link system
     const pwaLinkUrl = `${baseUrl}/email-link?type=pwa&target=assignment&token=${token}`;
-    const browserLinkUrl = `${baseUrl}/email-link?type=browser&target=assignment&token=${token}`;
+    // Use redirector.html for browser-only links to prevent PWA flash
+    const browserLinkUrl = `${baseUrl}/redirector.html?target=/play&token=${token}&forceBrowser=true&from=email&emailAccess=true`;
     const installLinkUrl = `${baseUrl}/email-link?type=install&target=dashboard`;
     return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px; border-radius: 8px;">

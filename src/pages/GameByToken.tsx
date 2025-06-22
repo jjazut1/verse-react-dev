@@ -206,14 +206,9 @@ const GameByToken: React.FC<Props> = () => {
     localStorage.setItem('pwa_origin', fromEmail ? 'email_link' : 'javascript');
     console.log('GameByToken: Marked window as email/JS launched (auto-closeable)');
     
-    // Tell service worker to close existing assignment windows
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'CLOSE_EXISTING_ASSIGNMENT_WINDOWS',
-        token: token,
-        timestamp: Date.now()
-      });
-    }
+    // NOTE: PWA window management now handled by useSinglePWAWindow hook
+    // This provides more sophisticated focus-first behavior with security fallbacks
+    console.log('GameByToken: 📢 PWA window management delegated to useSinglePWAWindow hook');
     
     // Listen for service worker messages
     const handleServiceWorkerMessage = (event: MessageEvent) => {

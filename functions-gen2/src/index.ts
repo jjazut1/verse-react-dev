@@ -14,6 +14,9 @@ export const APP_URL = defineSecret("APP_URL");
 // Get environment
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Configuration flag to use untrackable email templates
+
+
 // Helper function to get the appropriate base URL
 function getBaseUrl(): string {
   // First try to get from secrets
@@ -118,23 +121,24 @@ export const sendAssignmentEmail = onDocumentCreated(
       return;
     }
 
-    // Use the new PWA-aware email template
+    // Use the appropriate email template based on configuration
     const emailHtml = createAssignmentEmailTemplate(
       studentName,
       assignment.gameTitle || assignment.gameName,
       formattedDate,
       assignment.linkToken,
-      baseUrl
+      baseUrl,
+      studentEmail
     );
 
-    const msg = {
+    const msg: any = {
       to: studentEmail,
       from: {
         email: SENDER_EMAIL.value().trim(),
         name: "Lumino Learning"
       },
-      subject: `📱 New PWA-Ready Assignment: ${assignment.gameTitle || assignment.gameName}`,
-      html: emailHtml,
+      subject: `📱 New Assignment: ${assignment.gameTitle || assignment.gameName}`,
+      html: emailHtml
     };
 
     // Use the helper function to send the email
@@ -218,23 +222,24 @@ export const sendEmailLinkWithAssignment = onDocumentCreated(
       return;
     }
 
-    // Use the new 3-link assignment email template (same as regular assignments)
+    // Use the appropriate email template based on configuration
     const emailHtml = createAssignmentEmailTemplate(
       studentName,
       assignment.gameTitle || assignment.gameName,
       formattedDate,
       assignment.linkToken,
-      baseUrl
+      baseUrl,
+      studentEmail
     );
 
-    const msg = {
+    const msg: any = {
       to: studentEmail,
       from: {
         email: SENDER_EMAIL.value().trim(),
         name: "Lumino Learning"
       },
-      subject: `🔐📱 Secure PWA Assignment: ${assignment.gameTitle || assignment.gameName}`,
-      html: emailHtml,
+      subject: `📱 New Assignment: ${assignment.gameTitle || assignment.gameName}`,
+      html: emailHtml
     };
 
     const isEmailSent = await sendEmail(msg);

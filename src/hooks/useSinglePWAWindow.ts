@@ -20,17 +20,35 @@ export function useSinglePWAWindow(options: SinglePWAWindowOptions = {}) {
 
   useEffect(() => {
     // Only run once per component mount and if enabled
-    if (!enabled || processedRef.current) return;
+    if (!enabled || processedRef.current) {
+      return;
+    }
 
-    // Check if we're in a PWA context
-    const isPWAContext = window.location.pathname.includes('/student') || 
-                        window.location.pathname.includes('/play') || 
-                        window.location.pathname.includes('/teacher') ||
-                        new URLSearchParams(window.location.search).has('pwa') ||
-                        new URLSearchParams(window.location.search).has('emailAccess');
+    // Check if we're in a PWA context, but respect forceBrowser parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceBrowser = urlParams.has('forceBrowser') && urlParams.get('forceBrowser') === 'true';
+    
+    // CRITICAL: If forceBrowser is true, this is explicitly NOT a PWA context
+    if (forceBrowser) {
+      console.log('[useSinglePWAWindow] ❌ forceBrowser=true detected, explicitly not a PWA context');
+      return;
+    }
+    
+    const isPWAContext = (
+      window.location.pathname.includes('/student') || 
+      window.location.pathname.includes('/play') || 
+      window.location.pathname.includes('/teacher') ||
+      window.location.pathname.includes('/email-link') ||
+      window.location.pathname.includes('/login') ||
+      urlParams.has('pwa') ||
+      urlParams.has('emailAccess') ||
+      urlParams.has('studentEmail')
+    );
+
+
 
     if (!isPWAContext) {
-      console.log('[useSinglePWAWindow] Not in PWA context, skipping enforcement');
+      console.log('[useSinglePWAWindow] ❌ Not in PWA context, skipping enforcement');
       return;
     }
 
@@ -52,23 +70,40 @@ export function useSinglePWAWindow(options: SinglePWAWindowOptions = {}) {
             console.log('[useSinglePWAWindow] 📨 Received close duplicate response:', event.data);
 
             if (event.data.success) {
-              // Existing PWA was focused, we should close this window
+              // Existing PWA was focused OR fallback strategy applied
+              const reason = event.data.reason;
               onDuplicateDetected?.('focused_existing');
               
-              console.log('[useSinglePWAWindow] ✅ Existing PWA focused, closing this window');
+              if (reason === 'existing_pwa_focused') {
+                console.log('[useSinglePWAWindow] ✅ Existing PWA successfully focused, closing this window');
+              } else if (reason === 'focus_blocked_fallback_close_new') {
+                console.log('[useSinglePWAWindow] 🔒 Focus blocked by browser security, closing new window per fallback strategy');
+              } else if (reason === 'focus_failed_prefer_existing') {
+                console.log('[useSinglePWAWindow] ✅ Focus failed but preferring existing PWA, closing this window');
+              } else {
+                console.log('[useSinglePWAWindow] ✅ Closing this window, reason:', reason);
+              }
               
               // Small delay to ensure message processing
               setTimeout(() => {
-                window.close();
+                try {
+                  window.close();
+                } catch (closeError) {
+                  console.log('[useSinglePWAWindow] ❌ Could not close window:', closeError);
+                  // Window might be user-launched and cannot be closed programmatically
+                  // This is expected behavior in some browser security contexts
+                }
               }, 500);
 
             } else {
-              // No existing PWA or focus failed, this window can stay
+              // No existing PWA or other error, this window can stay
               const reason = event.data.reason;
               console.log('[useSinglePWAWindow] ✅ This window can stay, reason:', reason);
               
-              if (reason === 'focus_failed_keeping_new') {
-                onDuplicateDetected?.('closed_duplicates');
+              if (reason === 'no_existing_pwa') {
+                onDuplicateDetected?.('no_action');
+              } else if (reason === 'focus_failed_other_error') {
+                onDuplicateDetected?.('no_action');
               } else {
                 onDuplicateDetected?.('no_action');
               }

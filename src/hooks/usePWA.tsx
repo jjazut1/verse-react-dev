@@ -26,6 +26,43 @@ export const usePWA = () => {
     installPrompt: null
   });
 
+  // IMMEDIATE forceBrowser detection - runs before any other PWA logic
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceBrowser = urlParams.get('forceBrowser') === 'true';
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        (window.navigator as any).standalone === true;
+    
+    console.log('🔧 PWA Hook - Immediate forceBrowser check:', {
+      forceBrowser,
+      isStandalone,
+      currentUrl: window.location.href
+    });
+    
+    // If we're in standalone mode (PWA) but forceBrowser is requested
+    if (isStandalone && forceBrowser) {
+      console.log('🎯 PWA Hook - forceBrowser detected in standalone mode, redirecting to browser');
+      
+      // Create clean browser URL
+      const browserUrl = window.location.href;
+      
+      // Open in new browser tab
+      window.open(browserUrl, '_blank');
+      
+      // Try to close PWA window
+      setTimeout(() => {
+        try {
+          window.close();
+        } catch (e) {
+          console.log('🎯 PWA Hook - Could not close PWA window, showing user message');
+          alert('Please use the new browser tab that just opened. You can close this PWA window.');
+        }
+      }, 500);
+      
+      return; // Exit early to prevent other PWA logic
+    }
+  }, []); // Run only once on mount
+
   // Enhanced PWA installation detection
   const checkIfInstalled = async (): Promise<boolean> => {
     try {
@@ -1014,6 +1051,8 @@ export const usePWA = () => {
 
     // PWA Link Interception for Deep Linking
     const setupLinkInterception = () => {
+      const isInPWA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+
       // Enhanced LaunchQueue API with proper navigation
       if ('launchQueue' in window) {
         try {
@@ -1040,8 +1079,28 @@ export const usePWA = () => {
                   const urlParams = new URLSearchParams(url.search);
                   const target = urlParams.get('target');
                   const token = urlParams.get('token');
+                  const forceBrowser = urlParams.get('forceBrowser') === 'true';
                   
-                  console.log('📱 PWA LaunchQueue - Parsed params:', { target, token });
+                  console.log('📱 PWA LaunchQueue - Parsed params:', { target, token, forceBrowser });
+                  
+                  // Check if this should be opened in browser instead of PWA
+                  if (forceBrowser && isInPWA) {
+                    console.log('📱 Detected forceBrowser=true in PWA context');
+
+                    // Create anchor element to simulate real user click
+                    const anchor = document.createElement('a');
+                    anchor.href = url.href;
+                    anchor.target = '_blank';
+                    anchor.rel = 'noopener noreferrer';
+                    document.body.appendChild(anchor);
+                    anchor.click();
+
+                    setTimeout(() => {
+                      alert('Opened in your browser. You may close this PWA tab.');
+                    }, 500);
+
+                    return;
+                  }
                   
                   // Navigate to the correct route instead of just updating URL
                   if (target && target.startsWith('/')) {

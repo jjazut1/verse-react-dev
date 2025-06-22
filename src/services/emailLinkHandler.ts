@@ -20,6 +20,15 @@ export class EmailLinkHandler {
   private serviceWorkerReady = false;
 
   private constructor() {
+    // Check if we're in browser-only mode before initializing
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceBrowser = urlParams.get('forceBrowser') === 'true';
+    
+    if (forceBrowser) {
+      console.log('[EmailLink] 🚫 Browser-only mode detected - skipping service worker initialization');
+      return;
+    }
+    
     this.initializeBroadcastChannel();
     this.checkServiceWorkerReady();
   }
@@ -56,7 +65,7 @@ export class EmailLinkHandler {
    * Handle PWA link click - FOCUS-FIRST approach
    */
   public async handlePWALink(params: EmailLinkParams): Promise<void> {
-    console.log('[EmailLink] 📱 Handling PWA link with FOCUS-FIRST approach:', params);
+    console.log('[EmailLink] 📱 Handling PWA link with LAUNCHER BRIDGE approach:', params);
     
     // Step 1: FOCUS-FIRST - Always try to focus existing PWA windows first
     if (this.serviceWorkerReady && navigator.serviceWorker.controller) {
@@ -72,10 +81,9 @@ export class EmailLinkHandler {
           this.notifyPWAOfNewAssignment(params);
         }
         
-        // Close this launcher window since we focused existing
-        setTimeout(() => {
-          this.attemptWindowClose();
-        }, 500);
+        // For email link router window, just show success message instead of closing
+        // This prevents interference with PWA window management
+        this.showSuccessMessage('✅ Opened in existing app window');
         return;
       } else {
         console.log('[EmailLink] ❌ FOCUS-FIRST: No existing PWA windows found:', focusResult.reason);
@@ -84,27 +92,24 @@ export class EmailLinkHandler {
       console.log('[EmailLink] ⚠️ Service Worker not ready, skipping focus attempt');
     }
     
-    // Step 2: No existing PWA to focus - Launch new PWA (if installed)
-    const pwaDetection = await this.checkPWAInstalled();
-    console.log('[EmailLink] 🎯 PWA detection result:', pwaDetection);
-    
-    if (pwaDetection.isInstalled) {
-      console.log('[EmailLink] 🚀 PWA is installed - launching new PWA window...');
-      const pwaUrl = this.buildDashboardURL(params);
+    // Step 2: No existing PWA to focus - Direct dashboard redirect for seamless UX
+    if (params.target === 'dashboard') {
+      console.log('[EmailLink] 🎯 Direct dashboard redirect for seamless UX');
+      const dashboardUrl = this.buildDashboardURL({
+        ...params,
+        mode: 'pwa'
+      });
       
-      console.log('[EmailLink] 🎯 Direct redirect to PWA (focus-first fallback):', pwaUrl);
-      window.location.href = pwaUrl;
-      return;
+      console.log('[EmailLink] 🚀 Redirecting directly to dashboard:', dashboardUrl);
+      window.location.href = dashboardUrl;
+    } else {
+      // For assignments, still use launcher.html bridge for authentication transfer
+      console.log('[EmailLink] 🌉 Using launcher.html bridge for assignment authentication transfer');
+      const launcherUrl = this.buildLauncherURL(params);
+      
+      console.log('[EmailLink] 🎯 Redirecting to launcher bridge:', launcherUrl);
+      window.location.href = launcherUrl;
     }
-    
-    // Step 3: PWA not installed - Fallback to browser with install message
-    console.log('[EmailLink] 🌐 PWA not installed - browser fallback with install message');
-    const fallbackUrl = this.buildDashboardURL({
-      ...params,
-      mode: 'install' // This adds showInstall=true
-    });
-    
-    window.location.href = fallbackUrl;
   }
 
   /**
@@ -113,15 +118,15 @@ export class EmailLinkHandler {
   public async handleBrowserLink(params: EmailLinkParams): Promise<void> {
     console.log('[EmailLink] 🌐 Handling Browser link:', params);
 
-    const { studentEmail } = params;
     const url = this.buildDashboardURL({
       ...params,
       mode: 'browser'
     });
 
-    // Always open in new browser tab
-    console.log('[EmailLink] 🌐 Opening in browser tab:', url);
-    window.open(url, '_blank');
+    // Force browser mode by redirecting current window (not opening new tab)
+    // This prevents PWA detection and window management interference
+    console.log('[EmailLink] 🌐 Redirecting to browser-only mode:', url);
+    window.location.href = url;
   }
 
   /**
@@ -204,48 +209,7 @@ export class EmailLinkHandler {
     });
   }
 
-  /**
-   * Launch PWA or fallback to browser with install message
-   * Implements graceful handling of install state loss and COOP policy
-   */
-  private async launchPWAOrFallback(params: EmailLinkParams): Promise<void> {
-    console.log('[EmailLink] 🔍 Starting PWA detection...');
-    const pwaDetection = await this.checkPWAInstalled();
-    const { isInstalled, confidence, reasons } = pwaDetection;
-    
-    console.log('[EmailLink] 🎯 PWA launch decision:', { isInstalled, confidence, reasons });
-    
-    if (isInstalled) {
-      // PWA is installed, launch it in standalone mode
-      const pwaUrl = this.buildDashboardURL({
-        ...params,
-        mode: 'pwa'
-      });
-      
-      console.log(`[EmailLink] 📱 PWA detected (${confidence} confidence) - launching in standalone mode:`, pwaUrl);
-      
-      // SIMPLIFIED APPROACH: Just redirect directly to avoid popup issues
-      console.log('[EmailLink] 🚀 Direct redirect to PWA (avoiding popup complications)');
-      console.log('[EmailLink] 🎯 Generated PWA URL:', pwaUrl);
-      window.location.href = pwaUrl;
-    } else {
-      // PWA not installed or install state lost, provide helpful guidance
-      const fallbackUrl = this.buildDashboardURL({
-        ...params,
-        mode: 'browser',
-        install: confidence === 'low' ? 'lost' : 'prompt'
-      });
-      
-      if (confidence === 'low' && reasons.some(r => r.includes('cleared data'))) {
-        console.log('[EmailLink] ⚠️ PWA install state may have been lost due to cleared data');
-      }
-      
-      console.log(`[EmailLink] 🌐 PWA not detected (${confidence} confidence) - fallback to browser:`, fallbackUrl);
-      console.log('[EmailLink] 📋 Detection reasons:', reasons);
-      
-      window.location.href = fallbackUrl;
-    }
-  }
+
 
   /**
    * Attempt to close window with graceful COOP policy handling
@@ -276,6 +240,41 @@ export class EmailLinkHandler {
         this.showCloseHint();
       }
     }, 1000);
+  }
+
+  /**
+   * Show success message to user
+   */
+  private showSuccessMessage(message: string): void {
+    // Create a success notification for the user
+    const hint = document.createElement('div');
+    hint.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #48BB78;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 10000;
+      max-width: 300px;
+    `;
+    hint.innerHTML = `
+      <div style="font-weight: bold;">${message}</div>
+      <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">You may safely close this tab.</div>
+    `;
+    
+    document.body.appendChild(hint);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (hint.parentNode) {
+        hint.parentNode.removeChild(hint);
+      }
+    }, 5000);
   }
 
   /**
@@ -468,6 +467,47 @@ export class EmailLinkHandler {
     console.log(`[EmailLink] ${isPWAInstalled ? '✅' : '❌'} PWA installation status: ${isPWAInstalled ? 'INSTALLED' : 'NOT INSTALLED'} (score: ${pwaScore}/7, confidence: ${confidence})`);
     
     return { isInstalled: isPWAInstalled, confidence, reasons };
+  }
+
+  /**
+   * Build URL for launcher.html bridge (maintains authentication context)
+   */
+  private buildLauncherURL(params: EmailLinkParams): string {
+    const baseUrl = window.location.origin;
+    const url = new URL('/launcher.html', baseUrl);
+
+    // Set target destination for launcher
+    if (params.target === 'assignment' && params.token) {
+      url.searchParams.set('target', encodeURIComponent(`/play?token=${params.token}&pwa=true&pwa_type=game&from=launcher&emailAccess=true`));
+    } else {
+      // Dashboard target with email parameters
+      let dashboardTarget = '/student';
+      const dashboardParams = new URLSearchParams();
+      
+      if (params.studentEmail) {
+        dashboardParams.set('studentEmail', params.studentEmail);
+      }
+      if (params.source) {
+        dashboardParams.set('source', params.source);
+      }
+      
+      // Add PWA context parameters
+      dashboardParams.set('pwa', 'true');
+      dashboardParams.set('from', 'email');
+      dashboardParams.set('emailAccess', 'true');
+      
+      if (dashboardParams.toString()) {
+        dashboardTarget += '?' + dashboardParams.toString();
+      }
+      
+      url.searchParams.set('target', encodeURIComponent(dashboardTarget));
+    }
+    
+    // Add PWA hint for launcher
+    url.searchParams.set('pwa', 'true');
+    
+    console.log('[EmailLink] 🌉 Built launcher URL:', url.toString());
+    return url.toString();
   }
 
   /**

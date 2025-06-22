@@ -5,6 +5,9 @@ import { emailLinkHandler, EmailLinkParams } from '../services/emailLinkHandler'
 import { useSinglePWAWindow } from '../hooks/useSinglePWAWindow';
 
 const EmailLinkRouter: React.FC = () => {
+  // EMERGENCY DEBUG - This should appear if component ever mounts
+  console.log('🚨🚨🚨 EMERGENCY: EmailLinkRouter IS MOUNTING - COMPONENT IS WORKING! 🚨🚨🚨');
+  
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [message, setMessage] = useState('');

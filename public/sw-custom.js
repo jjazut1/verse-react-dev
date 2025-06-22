@@ -122,12 +122,12 @@ async function testClientAlive(client) {
   });
 }
 
-// NEW: Handle single PWA window enforcement (focus-first approach)
+// ENHANCED: Handle single PWA window enforcement with robust fallback
 async function handleEnforceSinglePWA(data, requestingClient) {
   const { currentUrl, studentEmail, source = 'pwa_launch' } = data;
   
   try {
-    console.log('[SW] 🎯 Enforcing single PWA window (focus-first)');
+    console.log('[SW] 🎯 Enforcing single PWA window (focus-first with fallback)');
     console.log('[SW] 📍 Current window URL:', currentUrl);
     
     const allClients = await self.clients.matchAll({ 
@@ -177,18 +177,23 @@ async function handleEnforceSinglePWA(data, requestingClient) {
     console.log(`[SW] 🔍 Found ${existingPWAClients.length} existing PWA windows`);
     
     if (existingPWAClients.length > 0) {
-      // FOCUS-FIRST: Focus the most relevant existing PWA window
+      // FOCUS-FIRST: Attempt to focus the most relevant existing PWA window
       const studentDashboard = existingPWAClients.find(client => 
         new URL(client.url).pathname.includes('/student')
       );
       const targetClient = studentDashboard || existingPWAClients[0];
       
-      console.log('[SW] ✅ FOCUS-FIRST: Focusing existing PWA window:', new URL(targetClient.url).pathname);
+      console.log('[SW] 🎯 FOCUS-FIRST: Attempting to focus existing PWA window:', new URL(targetClient.url).pathname);
+      
+      let focusSucceeded = false;
       
       try {
         await targetClient.focus();
+        focusSucceeded = true;
         
-        // Notify the existing PWA about new activity (if needed)
+        console.log('[SW] ✅ Successfully focused existing PWA window');
+        
+        // Notify the existing PWA about new activity
         targetClient.postMessage({
           type: 'PWA_ACTIVITY_NOTIFICATION',
           source: source,
@@ -208,29 +213,55 @@ async function handleEnforceSinglePWA(data, requestingClient) {
         console.log('[SW] 🎯 Single PWA enforcement complete - existing window focused');
         
       } catch (focusError) {
-        console.error('[SW] ❌ Error focusing existing PWA window:', focusError);
+        console.log('[SW] ⚠️ Focus failed with error:', focusError.name, focusError.message);
         
-        // Focus failed, close existing windows and keep new one
-        console.log('[SW] 🔄 Focus failed, closing existing PWA windows instead');
-        for (const client of existingPWAClients) {
-          try {
-            await client.postMessage({
-              type: 'FORCE_CLOSE_LAUNCHER',
-              reason: 'focus_failed_close_duplicate',
-              timestamp: Date.now()
-            });
-          } catch (error) {
-            console.error('[SW] ❌ Error closing PWA window:', error);
+        // ENHANCED FALLBACK LOGIC for browser security restrictions
+        if (focusError.name === 'InvalidAccessError' || focusError.message.includes('Not allowed to focus')) {
+          console.log('[SW] 🔒 Browser security blocked focus attempt - applying fallback strategy');
+          
+          // Strategy: Tell existing windows to check if they can close themselves
+          // This respects the browser security model where only the window itself can decide to close
+          for (const client of existingPWAClients) {
+            try {
+              client.postMessage({
+                type: 'FORCE_CLOSE_LAUNCHER',
+                reason: 'focus_blocked_by_security',
+                canAutoClose: true, // Hint that auto-close is acceptable
+                newWindowInfo: {
+                  url: currentUrl,
+                  source: source,
+                  studentEmail: studentEmail
+                },
+                timestamp: Date.now()
+              });
+            } catch (messageError) {
+              console.error('[SW] ❌ Error sending close message to existing window:', messageError);
+            }
           }
+          
+          // Tell the new window to close itself (it was opened by link click, so it can close)
+          requestingClient.postMessage({
+            type: 'CLOSE_DUPLICATE_PWA',
+            success: true,
+            focusedWindow: new URL(targetClient.url).pathname,
+            reason: 'focus_blocked_fallback_close_new',
+            timestamp: Date.now()
+          });
+          
+          console.log('[SW] 🎯 Fallback complete - new window instructed to close, existing notified');
+          
+        } else {
+          // Other focus error - treat as general failure
+          console.log('[SW] ❌ Focus failed with non-security error - keeping new window');
+          
+          requestingClient.postMessage({
+            type: 'CLOSE_DUPLICATE_PWA',
+            success: false,
+            reason: 'focus_failed_other_error',
+            error: focusError.message,
+            timestamp: Date.now()
+          });
         }
-        
-        // Tell requesting window it can stay
-        requestingClient.postMessage({
-          type: 'CLOSE_DUPLICATE_PWA',
-          success: false,
-          reason: 'focus_failed_keeping_new',
-          timestamp: Date.now()
-        });
       }
       
     } else {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, orderBy, limit } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Assignment, Attempt } from '../types';
@@ -53,6 +53,36 @@ const StudentDashboard: React.FC = () => {
   // Custom toast hook for notifications
   const { showToast } = useCustomToast();
   
+  // Email link access bypass state (similar to GameByToken)
+  // Initialize early to check for email link parameters immediately
+  const [isEmailLinkAccess, setIsEmailLinkAccess] = useState(() => {
+    // Early detection of email link access during component initialization
+    const urlParams = new URLSearchParams(window.location.search);
+    const emailAccess = urlParams.get('emailAccess') === 'true';
+    const fromEmail = urlParams.get('from') === 'email';
+    const pwaParam = urlParams.get('pwa') === 'true';
+    const studentEmailParam = urlParams.get('studentEmail');
+    const sourceParam = urlParams.get('source') === 'email';
+    const sessionFlag = sessionStorage.getItem('direct_token_access') === 'true';
+    
+    const isEmailLink = emailAccess || 
+                       (fromEmail && pwaParam) || 
+                       (fromEmail && studentEmailParam) ||
+                       sourceParam ||
+                       sessionFlag;
+    
+    console.log('[StudentDashboard] INITIALIZATION: Email link check:', {
+      emailAccess, fromEmail, pwaParam, studentEmailParam, sourceParam, sessionFlag, isEmailLink
+    });
+    
+    if (isEmailLink) {
+      console.log('[StudentDashboard] ✅ INITIALIZATION: Email link access detected');
+      sessionStorage.setItem('direct_token_access', 'true');
+    }
+    
+    return isEmailLink;
+  });
+  
   const [studentData, setStudentData] = useState<any>(null);
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -77,7 +107,7 @@ const StudentDashboard: React.FC = () => {
   const [pwaWindowAction, setPwaWindowAction] = useState<string | null>(null);
   
   // Determine student email for PWA window management
-  const studentEmail = studentId || currentUser?.email || '';
+  const studentEmail = studentId || currentUser?.email || queryParams.get('studentEmail') || '';
   
   // Enable single PWA window enforcement
   useSinglePWAWindow({
@@ -189,7 +219,7 @@ const StudentDashboard: React.FC = () => {
         return () => clearTimeout(timer);
       }
     }
-  }, [pwaInstall, isInstallable, isInstalled, queryParams, showToast]);
+    }, [pwaInstall, isInstallable, isInstalled, queryParams, showToast]);
 
   // Handle PWA installation action
   const handlePWAInstall = async () => {
@@ -347,13 +377,58 @@ const StudentDashboard: React.FC = () => {
             console.error("Student not found");
             navigate('/teacher'); // Redirect back if student not found
           }
-        } else if (!currentUser) {
-          // Not teacher view and no current user
+        } else if (!currentUser && !isEmailLinkAccess) {
+          // Not teacher view and no current user (unless email link access)
+          console.log('[StudentDashboard] No current user and not email link access - redirecting to login');
           navigate('/login');
           return;
-        } else {
+        } else if (currentUser) {
           // Regular student view for the current user
           await fetchStudentData();
+        } else if (isEmailLinkAccess) {
+          // Email link access without Firebase auth - use email from URL
+          const studentEmailParam = queryParams.get('studentEmail');
+          if (studentEmailParam) {
+            console.log('[StudentDashboard] Email link access detected - fetching data for:', studentEmailParam);
+            await fetchStudentSpecificData(studentEmailParam);
+            
+            // Fetch actual student name from users collection
+            let studentDisplayName = studentEmailParam.split('@')[0]; // Fallback
+            try {
+              console.log('[StudentDashboard] Fetching student name from users collection for email:', studentEmailParam);
+              const usersQuery = query(
+                collection(db, 'users'),
+                where('email', '==', studentEmailParam.toLowerCase()),
+                limit(1)
+              );
+              const usersSnapshot = await getDocs(usersQuery);
+              
+              if (!usersSnapshot.empty) {
+                const userData = usersSnapshot.docs[0].data();
+                if (userData.name) {
+                  studentDisplayName = userData.name;
+                  console.log('[StudentDashboard] Found student name in users collection:', userData.name);
+                } else {
+                  console.log('[StudentDashboard] No name field in user document, using email prefix');
+                }
+              } else {
+                console.log('[StudentDashboard] No user found in users collection, using email prefix');
+              }
+            } catch (error) {
+              console.error('[StudentDashboard] Error fetching student name from users collection:', error);
+            }
+            
+            // Set minimal user data for display with proper name
+            setCurrentUserData({
+              id: 'email_link_user',
+              email: studentEmailParam,
+              name: studentDisplayName
+            });
+          } else {
+            console.log('[StudentDashboard] Email link access but no studentEmail parameter');
+            navigate('/login');
+            return;
+          }
         }
       } catch (error) {
         console.error('Error in data fetching:', error);
@@ -363,7 +438,7 @@ const StudentDashboard: React.FC = () => {
     };
     
     fetchData();
-  }, [currentUser, navigate, studentId, isTeacherView]);
+  }, [currentUser, navigate, studentId, isTeacherView, isEmailLinkAccess]);
   
   // Function to fetch data for a specific student (used in teacher view)
   const fetchStudentSpecificData = async (studentEmail: string) => {
@@ -1856,6 +1931,51 @@ const StudentDashboard: React.FC = () => {
       loadEnhancedHighScores();
     }
   }, [activeTab]);
+  
+  // Enhanced email link access detection (must run BEFORE fetchData)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Check for email link access indicators
+    const emailAccess = urlParams.get('emailAccess') === 'true';
+    const fromEmail = urlParams.get('from') === 'email';
+    const pwaParam = urlParams.get('pwa') === 'true';
+    const studentEmailParam = urlParams.get('studentEmail');
+    const sourceParam = urlParams.get('source') === 'email';
+    
+    // Additional email link detection
+    const currentUrl = window.location.href;
+    const referrer = document.referrer;
+    const hasOobCodeInReferrer = referrer.includes('oobCode=');
+    const hasOobCodeInUrl = currentUrl.includes('oobCode=');
+    
+    console.log('[StudentDashboard] Email link access detection (EARLY):', {
+      emailAccess,
+      fromEmail,
+      pwaParam,
+      studentEmailParam,
+      sourceParam,
+      hasOobCodeInReferrer,
+      hasOobCodeInUrl,
+      currentUrl
+    });
+    
+    // Enhanced condition checking for email link access
+    if (emailAccess || 
+        (fromEmail && pwaParam) || 
+        (fromEmail && studentEmailParam) ||
+        sourceParam ||
+        hasOobCodeInReferrer || 
+        hasOobCodeInUrl ||
+        sessionStorage.getItem('direct_token_access') === 'true') {
+      
+      console.log('[StudentDashboard] ✅ EARLY: Email link access detected - setting bypass flag');
+      setIsEmailLinkAccess(true);
+      
+      // Store flag in session storage to persist across page reloads
+      sessionStorage.setItem('direct_token_access', 'true');
+    }
+  }, []); // Run only once on component mount
   
   return (
     <div style={{ 

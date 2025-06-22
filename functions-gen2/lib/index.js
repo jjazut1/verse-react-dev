@@ -14,6 +14,7 @@ exports.SENDER_EMAIL = (0, params_1.defineSecret)("SENDER_EMAIL");
 exports.APP_URL = (0, params_1.defineSecret)("APP_URL");
 // Get environment
 const isProduction = process.env.NODE_ENV === 'production';
+// Configuration flag to use untrackable email templates
 // Helper function to get the appropriate base URL
 function getBaseUrl() {
     // First try to get from secrets
@@ -93,16 +94,16 @@ exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
         console.error("Failed to set up SendGrid properly");
         return;
     }
-    // Use the new PWA-aware email template
-    const emailHtml = (0, emailTemplates_1.createAssignmentEmailTemplate)(studentName, assignment.gameTitle || assignment.gameName, formattedDate, assignment.linkToken, baseUrl);
+    // Use the appropriate email template based on configuration
+    const emailHtml = (0, emailTemplates_1.createAssignmentEmailTemplate)(studentName, assignment.gameTitle || assignment.gameName, formattedDate, assignment.linkToken, baseUrl, studentEmail);
     const msg = {
         to: studentEmail,
         from: {
             email: exports.SENDER_EMAIL.value().trim(),
             name: "Lumino Learning"
         },
-        subject: `📱 New PWA-Ready Assignment: ${assignment.gameTitle || assignment.gameName}`,
-        html: emailHtml,
+        subject: `📱 New Assignment: ${assignment.gameTitle || assignment.gameName}`,
+        html: emailHtml
     };
     // Use the helper function to send the email
     const isEmailSent = await (0, sendgridHelper_1.sendEmail)(msg);
@@ -177,16 +178,16 @@ exports.sendEmailLinkWithAssignment = (0, firestore_1.onDocumentCreated)({
         console.error("Failed to set up SendGrid properly");
         return;
     }
-    // Use the new 3-link assignment email template (same as regular assignments)
-    const emailHtml = (0, emailTemplates_1.createAssignmentEmailTemplate)(studentName, assignment.gameTitle || assignment.gameName, formattedDate, assignment.linkToken, baseUrl);
+    // Use the appropriate email template based on configuration
+    const emailHtml = (0, emailTemplates_1.createAssignmentEmailTemplate)(studentName, assignment.gameTitle || assignment.gameName, formattedDate, assignment.linkToken, baseUrl, studentEmail);
     const msg = {
         to: studentEmail,
         from: {
             email: exports.SENDER_EMAIL.value().trim(),
             name: "Lumino Learning"
         },
-        subject: `🔐📱 Secure PWA Assignment: ${assignment.gameTitle || assignment.gameName}`,
-        html: emailHtml,
+        subject: `📱 New Assignment: ${assignment.gameTitle || assignment.gameName}`,
+        html: emailHtml
     };
     const isEmailSent = await (0, sendgridHelper_1.sendEmail)(msg);
     if (isEmailSent) {

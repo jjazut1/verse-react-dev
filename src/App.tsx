@@ -40,68 +40,60 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     const standaloneMatch = window.matchMedia('(display-mode: standalone)').matches;
     const navigatorStandalone = (window.navigator as any).standalone === true;
     const pwaParam = window.location.search.includes('pwa=true');
+    const emailAccessParam = window.location.search.includes('emailAccess=true');
+    const fromEmailParam = window.location.search.includes('from=email');
+    const forceBrowserParam = window.location.search.includes('forceBrowser=true');
+    const browserOnlyParam = window.location.search.includes('browserOnly=true');
+    const noPWAParam = window.location.search.includes('noPWA=true');
+    const redirectorParam = window.location.search.includes('redirector=true');
     const isStudentRoute = window.location.pathname === '/student';
+
     const isTeacherRoute = window.location.pathname === '/teacher';
+    const isEmailLinkRoute = window.location.pathname === '/email-link';
+    const isLoginWithEmailParams = window.location.pathname === '/login' && (emailAccessParam || fromEmailParam);
     
-    console.log('Layout: PWA Detection Details:', {
-      standaloneMatch,
-      navigatorStandalone, 
-      pwaParam,
-      isStudentRoute,
-      isTeacherRoute,
-      pathname: window.location.pathname,
-      search: window.location.search
-    });
+
     
-    // More inclusive PWA detection - if it's student/teacher route, assume it's PWA
-    const isPWA = standaloneMatch || navigatorStandalone || pwaParam || isStudentRoute || isTeacherRoute;
-    
-    console.log('Layout: Final PWA decision:', isPWA);
+    // PWA detection with multiple browser-only overrides
+    const isPWA = !forceBrowserParam && !browserOnlyParam && !noPWAParam && !redirectorParam && (
+      standaloneMatch || navigatorStandalone || pwaParam || 
+      isStudentRoute || isTeacherRoute || isEmailLinkRoute || isLoginWithEmailParams
+    );
     
     if (isPWA) {
-      console.log(`Layout: 🎯 Service Worker window management for PWA route: ${window.location.pathname}`);
-      
       // Mark this as a device icon launched PWA window
       window.name = 'standalone-pwa';
       const deviceIconOrigin = 'device_icon';
       localStorage.setItem('pwa_origin', deviceIconOrigin);
-      console.log('Layout: Marked window as device icon launched PWA');
-      console.log('Layout: Verified localStorage pwa_origin:', localStorage.getItem('pwa_origin'));
-      
-      // Tell service worker to close existing PWA windows when this device icon window opens
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        console.log('Layout: 📢 Requesting closure of existing PWA windows');
-        navigator.serviceWorker.controller.postMessage({
-          type: 'CLOSE_EXISTING_ASSIGNMENT_WINDOWS',
-          token: 'device-icon-window',
-          source: 'device-icon',
-          path: window.location.pathname,
-          timestamp: Date.now()
-        });
-      }
       
       // Listen for service worker messages
       const handleServiceWorkerMessage = (event: MessageEvent) => {
-        console.log('Layout: 🎵 Received service worker message:', event.data);
-        
         if (event.data?.type === 'FORCE_CLOSE_LAUNCHER') {
-          console.log('Layout: 🔄 Service worker requesting window close');
+          const { reason, canAutoClose, newWindowInfo } = event.data;
           
           const storedOrigin = localStorage.getItem('pwa_origin');
-          console.log('Layout: Stored origin value:', storedOrigin);
           const wasUserLaunched = storedOrigin === 'device_icon';
-          console.log('Layout: Was user launched (device icon):', wasUserLaunched);
-          console.log('Layout: Window name:', window.name);
-          
-          // Additional check using window.name as backup
           const isDeviceIconWindow = wasUserLaunched || window.name === 'standalone-pwa';
-          console.log('Layout: Final device icon window determination:', isDeviceIconWindow);
           
-          if (isDeviceIconWindow) {
-            console.log('Layout: 🚨 Cannot auto-close device icon window, showing user message');
-            alert('Please close this tab manually. A newer game window has been launched.');
+          // Special handling for focus blocked by security scenario
+          if (reason === 'focus_blocked_by_security' && canAutoClose) {
+            if (isDeviceIconWindow) {
+              try {
+                window.close();
+                // If we reach here, close didn't work (device icon windows often can't auto-close)
+                setTimeout(() => {
+                  alert(`Please close this tab manually. A newer assignment window has been opened.${newWindowInfo ? ` New: ${new URL(newWindowInfo.url).pathname}` : ''}`);
+                }, 100);
+              } catch (closeError) {
+                alert(`Please close this tab manually. A newer assignment window has been opened.${newWindowInfo ? ` New: ${new URL(newWindowInfo.url).pathname}` : ''}`);
+              }
+            } else {
+              window.close();
+            }
+          } else if (isDeviceIconWindow) {
+            const messageContext = newWindowInfo ? ` A newer window has been opened: ${new URL(newWindowInfo.url).pathname}` : ' A newer game window has been launched.';
+            alert(`Please close this tab manually.${messageContext}`);
           } else {
-            console.log('Layout: 🔄 Auto-closing JavaScript-opened window');
             window.close();
           }
         }
@@ -115,8 +107,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
         };
       }
-    } else {
-      console.log('Layout: Not a PWA context, skipping window management');
     }
   }, []);
   
@@ -439,6 +429,7 @@ const router = createBrowserRouter([
     element: <Layout><StudentDashboard /></Layout>,
     errorElement: <ErrorBoundary />,
   },
+
   {
     path: "/link",
     element: <LinkInterceptor />,
