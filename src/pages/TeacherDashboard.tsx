@@ -101,6 +101,12 @@ const TeacherDashboard = () => {
   // Add state for assignment status filter
   const [activeStatusFilter, setActiveStatusFilter] = useState('all');
   
+  // Function to get student display name from email
+  const getStudentDisplayName = (studentEmail: string): string => {
+    const student = students.find(s => s.email === studentEmail);
+    return student?.name || studentEmail.split('@')[0]; // Fallback to email prefix if name not found
+  };
+  
   // Ref to store the current game being edited
   const gameToEditRef = useRef<Game | null>(null);
 
@@ -1361,6 +1367,7 @@ const TeacherDashboard = () => {
                 <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Title</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Game</th>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Created Date</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Due Date</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Student</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Status</th>
@@ -1379,6 +1386,9 @@ const TeacherDashboard = () => {
                     <td style={{ padding: '12px' }}>{assignment.gameName}</td>
                     <td style={{ padding: '12px' }}>{assignment.gameType}</td>
                     <td style={{ padding: '12px' }}>
+                      {assignment.createdAt?.toDate().toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '12px' }}>
                       {assignment.deadline?.toDate().toLocaleDateString()}
                       {assignment.deadline?.toDate() < new Date() && 
                        (assignment.status === 'assigned' || assignment.status === 'started') && 
@@ -1392,7 +1402,7 @@ const TeacherDashboard = () => {
                          </span>
                       }
                     </td>
-                    <td style={{ padding: '12px' }}>{assignment.studentEmail}</td>
+                    <td style={{ padding: '12px' }}>{getStudentDisplayName(assignment.studentEmail)}</td>
                     <td style={{ padding: '12px' }}>
                       <span style={{
                         padding: '2px 8px',
