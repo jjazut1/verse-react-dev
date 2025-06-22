@@ -260,6 +260,38 @@ const Navbar = () => {
   
   const toast = useToast();
   
+  // Context-aware navigation detection
+  const isStudentInActiveUse = () => {
+    // Students using the platform are now properly authenticated
+    if (currentUser && isStudent) {
+      return true;
+    }
+    
+    // Check for game access with assignment tokens (before authentication happens)
+    const urlParams = new URLSearchParams(location.search);
+    const isGameRoute = location.pathname === '/play';
+    const assignmentToken = urlParams.get('token');
+    const sessionFlag = sessionStorage.getItem('direct_token_access') === 'true';
+    
+    // Hide auth buttons for unauthenticated game access with assignment tokens
+    return isGameRoute && (assignmentToken || sessionFlag);
+  };
+
+  // Should show auth buttons (Get Started as Teacher / Members Login)
+  const studentInUse = isStudentInActiveUse();
+  const shouldShowAuthButtons = !currentUser && !studentInUse;
+  
+  // Debug logging for navbar button visibility
+  console.log('🧭 Navbar Detection:', {
+    currentUser: !!currentUser,
+    isStudent,
+    pathname: location.pathname,
+    searchParams: location.search,
+    studentInUse,
+    shouldShowAuthButtons,
+    shouldShowHomeButton: !currentUser && !studentInUse
+  });
+  
   // Check if user is an admin
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -699,8 +731,8 @@ const Navbar = () => {
           justifyContent: 'space-between' 
         }}>
           <div style={{ display: 'flex', gap: 'var(--spacing-4)' }}>
-            {/* Only show Home for non-authenticated users */}
-            {!currentUser && (
+            {/* Only show Home for non-authenticated users who aren't students using the app */}
+            {!currentUser && !studentInUse && (
               <RouterLink 
                 to="/" 
                 style={navLinkStyle('/')}
@@ -764,7 +796,7 @@ const Navbar = () => {
                   Logout
                 </button>
               </>
-            ) : (
+            ) : shouldShowAuthButtons ? (
               <>
                 <button
                   onClick={() => setIsTeacherSignupOpen(true)}
@@ -783,7 +815,7 @@ const Navbar = () => {
                   Members Login
                 </button>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </nav>

@@ -518,9 +518,9 @@ const TeacherDashboard = () => {
     // No cleanup needed for global modal
   };
 
-  const handleAssignGame = async (game: any, studentEmails: string[], deadline: Date, timesRequired: number, usePasswordAuth: boolean) => {
+  const handleAssignGame = async (game: any, studentEmails: string[], deadline: Date, timesRequired: number) => {
     console.log(`Assigning ${game.title} to ${studentEmails.length} student(s)`);
-    console.log(`Deadline: ${deadline}, Times to complete: ${timesRequired}, usePasswordAuth: ${usePasswordAuth}`);
+    console.log(`Deadline: ${deadline}, Times to complete: ${timesRequired}`);
     
     try {
       // Create assignments for each student
@@ -537,18 +537,9 @@ const TeacherDashboard = () => {
         deadline: Timestamp.fromDate(deadline),
       };
       
-      // Choose the appropriate assignment creation method based on usePasswordAuth flag
-        // FIXED: Inverted the logic to match checkbox semantics correctly
-      let assignmentId: string;
-      if (usePasswordAuth) {
-          // Create standard assignment that requires password authentication
-          assignmentId = await createAssignment(assignmentData);
-          console.log('Successfully created assignment with password auth required, ID:', assignmentId);
-        } else {
-        // Create assignment with passwordless email link authentication
-        assignmentId = await createAssignmentWithEmailLink(assignmentData);
-        console.log('Successfully created assignment with passwordless auth, ID:', assignmentId);
-        }
+      // Always use standard assignment creation (simplified approach)
+      const assignmentId = await createAssignment(assignmentData);
+      console.log('Successfully created assignment, ID:', assignmentId);
       }
       
       // Refresh assignments list

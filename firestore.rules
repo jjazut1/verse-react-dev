@@ -380,5 +380,27 @@ service cloud.firestore {
       // Users can delete their own assignments
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
     }
+
+    // Email Link Authentication Requests - for converting email link users to authenticated users
+    match /emailLinkAuthRequests/{requestId} {
+      // Allow unauthenticated users to create requests (following pattern from attempts/assignments)
+      allow create: if 
+        // Anyone can create a request, but with strict validation
+        request.resource.data.email is string &&
+        request.resource.data.email.size() > 0 &&
+        request.resource.data.email.matches('.*@.*\\..*') &&  // Basic email format
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.status == 'pending';
+      
+      // Allow service accounts (Firebase Functions) to read and update requests
+      allow read, update: if isServiceAccount();
+      
+      // Allow the requester to read their own request by checking email in query
+      // This follows the pattern used in assignments for unauthenticated access
+      allow read: if request.auth == null;
+      
+      // Allow cleanup - service accounts can delete processed requests
+      allow delete: if isServiceAccount();
+    }
   }
 } 

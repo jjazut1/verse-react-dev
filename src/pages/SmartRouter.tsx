@@ -23,6 +23,7 @@ const SmartRouter: React.FC = () => {
   const pwaMode = searchParams.get('pwaMode'); // 'required' for PWA-only links
   const showGuide = searchParams.get('showGuide') === 'true';
   const fromEmail = searchParams.get('from') === 'email';
+  const studentEmail = searchParams.get('studentEmail'); // For email link access
 
   useEffect(() => {
     const handleSmartRouting = async () => {
@@ -34,6 +35,7 @@ const SmartRouter: React.FC = () => {
         pwaMode,
         showGuide,
         fromEmail,
+        studentEmail,
         isInstalled,
         isInstallable
       });
@@ -52,9 +54,10 @@ const SmartRouter: React.FC = () => {
       // Handle explicit mode requests first
       if (forceBrowser) {
         setRouteDecision('🖥️ Force Browser Mode');
+        const emailParams = studentEmail ? `&studentEmail=${studentEmail}&emailAccess=true` : '';
         const url = routeType === 'assignment' 
-          ? `/play?token=${token}&mode=browser&from=email&forceBrowser=true`
-          : `/student?mode=browser&from=email&forceBrowser=true`;
+          ? `/play?token=${token}&mode=browser&from=email&forceBrowser=true${emailParams}`
+          : `/student?mode=browser&from=email&forceBrowser=true${emailParams}`;
         console.log('🖥️ Smart Router - Force browser mode, redirecting to:', url);
         
         // Track analytics
@@ -70,9 +73,10 @@ const SmartRouter: React.FC = () => {
       if (pwaMode === 'required') {
         if (isInstalled) {
           setRouteDecision('📱 PWA Required - Opening in App');
+          const emailParams = studentEmail ? `&studentEmail=${studentEmail}&emailAccess=true` : '';
           const url = routeType === 'assignment'
-            ? `/play?token=${token}&pwa=true&pwa_type=game&from=email`
-            : `/student?pwa_type=student&from=email`;
+            ? `/play?token=${token}&pwa=true&pwa_type=game&from=email${emailParams}`
+            : `/student?pwa_type=student&from=email${emailParams}`;
           console.log('📱 Smart Router - PWA required and installed, redirecting to:', url);
           window.location.href = url;
         } else {
@@ -99,31 +103,27 @@ const SmartRouter: React.FC = () => {
       // Smart routing logic - detect best option
       await new Promise(resolve => setTimeout(resolve, 2000)); // Allow PWA detection to complete - increased delay
 
-      // Manual override for testing - check if we're in PWA mode right now
+      // Check if currently in PWA mode
       const isCurrentlyInPWA = window.matchMedia('(display-mode: standalone)').matches || 
                                (window.navigator as any).standalone === true ||
                                document.referrer.includes('android-app://');
-
-      console.log('🎯 Smart Router - PWA detection comparison:', {
+      
+      console.log('🎯 Smart Router - Universal routing (all browser loads get PWA guidance):', {
         'usePWA.isInstalled': isInstalled,
-        'manual detection': isCurrentlyInPWA,
-        'window height difference': window.outerHeight - window.innerHeight,
+        'isCurrentlyInPWA': isCurrentlyInPWA,
+        'routeType': routeType,
+        'fromEmail': fromEmail,
         'timing': 'After 2-second delay'
       });
 
-      // Use manual detection as backup if hook detection fails
-      const shouldUsePWA = isInstalled || isCurrentlyInPWA;
-      
-      console.log('🎯 Smart Router - Final PWA decision:', {
-        shouldUsePWA,
-        'reason': shouldUsePWA ? (isInstalled ? 'usePWA hook detected' : 'manual detection') : 'no PWA detected'
-      });
-
-      if (shouldUsePWA) {
+      // Universal approach - route to destination, StudentDashboard will show universal PWA guidance
+      if (isInstalled && !isCurrentlyInPWA) {
+        // PWA is installed but we're in browser - prefer PWA
         setRouteDecision('🎯 Smart Route - Using Installed PWA');
+        const emailParams = studentEmail ? `&studentEmail=${studentEmail}&emailAccess=true` : '';
         const url = routeType === 'assignment'
-          ? `/play?token=${token}&pwa=true&pwa_type=game&from=email&emailAccess=true`
-          : `/student?pwa_type=student&from=email`;
+          ? `/play?token=${token}&pwa=true&pwa_type=game&from=email&emailAccess=true${emailParams}`
+          : `/student?pwa_type=student&from=email${emailParams}`;
         console.log('🎯 Smart Router - PWA detected, using PWA route:', url);
         
         // Use launcher for PWA to ensure proper window management
@@ -133,11 +133,13 @@ const SmartRouter: React.FC = () => {
           window.location.href = url;
         }
       } else {
-        setRouteDecision('🎯 Smart Route - Using Browser');
+        // Default browser route - StudentDashboard will show universal PWA guidance
+        setRouteDecision('🎯 Smart Route - Using Browser (Universal PWA guidance)');
+        const emailParams = studentEmail ? `&studentEmail=${studentEmail}&emailAccess=true` : '';
         const url = routeType === 'assignment'
-          ? `/play?token=${token}&from=email&emailAccess=true`
-          : `/student?from=email`;
-        console.log('🎯 Smart Router - No PWA detected, using browser route:', url);
+          ? `/play?token=${token}&from=email&emailAccess=true${emailParams}`
+          : `/student?from=email${emailParams}`;
+        console.log('🎯 Smart Router - Using browser route with universal PWA guidance:', url);
         window.location.href = url;
       }
     };

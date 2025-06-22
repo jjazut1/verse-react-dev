@@ -5,9 +5,10 @@ import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Assignment, Attempt } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { authenticateEmailLinkUser } from '../services/authService';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
 import { usePWA } from '../hooks/usePWA';
-import { useCustomToast } from '../hooks/useCustomToast';
+import { useCustomToast, ToastComponent } from '../hooks/useCustomToast';
 import { useSinglePWAWindow } from '../hooks/useSinglePWAWindow';
 
 // Define Game interface based on TeacherDashboard.tsx
@@ -48,10 +49,10 @@ const StudentDashboard: React.FC = () => {
   const pwaInstall = queryParams.get('pwa'); // Check for PWA installation parameter
   
   // PWA hook for installation functionality
-  const { installPWA, showInstallPrompt, isInstallable, isInstalled } = usePWA();
+  const { installPWA, showInstallPrompt, isInstallable, isInstalled, showBriefInstallPrompt, dismissBriefInstallPrompt } = usePWA();
   
   // Custom toast hook for notifications
-  const { showToast } = useCustomToast();
+  const { toastMessage, showToast } = useCustomToast();
   
   // Email link access bypass state (similar to GameByToken)
   // Initialize early to check for email link parameters immediately
@@ -78,6 +79,12 @@ const StudentDashboard: React.FC = () => {
     if (isEmailLink) {
       console.log('[StudentDashboard] ✅ INITIALIZATION: Email link access detected');
       sessionStorage.setItem('direct_token_access', 'true');
+      
+      // Store the student email for future Dashboard navigation
+      if (studentEmailParam) {
+        sessionStorage.setItem('student_email', studentEmailParam);
+        console.log('[StudentDashboard] ✅ INITIALIZATION: Stored student email for Dashboard navigation:', studentEmailParam);
+      }
     }
     
     return isEmailLink;
@@ -154,17 +161,79 @@ const StudentDashboard: React.FC = () => {
     } | null;
   }
 
+  // Universal PWA guidance message for browser loads only - immediate and delayed checks
+  useEffect(() => {
+    // Immediate check first with detailed logging
+    const standaloneMatch = window.matchMedia('(display-mode: standalone)').matches;
+    const iosStandalone = (window.navigator as any).standalone === true;
+    const isInPWAImmediate = standaloneMatch || iosStandalone;
+    
+         console.log('📱 StudentDashboard - IMMEDIATE CHECK:');
+     console.log('  - standaloneMatch:', standaloneMatch);
+     console.log('  - iosStandalone:', iosStandalone);
+     console.log('  - isInPWAImmediate:', isInPWAImmediate);
+     console.log('  - userAgent:', navigator.userAgent);
+     console.log('  - windowSize:', `${window.outerWidth}x${window.outerHeight}`);
+     console.log('  - innerSize:', `${window.innerWidth}x${window.innerHeight}`);
+    
+    if (isInPWAImmediate) {
+      console.log('📱 StudentDashboard - IMMEDIATE CHECK: In PWA mode, skipping universal guidance message');
+      return;
+    }
+    
+    console.log('📱 StudentDashboard - IMMEDIATE CHECK: In browser mode, setting up delayed check...');
+    
+    // Add delay for cases where PWA detection takes time
+    const timer = setTimeout(() => {
+      // Double-check PWA mode after delay with detailed logging
+      const standaloneMatchDelayed = window.matchMedia('(display-mode: standalone)').matches;
+      const iosStandaloneDelayed = (window.navigator as any).standalone === true;
+      const isInPWADelayed = standaloneMatchDelayed || iosStandaloneDelayed;
+      
+             console.log('📱 StudentDashboard - DELAYED CHECK:');
+       console.log('  - standaloneMatchDelayed:', standaloneMatchDelayed);
+       console.log('  - iosStandaloneDelayed:', iosStandaloneDelayed);
+       console.log('  - isInPWADelayed:', isInPWADelayed);
+       console.log('  - decision:', isInPWADelayed ? 'SKIP_MESSAGE' : 'SHOW_MESSAGE');
+      
+      if (isInPWADelayed) {
+        console.log('📱 StudentDashboard - DELAYED CHECK: In PWA mode, skipping universal guidance message');
+        return;
+      }
+      
+      console.log('📱 StudentDashboard - DELAYED CHECK: In browser mode, showing universal PWA guidance');
+      
+      try {
+        showToast({
+          title: "🌟 Get the best Lumino experience!",
+          description: "See an Install icon? → Tap it to add Lumino to your device\nSee \"Open in App\"? → Tap it\nSee \"Always Use\"? → Tap it",
+          status: "info",
+          duration: 12000, // Longer duration for universal message
+        });
+        console.log('📱 StudentDashboard - Universal PWA toast completed');
+      } catch (error) {
+        console.error('📱 StudentDashboard - Universal PWA toast error:', error);
+      }
+    }, 6000); // Increased to 6 seconds to allow PWA standalone detection to complete fully
+    
+    return () => clearTimeout(timer);
+  }, []); // Run only once on mount
+
   // Enhanced PWA installation handling from email links
   useEffect(() => {
     const showGuide = queryParams.get('showGuide') === 'true';
     const alreadyInstalled = queryParams.get('pwa') === 'alreadyInstalled';
     const forceBrowser = queryParams.get('forceBrowser') === 'true';
+    const showOpenInAppHint = queryParams.get('showOpenInAppHint') === 'true';
+    const emailClient = queryParams.get('emailClient') === 'true';
     
     console.log('StudentDashboard: PWA parameters:', {
       pwaInstall,
       showGuide,
       alreadyInstalled,
       forceBrowser,
+      showOpenInAppHint,
+      emailClient,
       isInstallable,
       isInstalled
     });
@@ -173,6 +242,8 @@ const StudentDashboard: React.FC = () => {
       console.log('📱 Force browser mode detected - skipping PWA features');
       return;
     }
+
+
 
     if (alreadyInstalled) {
       // Show message that PWA is already installed
@@ -248,14 +319,14 @@ const StudentDashboard: React.FC = () => {
 
         // Email link parameters that should be cleaned up for better UX
         const emailLinkParams = [
-          'studentEmail',  // Student identification (internal use only)
-          'source',        // Source tracking (email/direct)
-          'pwa',           // PWA mode indicator  
-          'from',          // Origin tracking (email/launcher)
-          'emailAccess',   // Email access bypass flag
-          'forceBrowser',  // Browser mode forcing
-          'showInstall',   // Install guide trigger
-          'showGuide'      // Installation guide flag
+          'studentEmail',        // Student identification (internal use only)
+          'source',              // Source tracking (email/direct)
+          'pwa',                 // PWA mode indicator  
+          'from',                // Origin tracking (email/launcher)
+          'emailAccess',         // Email access bypass flag
+          'forceBrowser',        // Browser mode forcing
+          'showInstall',         // Install guide trigger
+          'showGuide'            // Installation guide flag
         ];
 
         // Remove email link parameters one by one
@@ -384,46 +455,85 @@ const StudentDashboard: React.FC = () => {
           return;
         } else if (currentUser) {
           // Regular student view for the current user
-          await fetchStudentData();
+          // If this is email link access OR we have stored student email, use it for data fetching
+          if (isEmailLinkAccess) {
+            const studentEmailParam = queryParams.get('studentEmail') || sessionStorage.getItem('student_email');
+            if (studentEmailParam) {
+              console.log('[StudentDashboard] ✅ Authenticated email link user - fetching data for:', studentEmailParam);
+              await fetchStudentSpecificData(studentEmailParam);
+            } else {
+              await fetchStudentData();
+            }
+          } else {
+            // Check if we have a stored student email from previous email link access
+            const storedStudentEmail = sessionStorage.getItem('student_email');
+            if (storedStudentEmail && sessionStorage.getItem('direct_token_access') === 'true') {
+              console.log('[StudentDashboard] ✅ Using stored student email for authenticated user:', storedStudentEmail);
+              await fetchStudentSpecificData(storedStudentEmail);
+            } else {
+              await fetchStudentData();
+            }
+          }
         } else if (isEmailLinkAccess) {
-          // Email link access without Firebase auth - use email from URL
+          // Email link access - authenticate the user properly
           const studentEmailParam = queryParams.get('studentEmail');
           if (studentEmailParam) {
-            console.log('[StudentDashboard] Email link access detected - fetching data for:', studentEmailParam);
-            await fetchStudentSpecificData(studentEmailParam);
+            console.log('🔐🔐🔐 [NEW CODE] Email link access detected - authenticating user:', studentEmailParam);
             
-            // Fetch actual student name from users collection
-            let studentDisplayName = studentEmailParam.split('@')[0]; // Fallback
             try {
-              console.log('[StudentDashboard] Fetching student name from users collection for email:', studentEmailParam);
-              const usersQuery = query(
-                collection(db, 'users'),
-                where('email', '==', studentEmailParam.toLowerCase()),
-                limit(1)
-              );
-              const usersSnapshot = await getDocs(usersQuery);
+              // Authenticate the email link user using their existing Firebase Auth account
+              const authenticatedUser = await authenticateEmailLinkUser(studentEmailParam);
+              console.log('[StudentDashboard] ✅ Email link authentication successful, now fetching data as authenticated user');
               
-              if (!usersSnapshot.empty) {
-                const userData = usersSnapshot.docs[0].data();
-                if (userData.name) {
-                  studentDisplayName = userData.name;
-                  console.log('[StudentDashboard] Found student name in users collection:', userData.name);
-                } else {
-                  console.log('[StudentDashboard] No name field in user document, using email prefix');
-                }
-              } else {
-                console.log('[StudentDashboard] No user found in users collection, using email prefix');
-              }
+              // The user is now authenticated and currentUser will be updated by AuthContext
+              // Wait a moment for the auth context to update
+              setTimeout(() => {
+                // Trigger data refetch as authenticated user
+                window.location.reload();
+              }, 1000);
+              
+              return;
+              
             } catch (error) {
-              console.error('[StudentDashboard] Error fetching student name from users collection:', error);
+              console.error('[StudentDashboard] ❌ Email link authentication failed:', error);
+              
+              // Fallback to bypass mode if authentication fails
+              console.log('[StudentDashboard] Falling back to bypass mode for:', studentEmailParam);
+              await fetchStudentSpecificData(studentEmailParam);
+              
+              // Fetch actual student name from users collection
+              let studentDisplayName = studentEmailParam.split('@')[0]; // Fallback
+              try {
+                console.log('[StudentDashboard] Fetching student name from users collection for email:', studentEmailParam);
+                const usersQuery = query(
+                  collection(db, 'users'),
+                  where('email', '==', studentEmailParam.toLowerCase()),
+                  limit(1)
+                );
+                const usersSnapshot = await getDocs(usersQuery);
+                
+                if (!usersSnapshot.empty) {
+                  const userData = usersSnapshot.docs[0].data();
+                  if (userData.name) {
+                    studentDisplayName = userData.name;
+                    console.log('[StudentDashboard] Found student name in users collection:', userData.name);
+                  } else {
+                    console.log('[StudentDashboard] No name field in user document, using email prefix');
+                  }
+                } else {
+                  console.log('[StudentDashboard] No user found in users collection, using email prefix');
+                }
+              } catch (nameError) {
+                console.error('[StudentDashboard] Error fetching student name from users collection:', nameError);
+              }
+              
+              // Set minimal user data for display with proper name
+              setCurrentUserData({
+                id: 'email_link_user',
+                email: studentEmailParam,
+                name: studentDisplayName
+              });
             }
-            
-            // Set minimal user data for display with proper name
-            setCurrentUserData({
-              id: 'email_link_user',
-              email: studentEmailParam,
-              name: studentDisplayName
-            });
           } else {
             console.log('[StudentDashboard] Email link access but no studentEmail parameter');
             navigate('/login');
@@ -455,6 +565,9 @@ const StudentDashboard: React.FC = () => {
       // Fetch high scores if available
       if (studentId) {
         await fetchHighScoresForStudent(studentId);
+      } else if (currentUser?.uid) {
+        // For email link users who are now authenticated, use their current user ID
+        await fetchHighScoresForStudent(currentUser.uid);
       }
     } catch (error) {
       console.error('Error fetching student specific data:', error);
@@ -1974,6 +2087,12 @@ const StudentDashboard: React.FC = () => {
       
       // Store flag in session storage to persist across page reloads
       sessionStorage.setItem('direct_token_access', 'true');
+      
+      // Store the student email for future Dashboard navigation
+      if (studentEmailParam) {
+        sessionStorage.setItem('student_email', studentEmailParam);
+        console.log('[StudentDashboard] ✅ EARLY: Stored student email for Dashboard navigation:', studentEmailParam);
+      }
     }
   }, []); // Run only once on component mount
   
@@ -2038,7 +2157,65 @@ const StudentDashboard: React.FC = () => {
       </div>
       
       {/* PWA Install Banner - Only show for actual students, not teacher view */}
-      {!isTeacherView && <PWAInstallBanner />}
+              {/* Brief install prompt for simplified single-link system */}
+        {!isTeacherView && showBriefInstallPrompt && (
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: 'white',
+            padding: '16px 20px',
+            borderRadius: '12px',
+            boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)',
+            zIndex: 1000,
+            maxWidth: '320px',
+            animation: 'slideIn 0.3s ease-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ fontSize: '1.5rem' }}>📱</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                  Install Our App?
+                </div>
+                <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+                  Get faster access to assignments
+                </div>
+              </div>
+              <button
+                onClick={installPWA}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  color: 'white',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  marginRight: '8px'
+                }}
+              >
+                Install
+              </button>
+              <button
+                onClick={dismissBriefInstallPrompt}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '1.2rem',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  opacity: 0.7
+                }}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {!isTeacherView && <PWAInstallBanner />}
       
       {/* PWA Installation Modal - Show when triggered from email */}
       {showPWAPrompt && !isTeacherView && (
@@ -2202,6 +2379,51 @@ const StudentDashboard: React.FC = () => {
           {activeTab === 'freeplay' && renderFreePlayTab()}
           {activeTab === 'highscores' && renderHighScoresTab()}
         </>
+      )}
+      
+      {/* Toast Component - Custom positioned at top */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: '#FFD700',
+            color: 'black',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            zIndex: 2000,
+            maxWidth: '90%',
+            textAlign: 'center',
+            animation: 'slideDown 0.3s ease-out',
+            fontFamily: "'Comic Neue', 'Comic Sans MS', 'Trebuchet MS', cursive, sans-serif"
+          }}
+        >
+          <style>
+            {`
+              @keyframes slideDown {
+                from {
+                  transform: translateX(-50%) translateY(-20px);
+                  opacity: 0;
+                }
+                to {
+                  transform: translateX(-50%) translateY(0);
+                  opacity: 1;
+                }
+              }
+            `}
+          </style>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
+            {toastMessage.title}
+          </h3>
+          {toastMessage.description && (
+            <p style={{ margin: 0, fontSize: '14px', opacity: 0.9 }}>
+              {toastMessage.description}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

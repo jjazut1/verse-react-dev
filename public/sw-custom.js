@@ -4,8 +4,13 @@
 let launcherSource = null;
 
 self.addEventListener('message', async (event) => {
-  // Only log messages that have a type property to reduce noise
-  if (event.data?.type) {
+  // Filter out common browser/Workbox internal messages to reduce noise
+  const isInternalMessage = !event.data || 
+                           !event.data.type || 
+                           typeof event.data === 'string' ||
+                           event.data.type === undefined;
+                           
+  if (!isInternalMessage) {
     console.log('[SW] Received message:', event.data);
   }
 
@@ -46,11 +51,14 @@ self.addEventListener('message', async (event) => {
     return;
   }
 
+  // Handle client alive responses (from PWA window management)
+  if (event.data?.type === 'CLIENT_ALIVE_RESPONSE') {
+    // These are handled by the testClientAlive promise resolution
+    return;
+  }
+
   if (!event.data || event.data.type !== 'FOCUS_EXISTING_PWA') {
-    // Only log if it has a type property to avoid spam from Workbox/browser internals
-    if (event.data?.type) {
-      console.log('[SW] Ignoring message - not FOCUS_EXISTING_PWA type. Received:', event.data.type);
-    }
+    // Silently ignore messages without proper type or internal browser messages
     return;
   }
 

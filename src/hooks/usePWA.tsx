@@ -26,28 +26,94 @@ export const usePWA = () => {
     installPrompt: null
   });
 
-  // IMMEDIATE forceBrowser detection - runs before any other PWA logic
+  // State for brief install prompt (for pwa=auto simplified single-link system)
+  const [showBriefInstallPrompt, setShowBriefInstallPrompt] = useState(false);
+
+  // IMMEDIATE URL parameter detection - runs before any other PWA logic
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const forceBrowser = urlParams.get('forceBrowser') === 'true';
+    const pwaParam = urlParams.get('pwa');
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
                         (window.navigator as any).standalone === true;
     
-    console.log('🔧 PWA Hook - Immediate forceBrowser check:', {
+    console.log('🔧 PWA Hook - Immediate URL parameter check:', {
       forceBrowser,
+      pwaParam,
       isStandalone,
       currentUrl: window.location.href
     });
     
+    // Handle pwa=auto parameter (simplified single-link system)
+    if (pwaParam === 'auto') {
+      console.log('🎯 PWA Hook - pwa=auto detected, smart routing enabled');
+      // Clean the parameter to prevent URL pollution
+      urlParams.delete('pwa');
+      const cleanUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
+      window.history.replaceState({}, '', cleanUrl);
+      
+      // If we're already in PWA mode, stay here
+      if (isStandalone) {
+        console.log('✅ PWA Hook - Already in PWA mode, continuing');
+        return;
+      }
+      
+      // If not in PWA mode, show brief install prompt if installable, then continue in browser
+      console.log('🌐 PWA Hook - In browser mode, will show brief install prompt if available');
+      
+      // Check if installable and show brief prompt
+      setTimeout(() => {
+        if (pwaState.isInstallable && !pwaState.isInstalled) {
+          console.log('📱 PWA Hook - Showing brief install prompt for pwa=auto');
+          setShowBriefInstallPrompt(true);
+          
+          // Auto-dismiss after 3 seconds
+          setTimeout(() => {
+            setShowBriefInstallPrompt(false);
+            console.log('📱 PWA Hook - Brief install prompt auto-dismissed');
+          }, 3000);
+        }
+      }, 1000); // Small delay to allow PWA state to be determined
+      
+      return;
+    }
+    
     // If we're in standalone mode (PWA) but forceBrowser is requested
     if (isStandalone && forceBrowser) {
       console.log('🎯 PWA Hook - forceBrowser detected in standalone mode, redirecting to browser');
+      console.log('🎯 PWA Hook - Browser URL will be:', window.location.href);
       
-      // Create clean browser URL
-      const browserUrl = window.location.href;
+      // Create clean browser URL (remove forceBrowser to prevent loops)
+      const url = new URL(window.location.href);
+      url.searchParams.delete('forceBrowser');
+      const browserUrl = url.toString();
       
-      // Open in new browser tab
-      window.open(browserUrl, '_blank');
+      console.log('🎯 PWA Hook - Clean browser URL:', browserUrl);
+      
+      // Create anchor element to simulate real user click (more reliable than window.open)
+      const anchor = document.createElement('a');
+      anchor.href = browserUrl;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      
+      // Simulate user click with proper event
+      const clickEvent = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        button: 0
+      });
+      
+      anchor.dispatchEvent(clickEvent);
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(anchor);
+      }, 100);
       
       // Try to close PWA window
       setTimeout(() => {
@@ -55,10 +121,11 @@ export const usePWA = () => {
           window.close();
         } catch (e) {
           console.log('🎯 PWA Hook - Could not close PWA window, showing user message');
-          alert('Please use the new browser tab that just opened. You can close this PWA window.');
+          alert('✅ Opened in your browser. You can close this PWA window.');
         }
       }, 500);
       
+      console.log('🎯 PWA Hook - forceBrowser redirect handled');
       return; // Exit early to prevent other PWA logic
     }
   }, []); // Run only once on mount
@@ -214,22 +281,52 @@ export const usePWA = () => {
   };
 
   useEffect(() => {
+    // Check for email link access (students can access via email without Firebase auth)
+    const urlParams = new URLSearchParams(window.location.search);
+    const emailAccess = urlParams.get('emailAccess') === 'true';
+    const fromEmail = urlParams.get('from') === 'email';
+    const studentEmailParam = urlParams.get('studentEmail');
+    const sourceParam = urlParams.get('source') === 'email';
+    const isStudentRoute = window.location.pathname === '/student';
+    const sessionFlag = sessionStorage.getItem('direct_token_access') === 'true';
+    
+    const isEmailLinkAccess = emailAccess || 
+                             (fromEmail && studentEmailParam) ||
+                             sourceParam ||
+                             (sessionFlag && isStudentRoute);
+    
     console.log('🔍 PWA Hook - useEffect triggered:', { 
       currentUser: !!currentUser, 
       isStudent, 
-      userEmail: currentUser?.email 
+      userEmail: currentUser?.email,
+      isEmailLinkAccess,
+      emailAccess,
+      fromEmail,
+      studentEmailParam: !!studentEmailParam,
+      sourceParam,
+      isStudentRoute,
+      sessionFlag
     });
     
-    // Only enable PWA functionality for students
-    if (!currentUser || !isStudent) {
+    // Enable PWA functionality for:
+    // 1. Authenticated students (currentUser && isStudent)
+    // 2. Email link access to student dashboard (isEmailLinkAccess && isStudentRoute)
+    const shouldEnablePWA = (currentUser && isStudent) || (isEmailLinkAccess && isStudentRoute);
+    
+    if (!shouldEnablePWA) {
       console.log('🚫 PWA Hook - Not enabling PWA:', { 
         hasCurrentUser: !!currentUser, 
-        isStudent 
+        isStudent,
+        isEmailLinkAccess,
+        isStudentRoute,
+        shouldEnablePWA
       });
       return;
     }
 
-    console.log('✅ PWA Hook - Enabling PWA for student');
+    console.log('✅ PWA Hook - Enabling PWA:', {
+      reason: currentUser && isStudent ? 'authenticated_student' : 'email_link_access'
+    });
 
     // PWA Launch Redirect - Redirect from browser to PWA if installed
     const checkAndRedirectToPWA = (isInstalled: boolean) => {
@@ -300,25 +397,41 @@ export const usePWA = () => {
         const checkPWAInstallationAdvanced = async () => {
           let pwaInstalled = isInstalled; // Start with our existing detection
           
-          // Try the more accurate getInstalledRelatedApps API (Chrome only)
+          console.log('🔍 PWA Hook - Advanced check starting with:', { 
+            isInstalled, 
+            initialDetection: pwaInstalled 
+          });
+          
+          // If our production heuristics already detected PWA, trust that result
+          if (pwaInstalled) {
+            console.log('✅ PWA Hook - Production heuristics detected PWA, trusting this result');
+            return true;
+          }
+          
+          // Only use getInstalledRelatedApps as fallback when heuristics failed
           if ('getInstalledRelatedApps' in navigator) {
             try {
-              console.log('🔍 PWA Hook - Checking with getInstalledRelatedApps...');
+              console.log('🔍 PWA Hook - Checking with getInstalledRelatedApps as fallback...');
               const apps = await (navigator as any).getInstalledRelatedApps();
               console.log('🔍 PWA Hook - Related apps found:', apps);
               
               const domain = window.location.hostname;
-              pwaInstalled = apps.some((app: any) => 
+              const relatedAppDetected = apps.some((app: any) => 
                 app.platform === 'webapp' && 
                 (app.url?.includes(domain) || app.id?.includes(domain))
               );
               
-              console.log('🔍 PWA Hook - getInstalledRelatedApps result:', pwaInstalled);
+              console.log('🔍 PWA Hook - getInstalledRelatedApps result:', relatedAppDetected);
+              
+              if (relatedAppDetected) {
+                pwaInstalled = true;
+              }
             } catch (error) {
               console.log('🔍 PWA Hook - getInstalledRelatedApps not supported:', error);
             }
           }
           
+          console.log('🔍 PWA Hook - Final advanced detection result:', pwaInstalled);
           return pwaInstalled;
         };
         
@@ -937,7 +1050,7 @@ export const usePWA = () => {
         };
         
         // Show the hybrid PWA notification
-        createHybridPWANotification();
+        // createHybridPWANotification(); // DISABLED: No longer needed with new authentication system
         
         return true;
       }
@@ -1086,19 +1199,48 @@ export const usePWA = () => {
                   // Check if this should be opened in browser instead of PWA
                   if (forceBrowser && isInPWA) {
                     console.log('📱 Detected forceBrowser=true in PWA context');
+                    console.log('📱 Opening link in browser using simulated user click');
 
+                    // Create clean browser URL (remove forceBrowser to prevent loops)
+                    const cleanUrl = new URL(url.href);
+                    cleanUrl.searchParams.delete('forceBrowser');
+                    const browserUrl = cleanUrl.toString();
+                    
+                    console.log('📱 Clean browser URL:', browserUrl);
+                    
                     // Create anchor element to simulate real user click
                     const anchor = document.createElement('a');
-                    anchor.href = url.href;
+                    anchor.href = browserUrl;
                     anchor.target = '_blank';
                     anchor.rel = 'noopener noreferrer';
+                    
+                    // Add the anchor to DOM temporarily
                     document.body.appendChild(anchor);
-                    anchor.click();
-
+                    
+                    // Simulate user click with proper event
+                    const clickEvent = new MouseEvent('click', {
+                      view: window,
+                      bubbles: true,
+                      cancelable: true,
+                      ctrlKey: false,
+                      metaKey: false,
+                      shiftKey: false,
+                      button: 0
+                    });
+                    
+                    anchor.dispatchEvent(clickEvent);
+                    
+                    // Clean up
                     setTimeout(() => {
-                      alert('Opened in your browser. You may close this PWA tab.');
+                      document.body.removeChild(anchor);
+                    }, 100);
+
+                    // Show user feedback
+                    setTimeout(() => {
+                      alert('✅ Opened in your browser. You may close this PWA tab.');
                     }, 500);
 
+                    console.log('📱 forceBrowser link handled - opened in browser');
                     return;
                   }
                   
@@ -1522,19 +1664,35 @@ export const usePWA = () => {
     }));
   };
 
-  // Check if PWA features should be available (student only)
-  const isPWAEnabled = currentUser && isStudent;
+  // Check if PWA features should be available
+  // Enable for: 1. Authenticated students, 2. Email link access to student dashboard
+  const urlParams = new URLSearchParams(window.location.search);
+  const emailAccess = urlParams.get('emailAccess') === 'true';
+  const fromEmail = urlParams.get('from') === 'email';
+  const studentEmailParam = urlParams.get('studentEmail');
+  const sourceParam = urlParams.get('source') === 'email';
+  const isStudentRoute = window.location.pathname === '/student';
+  const sessionFlag = sessionStorage.getItem('direct_token_access') === 'true';
+  
+  const isEmailLinkAccess = emailAccess || 
+                           (fromEmail && studentEmailParam) ||
+                           sourceParam ||
+                           (sessionFlag && isStudentRoute);
+  
+  const isPWAEnabled = (currentUser && isStudent) || (isEmailLinkAccess && isStudentRoute);
 
   return {
     // State
     isInstallable: pwaState.isInstallable && isPWAEnabled,
     isInstalled: pwaState.isInstalled,
     showInstallPrompt: pwaState.showInstallPrompt && isPWAEnabled,
+    showBriefInstallPrompt: showBriefInstallPrompt && isPWAEnabled,
     isPWAEnabled,
     
     // Actions
     installPWA,
     dismissInstallPrompt,
+    dismissBriefInstallPrompt: () => setShowBriefInstallPrompt(false),
     
     // Utility functions
     checkIfInstalled

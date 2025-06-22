@@ -1,4 +1,5 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions";
 import * as admin from "firebase-admin";
@@ -46,13 +47,17 @@ interface Assignment {
   gameId: string;
   gameTitle: string;
   gameName: string;
+  gameType: string;
   deadline: admin.firestore.Timestamp;
   dueDate: admin.firestore.Timestamp;
   completed: boolean;
   score?: number;
   linkToken: string;
   emailSent?: boolean;
-  useEmailLinkAuth?: boolean;
+  timesRequired: number;
+  completedCount: number;
+  status: string;
+  teacherId: string;
 }
 
 export const sendAssignmentEmail = onDocumentCreated(
@@ -65,8 +70,9 @@ export const sendAssignmentEmail = onDocumentCreated(
     const assignment = snapshot?.data() as Assignment;
     const assignmentId = event.params.assignmentId;
 
-    if (!assignment || assignment.emailSent === true || assignment.useEmailLinkAuth === true) {
-      console.log("Skipping email: already sent or uses email link auth", { assignmentId });
+    // Skip if already sent (regardless of useEmailLinkAuth flag since both functions now do the same thing)
+    if (!assignment || assignment.emailSent === true) {
+      console.log("Skipping email: already sent", { assignmentId });
       return;
     }
 
@@ -121,14 +127,20 @@ export const sendAssignmentEmail = onDocumentCreated(
       return;
     }
 
-    // Use the appropriate email template based on configuration
+    // Use the enhanced 3-link dashboard email template for all assignments
     const emailHtml = createAssignmentEmailTemplate(
       studentName,
       assignment.gameTitle || assignment.gameName,
       formattedDate,
       assignment.linkToken,
       baseUrl,
-      studentEmail
+      studentEmail,
+      {
+        gameType: assignment.gameType,
+        timesRequired: assignment.timesRequired,
+        completedCount: assignment.completedCount || 0,
+        status: assignment.status
+      }
     );
 
     const msg: any = {
@@ -138,116 +150,31 @@ export const sendAssignmentEmail = onDocumentCreated(
         name: "Lumino Learning"
       },
       subject: `📱 New Assignment: ${assignment.gameTitle || assignment.gameName}`,
-      html: emailHtml
+      html: emailHtml,
+      // Explicitly disable all SendGrid tracking
+      trackingSettings: {
+        clickTracking: {
+          enable: false
+        },
+        openTracking: {
+          enable: false
+        },
+        subscriptionTracking: {
+          enable: false
+        },
+        ganalytics: {
+          enable: false
+        }
+      }
     };
 
     // Use the helper function to send the email
     const isEmailSent = await sendEmail(msg);
     if (isEmailSent) {
       await admin.firestore().collection("assignments").doc(assignmentId).update({ emailSent: true });
-      console.log(`Email sent and marked for assignment ${assignmentId}`);
+      console.log(`Assignment email sent successfully for ${assignmentId}`);
     } else {
-      console.error(`Failed to send email for assignment ${assignmentId}`);
-    }
-  }
-);
-
-export const sendEmailLinkWithAssignment = onDocumentCreated(
-  {
-    document: "assignments/{assignmentId}",
-    secrets: [SENDGRID_API_KEY, SENDER_EMAIL, APP_URL],
-  },
-  async (event) => {
-    const snapshot = event.data;
-    const assignment = snapshot?.data() as Assignment;
-    const assignmentId = event.params.assignmentId;
-
-    // Only process assignments that require password authentication
-    if (!assignment || assignment.emailSent === true || assignment.useEmailLinkAuth !== true) {
-      console.log("Skipping password-required auth flow", { assignmentId });
-      return;
-    }
-
-    if (!assignment.studentEmail) {
-      console.error("Missing student email");
-      return;
-    }
-
-    const studentEmail = assignment.studentEmail.toLowerCase();
-    const baseUrl = getBaseUrl();
-    console.log(`Using base URL: ${baseUrl} for password-required auth`);
-
-    // Fetch the student's name from the users collection
-    let studentName = assignment.studentName || 'Student';
-    try {
-      const usersQuery = await admin.firestore()
-        .collection('users')
-        .where('email', '==', studentEmail)
-        .limit(1)
-        .get();
-      
-      if (!usersQuery.empty) {
-        const userData = usersQuery.docs[0].data();
-        if (userData.name) {
-          studentName = userData.name;
-          console.log(`Found student name in users collection: ${studentName}`);
-        }
-      } else {
-        console.log(`No user found in users collection for email: ${studentEmail}, using fallback name`);
-      }
-    } catch (error) {
-      console.error(`Error fetching student name from users collection:`, error);
-      // Continue with fallback name
-    }
-
-    // Format date for use in both success and fallback emails
-    let formattedDate = "No due date set";
-    try {
-      const dueDate = assignment.dueDate?.toDate() || assignment.deadline?.toDate();
-      if (dueDate) {
-        formattedDate = dueDate.toLocaleDateString("en-US", {
-          weekday: "long", year: "numeric", month: "long", day: "numeric"
-        });
-      }
-    } catch (e) {
-      console.error("Date formatting error", e);
-    }
-    
-    // Use the new 3-link email template system instead of the old PWA email link template
-    console.log(`Generating new-format 3-link email for password-required assignment ${assignmentId}`);
-
-    const isSetupSuccessful = setupSendGrid(SENDGRID_API_KEY.value());
-    if (!isSetupSuccessful) {
-      console.error("Failed to set up SendGrid properly");
-      return;
-    }
-
-    // Use the appropriate email template based on configuration
-    const emailHtml = createAssignmentEmailTemplate(
-      studentName,
-      assignment.gameTitle || assignment.gameName,
-      formattedDate,
-      assignment.linkToken,
-      baseUrl,
-      studentEmail
-    );
-
-    const msg: any = {
-      to: studentEmail,
-      from: {
-        email: SENDER_EMAIL.value().trim(),
-        name: "Lumino Learning"
-      },
-      subject: `📱 New Assignment: ${assignment.gameTitle || assignment.gameName}`,
-      html: emailHtml
-    };
-
-    const isEmailSent = await sendEmail(msg);
-    if (isEmailSent) {
-      await admin.firestore().collection("assignments").doc(assignmentId).update({ emailSent: true });
-      console.log(`Password-required email sent for assignment ${assignmentId}`);
-    } else {
-      console.error(`Failed to send password-required email for assignment ${assignmentId}`);
+      console.error(`Failed to send assignment email for ${assignmentId}`);
     }
   }
 );
@@ -355,7 +282,22 @@ export const sendPasswordSetupEmail = onDocumentCreated(
           name: "Verse Learning"
         },
         subject: subject,
-        html: htmlContent
+        html: htmlContent,
+        // Explicitly disable all SendGrid tracking
+        trackingSettings: {
+          clickTracking: {
+            enable: false
+          },
+          openTracking: {
+            enable: false
+          },
+          subscriptionTracking: {
+            enable: false
+          },
+          ganalytics: {
+            enable: false
+          }
+        }
       };
 
       const isEmailSent = await sendEmail(msg);
@@ -374,6 +316,135 @@ export const sendPasswordSetupEmail = onDocumentCreated(
 
     } catch (error) {
       logger.error('❌ Error sending password setup email:', error);
+    }
+  }
+);
+
+// New function to authenticate email link users
+export const authenticateEmailLinkUser = onCall({
+  cors: true,
+}, async (request) => {
+  const { studentEmail } = request.data;
+  
+  if (!studentEmail) {
+    throw new Error('Student email is required');
+  }
+
+  try {
+    // Look up the user in Firestore by email
+    const usersQuery = await admin.firestore()
+      .collection('users')
+      .where('email', '==', studentEmail.toLowerCase())
+      .limit(1)
+      .get();
+    
+    if (usersQuery.empty) {
+      throw new Error(`No user found with email: ${studentEmail}`);
+    }
+    
+    const userData = usersQuery.docs[0].data();
+    
+    // Check if user is linked to auth and get their authUid
+    if (!userData.linkedToAuth || !userData.authUid) {
+      throw new Error(`User ${studentEmail} is not linked to Firebase Auth`);
+    }
+    
+    // Generate a custom token for this user
+    const customToken = await admin.auth().createCustomToken(userData.authUid);
+    
+    logger.info(`Generated custom token for email link user: ${studentEmail}`);
+    
+    return {
+      success: true,
+      customToken,
+      user: {
+        uid: userData.authUid,
+        email: userData.email,
+        name: userData.name,
+        role: userData.role
+      }
+    };
+    
+  } catch (error) {
+    logger.error('Error authenticating email link user:', error);
+    throw error;
+  }
+});
+
+// Alternative approach: Firestore-triggered authentication
+export const processEmailLinkAuth = onDocumentCreated(
+  {
+    document: "emailLinkAuthRequests/{requestId}",
+  },
+  async (event) => {
+    const snapshot = event.data;
+    const requestData = snapshot?.data();
+    const requestId = event.params.requestId;
+
+    if (!requestData || !requestData.email) {
+      console.error('Invalid email link auth request:', requestId);
+      return;
+    }
+
+    try {
+      const studentEmail = requestData.email.toLowerCase();
+      
+      // Look up the user in Firestore by email
+      const usersQuery = await admin.firestore()
+        .collection('users')
+        .where('email', '==', studentEmail)
+        .limit(1)
+        .get();
+      
+      if (usersQuery.empty) {
+        console.error(`No user found with email: ${studentEmail}`);
+        await admin.firestore().collection('emailLinkAuthRequests').doc(requestId).update({
+          status: 'error',
+          error: `No user found with email: ${studentEmail}`,
+          processedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        return;
+      }
+      
+      const userData = usersQuery.docs[0].data();
+      
+      // Check if user is linked to auth and get their authUid
+      if (!userData.linkedToAuth || !userData.authUid) {
+        console.error(`User ${studentEmail} is not linked to Firebase Auth`);
+        await admin.firestore().collection('emailLinkAuthRequests').doc(requestId).update({
+          status: 'error',
+          error: `User ${studentEmail} is not linked to Firebase Auth`,
+          processedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        return;
+      }
+      
+      // Generate a custom token for this user
+      const customToken = await admin.auth().createCustomToken(userData.authUid);
+      
+      // Update the request document with the token
+      await admin.firestore().collection('emailLinkAuthRequests').doc(requestId).update({
+        status: 'success',
+        customToken: customToken,
+        user: {
+          uid: userData.authUid,
+          email: userData.email,
+          name: userData.name,
+          role: userData.role
+        },
+        processedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      console.log(`Generated custom token for email link user: ${studentEmail}`);
+      
+    } catch (error) {
+      console.error('Error processing email link auth request:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await admin.firestore().collection('emailLinkAuthRequests').doc(requestId).update({
+        status: 'error',
+        error: errorMessage,
+        processedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
     }
   }
 );

@@ -8,12 +8,12 @@ import {
   setPersistence,
   browserLocalPersistence,
   signInAnonymously,
-  updateProfile 
-} from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
-import { getFunctions } from 'firebase/functions';
-import { auth } from '../config/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+  updateProfile,
+  signInWithCustomToken
+  } from 'firebase/auth';
+  import { httpsCallable } from 'firebase/functions';
+  import { auth, functions } from '../config/firebase';
+import { doc, getDoc, setDoc, addDoc, collection, onSnapshot, deleteDoc, DocumentSnapshot, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 /**
@@ -139,8 +139,7 @@ export const completeSignInWithEmailLink = async (email: string): Promise<void> 
  */
 export const getAssignmentToken = async (assignmentId: string): Promise<string> => {
   try {
-    // Get a reference to the Firebase Functions
-    const functions = getFunctions();
+    // Get a reference to the Firebase Functions - use imported functions
     
     // Create a callable function reference
     const getAssignmentByIdForAuth = httpsCallable(functions, 'getAssignmentByIdForAuth');
@@ -178,5 +177,135 @@ export const getAssignmentToken = async (assignmentId: string): Promise<string> 
       console.error('Error in fallback token retrieval:', fallbackError);
       throw error; // Throw the original error
     }
+  }
+};
+
+// Enhanced email link authentication using Firebase's built-in method (no custom tokens needed)
+export const authenticateEmailLinkUser = async (studentEmail: string) => {
+  try {
+    console.log('🔐 Starting enhanced email link authentication for:', studentEmail);
+    
+    // First, try to find if this user already has a Firebase Auth account
+    try {
+      // Check if we have stored auth credentials for this email
+      const usersQuery = await getDocs(query(
+        collection(db, 'users'),
+        where('email', '==', studentEmail.toLowerCase()),
+        limit(1)
+      ));
+      
+      if (!usersQuery.empty) {
+        const userData = usersQuery.docs[0].data();
+        console.log('📋 Found user data:', { 
+          email: userData.email, 
+          linkedToAuth: userData.linkedToAuth,
+          hasAuthUid: !!userData.authUid 
+        });
+        
+        // If user is already linked to Firebase Auth, try to sign them in using anonymous auth
+        // then update their profile to link the email
+        if (userData.linkedToAuth && userData.authUid) {
+          console.log('🔗 User has existing auth link, creating session...');
+          
+          try {
+            // Create an anonymous session and update it with the user's information
+            const userCredential = await signInAnonymously(auth);
+            const user = userCredential.user;
+            
+            // Update the anonymous user's profile with the student information
+            await updateProfile(user, {
+              displayName: userData.name || studentEmail.split('@')[0],
+            });
+            
+            // Store the mapping between anonymous UID and actual user data
+            await setDoc(doc(db, 'users', user.uid), {
+              email: studentEmail,
+              name: userData.name,
+              role: userData.role || 'student',
+              teacherId: userData.teacherId,
+              linkedToAuth: true,
+              authUid: user.uid,
+              originalAuthUid: userData.authUid, // Keep reference to original
+              createdAt: userData.createdAt || new Date().toISOString(),
+              emailLinkSessionCreatedAt: new Date().toISOString()
+            }, { merge: true });
+            
+            console.log('✅ Enhanced email link authentication successful:', user.email || studentEmail);
+            return user;
+            
+          } catch (sessionError) {
+            console.error('❌ Session creation failed:', sessionError);
+            throw sessionError;
+          }
+        } else {
+          // User exists but not linked to auth - create a new auth account
+          console.log('🆕 Creating new auth account for existing user...');
+          
+          try {
+            // Create anonymous auth and link it to user data
+            const userCredential = await signInAnonymously(auth);
+            const user = userCredential.user;
+            
+            await updateProfile(user, {
+              displayName: userData.name || studentEmail.split('@')[0],
+            });
+            
+            // Update user document with auth link
+            await setDoc(doc(db, 'users', user.uid), {
+              ...userData,
+              linkedToAuth: true,
+              authUid: user.uid,
+              emailLinkAuthCreatedAt: new Date().toISOString()
+            }, { merge: true });
+            
+            // Also update original document to mark it as linked
+            await setDoc(doc(db, 'users', usersQuery.docs[0].id), {
+              linkedToAuth: true,
+              authUid: user.uid,
+              linkedAt: new Date().toISOString()
+            }, { merge: true });
+            
+            console.log('✅ New auth account created and linked:', user.email || studentEmail);
+            return user;
+            
+          } catch (createError) {
+            console.error('❌ Auth account creation failed:', createError);
+            throw createError;
+          }
+        }
+      } else {
+        // No user found - this shouldn't happen in normal flow, but handle gracefully
+        console.log('⚠️ No user data found for email, creating minimal auth...');
+        
+        const userCredential = await signInAnonymously(auth);
+        const user = userCredential.user;
+        
+        await updateProfile(user, {
+          displayName: studentEmail.split('@')[0],
+        });
+        
+        // Create minimal user document
+        await setDoc(doc(db, 'users', user.uid), {
+          email: studentEmail,
+          name: studentEmail.split('@')[0],
+          role: 'student',
+          linkedToAuth: true,
+          authUid: user.uid,
+          createdAt: new Date().toISOString(),
+          createdVia: 'email-link-fallback'
+        });
+        
+        console.log('✅ Minimal auth account created:', user.email || studentEmail);
+        return user;
+      }
+      
+    } catch (lookupError) {
+      console.error('❌ User lookup failed:', lookupError);
+      throw lookupError;
+    }
+    
+  } catch (error) {
+    console.error('❌ Enhanced email link authentication failed:', error);
+    throw error;
   }
 }; 

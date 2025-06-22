@@ -76,7 +76,7 @@ interface Game {
 
 interface AssignmentCreationModalProps {
   game: any;
-  onAssign: (game: any, studentEmails: string[], deadline: Date, timesRequired: number, usePasswordAuth: boolean) => Promise<void>;
+  onAssign: (game: any, studentEmails: string[], deadline: Date, timesRequired: number) => Promise<void>;
   onCancel: () => void;
   showToast: (options: { title: string; description?: string; status: 'success' | 'error' | 'info' | 'warning'; duration: number }) => void;
 }
@@ -1038,7 +1038,7 @@ const AssignmentCreationModal: React.FC<AssignmentCreationModalProps> = ({
   const [studentEmail, setStudentEmail] = useState('');
   const [deadline, setDeadline] = useState('');
   const [timesRequired, setTimesRequired] = useState(1);
-  const [usePasswordAuth, setUsePasswordAuth] = useState(true);
+
   const [assignmentStudents, setAssignmentStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   
@@ -1124,8 +1124,8 @@ const AssignmentCreationModal: React.FC<AssignmentCreationModalProps> = ({
       // Get the student emails for assignment
       const studentEmails = selectedStudents.map(student => student.email);
       
-      // Call the onAssign function with the required parameters
-      await onAssign(game, studentEmails, new Date(deadline), timesRequired, usePasswordAuth);
+      // Call the onAssign function with the required parameters (always use standard assignment)
+      await onAssign(game, studentEmails, new Date(deadline), timesRequired);
       
       showToast({
         title: 'Assignments created',
@@ -1365,23 +1365,7 @@ const AssignmentCreationModal: React.FC<AssignmentCreationModalProps> = ({
           </select>
         </div>
         
-        <div style={{ marginBottom: 'var(--spacing-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <input
-              type="checkbox"
-              id="usePasswordAuth"
-              checked={usePasswordAuth}
-              onChange={(e) => setUsePasswordAuth(e.target.checked)}
-              style={{ marginRight: 'var(--spacing-2)' }}
-            />
-            <span style={{ opacity: isModalReady ? 1 : 0.6 }}>
-              🔒 Password Required: Students must sign in with email/password to access the assignment (recommended for tests)
-            </span>
-          </div>
-          <div style={{ fontSize: '12px', color: '#999', marginTop: '4px', fontStyle: 'italic' }}>
-            Uncheck the box for quick access to the assignment.
-          </div>
-        </div>
+
         
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <button
@@ -1591,7 +1575,7 @@ export const GlobalModals: React.FC<{
   onCloseAssignmentDetails?: () => void;
   
   // Assignment creation
-  onAssignGame?: (game: any, studentEmails: string[], deadline: Date, timesRequired: number, usePasswordAuth: boolean) => Promise<void>;
+  onAssignGame?: (game: any, studentEmails: string[], deadline: Date, timesRequired: number) => Promise<void>;
   onCancelAssignment?: () => void;
   showToast?: (options: { title: string; description?: string; status: 'success' | 'error' | 'info' | 'warning'; duration: number }) => void;
 }> = ({ 

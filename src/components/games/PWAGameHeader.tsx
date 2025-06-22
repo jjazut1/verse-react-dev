@@ -44,6 +44,7 @@ export const PWAGameHeader: React.FC<PWAGameHeaderProps> = ({
   const titleSize = useBreakpointValue({ base: 'md', md: 'lg' });
 
   const handleHome = () => {
+    // Simple navigation - users are now properly authenticated
     if (isTeacher) {
       navigate('/teacher');
     } else if (isStudent) {
