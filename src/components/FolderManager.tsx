@@ -117,7 +117,14 @@ export const useFolderManager = ({
 
   // Memoized folder tree
   const folderTree = useMemo(() => {
-    return buildFolderTree(folders, games);
+    console.log('🌳 Building folder tree...');
+    console.log('🌳 Input folders:', folders);
+    console.log('🌳 Input games:', games);
+    console.log('🌳 Folders with parentId structure:', folders.map(f => ({ id: f.id, name: f.name, parentId: f.parentId, depth: f.depth })));
+    
+    const tree = buildFolderTree(folders, games);
+    console.log('🌳 Built tree result:', tree);
+    return tree;
   }, [folders, games]);
 
   const fetchFolders = useCallback(async () => {
