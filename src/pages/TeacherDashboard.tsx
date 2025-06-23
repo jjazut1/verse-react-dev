@@ -2006,28 +2006,18 @@ const TeacherDashboard = () => {
                       </div>
                     )}
                     
-                    {/* Unorganized Games Drop Zone */}
-                    {folderManager.getUnorganizedGames().length > 0 && (
-                      <div
-                        onDrop={(e) => folderManager.handleDrop(e, null)}
-                        onDragOver={(e) => {
-                          folderManager.handleDragOver(e);
-                          e.currentTarget.classList.add('folder-drop-zone-active');
-                        }}
-                        onDragLeave={(e) => {
-                          e.currentTarget.classList.remove('folder-drop-zone-active');
-                        }}
-                        style={{
-                          padding: '8px',
-                          border: '2px dashed #CBD5E0',
-                          borderRadius: '6px',
-                          backgroundColor: '#F7FAFC',
-                          textAlign: 'center',
-                          fontSize: '14px',
-                          color: '#718096',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
+                    {/* Unorganized Games Drop Zone - Temporarily disabled during folder system transition */}
+                    {false && folderManager.getUnorganizedGames().length > 0 && (
+                      <div style={{
+                        padding: '8px',
+                        border: '2px dashed #CBD5E0',
+                        borderRadius: '6px',
+                        backgroundColor: '#F7FAFC',
+                        textAlign: 'center',
+                        fontSize: '14px',
+                        color: '#718096',
+                        transition: 'all 0.2s ease'
+                      }}>
                         📤 Drop games here to remove from folders
                       </div>
                     )}
@@ -2085,17 +2075,7 @@ const TeacherDashboard = () => {
                       
                       return gamesToShow.map((game) => (
                         <div 
-                          key={game.id} 
-                          draggable
-                          onDragStart={(e) => {
-                            folderManager.handleDragStart(e, game.id);
-                            // Add CSS class for drag effect
-                            e.currentTarget.classList.add('game-card-dragging');
-                          }}
-                          onDragEnd={(e) => {
-                            // Remove drag effect class
-                            e.currentTarget.classList.remove('game-card-dragging');
-                          }}
+                          key={game.id}
                           style={{ 
                             backgroundColor: 'white',
                             borderRadius: '12px',

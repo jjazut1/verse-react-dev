@@ -78,17 +78,24 @@ interface FolderManagerReturn {
   
   // Selection and navigation
   selectFolder: (folderId: string | null) => void;
+  setSelectedFolderId: (folderId: string | null) => void;
   getFolderBreadcrumbs: (folderId: string) => GameFolder[];
   
   // Utility functions
   getGamesInFolder: (folderId: string) => GameWithFolder[];
   getGamesInFolderTree: (folderId: string) => GameWithFolder[];
+  getUnorganizedGames: () => GameWithFolderAndId[];
   canCreateSubfolder: (parentId: string | null) => boolean;
   getFolderStats: () => { totalFolders: number; totalGames: number; maxDepth: number };
   searchFolders: (searchTerm: string) => GameFolder[];
-  
+
   // Data refresh
   refreshData: () => Promise<void>;
+  refreshFolders: () => Promise<void>;
+  
+  // Modal management (for backward compatibility)
+  openCreateFolderModal: () => void;
+  openEditFolderModal: (folder: GameFolder) => void;
 }
 
 export const useFolderManager = ({
@@ -465,6 +472,10 @@ export const useFolderManager = ({
     return games.filter(game => game.folderId && folderIds.includes(game.folderId));
   }, [games, folders]);
 
+  const getUnorganizedGames = useCallback((): GameWithFolderAndId[] => {
+    return games.filter(game => !game.folderId);
+  }, [games]);
+
   const canCreateSubfolderCallback = useCallback((parentId: string | null): boolean => {
     return canCreateSubfolder(folders, parentId);
   }, [folders]);
@@ -484,6 +495,34 @@ export const useFolderManager = ({
   const refreshData = useCallback(async () => {
     await fetchFolders();
   }, [fetchFolders]);
+
+  // Alias for backward compatibility
+  const refreshFolders = refreshData;
+
+  // Modal management functions for backward compatibility
+  const openCreateFolderModal = useCallback(() => {
+    showModal('createFolder', {
+      onSave: async (folderData: FolderModalData) => {
+        await createNewFolder({
+          ...folderData,
+          parentId: selectedFolderId,
+          order: folders.length,
+          userId
+        });
+      }
+    });
+  }, [showModal, createNewFolder, selectedFolderId, folders.length, userId]);
+
+  const openEditFolderModal = useCallback((folder: GameFolder) => {
+    showModal('editFolder', {
+      folder,
+      onSave: async (folderData: FolderModalData) => {
+        await updateExistingFolder(folder.id, folderData);
+      }
+    });
+  }, [showModal, updateExistingFolder]);
+
+
 
   return {
     // State
@@ -510,16 +549,25 @@ export const useFolderManager = ({
     
     // Selection and navigation
     selectFolder,
+    setSelectedFolderId,
     getFolderBreadcrumbs,
     
     // Utility functions
     getGamesInFolder,
     getGamesInFolderTree,
+    getUnorganizedGames,
     canCreateSubfolder: canCreateSubfolderCallback,
     getFolderStats: getFolderStatsCallback,
     searchFolders,
+
+
     
     // Data refresh
-    refreshData
+    refreshData,
+    refreshFolders,
+    
+    // Modal management (for backward compatibility)
+    openCreateFolderModal,
+    openEditFolderModal
   };
 }; 
