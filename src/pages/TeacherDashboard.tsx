@@ -132,6 +132,8 @@ const TeacherDashboard = () => {
     console.log('My games count:', myGames.length);
     console.log('My games:', myGames);
     console.log('Folder manager folders:', folderManager.folders);
+    console.log('Folder manager folderTree:', folderManager.folderTree);
+    console.log('Folder manager folderTree length:', folderManager.folderTree.length);
     console.log('Folder manager loading:', folderManager.isLoading);
     console.log('============================');
   }, [currentUser, myGames, folderManager.folders, folderManager.isLoading]);
@@ -1872,7 +1874,7 @@ const TeacherDashboard = () => {
                     </div>
                     
                     {/* New 4-Level Folder Tree */}
-                    {folderManager.folderTree.length > 0 && (
+                    {folderManager.folderTree.length > 0 ? (
                       <div style={{ marginBottom: '12px' }}>
                         {/* All Games Button */}
                         <div style={{ marginBottom: '8px' }}>
@@ -1914,6 +1916,36 @@ const TeacherDashboard = () => {
                           showGameCounts={true}
                           collapsible={true}
                         />
+                      </div>
+                    ) : (
+                      /* Temporary fallback: show flat folder list if tree is empty */
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#FFF3CD', borderRadius: '6px', border: '1px solid #FFC107' }}>
+                          <strong>Debug:</strong> FolderTree is empty (length: {folderManager.folderTree.length}), showing fallback. 
+                          Folders array has {folderManager.folders.length} items.
+                        </div>
+                        
+                        {folderManager.folders.length > 0 && (
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            {folderManager.folders.map(folder => (
+                              <button
+                                key={folder.id}
+                                onClick={() => folderManager.setSelectedFolderId(folder.id)}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: 'white',
+                                  color: '#4A5568',
+                                  border: `2px solid ${folder.color || '#4299E1'}`,
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontSize: '14px'
+                                }}
+                              >
+                                📁 {folder.name} (level: {folder.depth || 0})
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                     
