@@ -1,5 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { GameFolder, GameWithFolder } from '../types/game';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { 
+  GameFolder, 
+  GameWithFolder,
+  GameWithFolderAndId,
+  FolderTreeNode, 
+  GameFolderAssignment,
+  DropResult,
+  FolderOperation 
+} from '../types/game';
 import { 
   createFolder, 
   getUserFolders, 
@@ -7,15 +15,23 @@ import {
   deleteFolder,
   assignGameToFolder,
   removeGameFromFolder,
-  getGameFolderAssignments
+  getGameFolderAssignments,
+  buildFolderTree,
+  validateFolderDepth,
+  canCreateSubfolder,
+  handleFolderDrop,
+  getFolderPath,
+  getAllDescendantIds,
+  isValidFolderMove,
+  getFolderStats
 } from '../services/folderService';
 import { ToastOptions } from '../hooks/useCustomToast';
 import { useModal } from '../contexts/ModalContext';
 
 interface FolderManagerProps {
   userId: string;
-  games: GameWithFolder[];
-  onGamesUpdate: (games: GameWithFolder[]) => void;
+  games: GameWithFolderAndId[];
+  onGamesUpdate: (games: GameWithFolderAndId[]) => void;
   onShowToast: (options: ToastOptions) => void;
 }
 
@@ -37,19 +53,65 @@ const DEFAULT_FOLDER_COLORS = [
   '#ED64A6', // Pink
 ];
 
+interface FolderManagerReturn {
+  // State
+  folders: GameFolder[];
+  folderTree: FolderTreeNode[];
+  assignments: GameFolderAssignment[];
+  selectedFolderId: string | null;
+  isLoading: boolean;
+  error: string | null;
+  
+  // Folder operations
+  createNewFolder: (folderData: Omit<GameFolder, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateExistingFolder: (folderId: string, updates: Partial<GameFolder>) => Promise<void>;
+  deleteExistingFolder: (folderId: string) => Promise<void>;
+  
+  // Game-Folder operations
+  assignGame: (gameId: string, folderId: string) => Promise<void>;
+  removeGame: (gameId: string) => Promise<void>;
+  
+  // Tree operations
+  handleDrop: (dropResult: DropResult) => Promise<void>;
+  expandFolder: (folderId: string) => void;
+  collapseFolder: (folderId: string) => void;
+  
+  // Selection and navigation
+  selectFolder: (folderId: string | null) => void;
+  getFolderBreadcrumbs: (folderId: string) => GameFolder[];
+  
+  // Utility functions
+  getGamesInFolder: (folderId: string) => GameWithFolder[];
+  getGamesInFolderTree: (folderId: string) => GameWithFolder[];
+  canCreateSubfolder: (parentId: string | null) => boolean;
+  getFolderStats: () => { totalFolders: number; totalGames: number; maxDepth: number };
+  searchFolders: (searchTerm: string) => GameFolder[];
+  
+  // Data refresh
+  refreshData: () => Promise<void>;
+}
+
 export const useFolderManager = ({
   userId,
   games,
   onGamesUpdate,
   onShowToast
-}: FolderManagerProps) => {
+}: FolderManagerProps): FolderManagerReturn => {
+  // State
   const [folders, setFolders] = useState<GameFolder[]>([]);
+  const [assignments, setAssignments] = useState<GameFolderAssignment[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [draggedGameId, setDraggedGameId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   
   // Use the global modal manager instead of local state
   const { showModal } = useModal();
+
+  // Memoized folder tree
+  const folderTree = useMemo(() => {
+    return buildFolderTree(folders, games);
+  }, [folders, games]);
 
   const fetchFolders = useCallback(async () => {
     if (!userId) {
@@ -57,15 +119,33 @@ export const useFolderManager = ({
     }
     
     setIsLoading(true);
+    setError(null);
     try {
-      const userFolders = await getUserFolders(userId);
-      setFolders(userFolders);
-    } catch (error) {
-      console.error('Error fetching folders:', error);
+      const [foldersData, assignmentsData] = await Promise.all([
+        getUserFolders(userId),
+        getGameFolderAssignments(userId)
+      ]);
+      
+      setFolders(foldersData);
+      setAssignments(assignmentsData);
+      
+      // Auto-expand first 2 levels
+      const autoExpanded = new Set<string>();
+      foldersData.forEach(folder => {
+        if ((folder.depth || 0) < 2) {
+          autoExpanded.add(folder.id);
+        }
+      });
+      setExpandedFolders(autoExpanded);
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load folder data';
+      setError(errorMessage);
       onShowToast({
-        title: 'Error loading folders',
-        status: 'error' as const,
-        duration: 3000
+        title: 'Error Loading Folders',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
       });
     } finally {
       setIsLoading(false);
@@ -157,364 +237,289 @@ export const useFolderManager = ({
     loadGameFolderAssignments();
   }, [userId, folders, games, onGamesUpdate, onShowToast]);
 
-  const handleCreateFolder = useCallback(async (folderData: Omit<FolderModalData, 'id'>) => {
+  // Folder CRUD operations
+  const createNewFolder = useCallback(async (folderData: Omit<GameFolder, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!userId) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      const newFolderId = await createFolder({
-        ...folderData,
-        userId,
-        order: folders.length
-      });
-
-      const newFolder: GameFolder = {
-        id: newFolderId,
-        ...folderData,
-        userId,
-        order: folders.length,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      setFolders([...folders, newFolder]);
-      onShowToast({
-        title: 'Folder created successfully',
-        status: 'success' as const,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Error creating folder:', error);
-      onShowToast({
-        title: 'Error creating folder',
-        status: 'error' as const,
-        duration: 3000
-      });
-    }
-  }, [userId, folders, onShowToast]);
-
-  const handleUpdateFolder = useCallback(async (folderId: string, folderData: Omit<FolderModalData, 'id'>) => {
-    try {
-      await updateFolder(folderId, folderData);
-      
-      setFolders(folders.map(folder => 
-        folder.id === folderId 
-          ? { ...folder, ...folderData }
-          : folder
-      ));
-
-      // Update games with new folder information
-      const updatedGames = games.map(game => 
-        game.folderId === folderId
-          ? { ...game, folderName: folderData.name, folderColor: folderData.color }
-          : game
-      );
-      onGamesUpdate(updatedGames);
-
-      onShowToast({
-        title: 'Folder updated successfully',
-        status: 'success' as const,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Error updating folder:', error);
-      onShowToast({
-        title: 'Error updating folder',
-        status: 'error' as const,
-        duration: 3000
-      });
-    }
-  }, [folders, games, onGamesUpdate, onShowToast]);
-
-  const handleDeleteFolder = async (folderId: string) => {
-    const startTime = Date.now();
-    console.log('🗑️ handleDeleteFolder called with folderId:', folderId, 'at timestamp:', startTime);
-    try {
-      console.log('🗑️ Starting folder deletion...');
-      await deleteFolder(folderId);
-      console.log('🗑️ Folder deleted successfully from database, took:', Date.now() - startTime, 'ms');
-      
-      // Update state immediately after successful deletion
-      setFolders(folders.filter(folder => folder.id !== folderId));
-      console.log('🗑️ Updated folders state');
-      
-      // Remove folder information from games
-      const updatedGames = games.map(game => 
-        game.folderId === folderId
-          ? { ...game, folderId: undefined, folderName: undefined, folderColor: undefined }
-          : game
-      );
-      onGamesUpdate(updatedGames);
-      console.log('🗑️ Updated games state');
-      
-      // Clear folder selection if the deleted folder was selected
-      if (selectedFolderId === folderId) {
-        setSelectedFolderId(null);
-        console.log('🗑️ Cleared selected folder');
+      // Validate depth before creating
+      if (!validateFolderDepth(folders, folderData.parentId || null)) {
+        throw new Error('Cannot create folder: would exceed maximum depth of 4 levels');
       }
-
-      // Show success message
+      
+      const folderId = await createFolder({ ...folderData, userId });
+      await fetchFolders(); // Refresh data
+      
       onShowToast({
-        title: 'Folder deleted successfully',
+        title: 'Folder Created',
+        description: `"${folderData.name}" has been created successfully`,
         status: 'success',
         duration: 3000,
       });
-      console.log('🗑️ Deletion process completed successfully, total time:', Date.now() - startTime, 'ms');
       
-    } catch (error) {
-      console.error('🗑️ Error deleting folder:', error);
+      // Auto-select the new folder
+      setSelectedFolderId(folderId);
       
-      // Show more specific error message based on the error
-      let errorMessage = 'Error deleting folder';
-      if (error instanceof Error) {
-        if (error.message.includes('Missing or insufficient permissions')) {
-          errorMessage = 'Cannot delete folder: This folder may have invalid data. Please contact support.';
-        } else {
-          errorMessage = `Error deleting folder: ${error.message}`;
-        }
-      }
-      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create folder';
+      setError(errorMessage);
       onShowToast({
-        title: errorMessage,
+        title: 'Error Creating Folder',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
       });
-      
-      // Keep the modal open on error so user can try again or cancel
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [userId, folders, fetchFolders, onShowToast]);
 
-  const confirmDeleteFolder = (folderId: string) => {
-    console.log('🔵 confirmDeleteFolder called with folderId:', folderId);
+  const updateExistingFolder = useCallback(async (folderId: string, updates: Partial<GameFolder>) => {
+    setIsLoading(true);
+    setError(null);
     
-    // Find the folder to get its details
-    const folder = folders.find(f => f.id === folderId);
-    if (!folder) {
-      console.warn('🟡 confirmDeleteFolder: Folder not found:', folderId);
-      return;
-    }
-    
-    // Count games in this folder
-    const gamesInFolder = getGamesInFolder(folderId);
-    
-    console.log('🔵 confirmDeleteFolder: Showing modal for folder:', {
-      folderId,
-      folderName: folder.name,
-      gamesCount: gamesInFolder.length
-    });
-    
-    // Show the global delete confirmation modal
-    showModal('delete-folder', {
-      folderId,
-      folderName: folder.name,
-      gamesCount: gamesInFolder.length
-    });
-  };
-
-  const handleGameDrop = useCallback(async (gameId: string, folderId: string | null) => {
     try {
-      if (folderId) {
-        await assignGameToFolder(gameId, folderId, userId);
-        const folder = folders.find(f => f.id === folderId);
-        
-        // Update the specific game with folder information
-        const updatedGames = games.map(game => 
-          game.id === gameId
-            ? { ...game, folderId, folderName: folder?.name, folderColor: folder?.color }
-            : game
-        );
-        onGamesUpdate(updatedGames);
-      } else {
-        // Remove from folder
-        await removeGameFromFolder(gameId, userId);
-        
-        const updatedGames = games.map(game => 
-          game.id === gameId
-            ? { ...game, folderId: undefined, folderName: undefined, folderColor: undefined }
-            : game
-        );
-        onGamesUpdate(updatedGames);
-      }
-
+      await updateFolder(folderId, updates);
+      await fetchFolders(); // Refresh data
+      
       onShowToast({
-        title: folderId ? 'Game moved to folder' : 'Game removed from folder',
-        status: 'success' as const,
-        duration: 2000
+        title: 'Folder Updated',
+        description: 'Folder has been updated successfully',
+        status: 'success',
+        duration: 3000,
       });
-    } catch (error) {
-      console.error('Error moving game:', error);
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update folder';
+      setError(errorMessage);
       onShowToast({
-        title: 'Error moving game',
-        status: 'error' as const,
-        duration: 3000
+        title: 'Error Updating Folder',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
       });
+    } finally {
+      setIsLoading(false);
     }
-  }, [userId, folders, games, onGamesUpdate, onShowToast]);
+  }, [userId, folders, fetchFolders, onShowToast]);
 
-  const openCreateFolderModal = useCallback(() => {
-    console.log('🔵 openCreateFolderModal called');
-    showModal('folder-modal', {
-      folder: null // null indicates creating a new folder
-    });
-  }, [showModal]);
-
-  const openEditFolderModal = useCallback((folder: GameFolder) => {
-    console.log('🔵 openEditFolderModal called with folder:', folder);
-    showModal('folder-modal', {
-      folder: {
-        id: folder.id,
-        name: folder.name,
-        description: folder.description || '',
-        color: folder.color || DEFAULT_FOLDER_COLORS[0]
-      }
-    });
-  }, [showModal]);
-
-  const handleSaveFolder = useCallback(async (folderData: { name: string; description: string; color: string }, folderId?: string) => {
-    console.log('🔵 handleSaveFolder called:', { folderData, folderId });
+  const deleteExistingFolder = useCallback(async (folderId: string) => {
+    setIsLoading(true);
+    setError(null);
     
-    if (folderId) {
-      // Update existing folder
-      await handleUpdateFolder(folderId, folderData);
-    } else {
-      // Create new folder
-      await handleCreateFolder(folderData);
+    try {
+      // Check if folder has children
+      const descendants = getAllDescendantIds(folders, folderId);
+      if (descendants.length > 0) {
+        throw new Error('Cannot delete folder with subfolders. Please delete subfolders first or move them to another location.');
+      }
+      
+      // Check if folder has games
+      const gamesInFolder = getGamesInFolder(folderId);
+      if (gamesInFolder.length > 0) {
+        throw new Error(`Cannot delete folder with ${gamesInFolder.length} game(s). Please move games to another folder first.`);
+      }
+      
+      await deleteFolder(folderId);
+      await fetchFolders(); // Refresh data
+      
+      // Clear selection if deleted folder was selected
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId(null);
+      }
+      
+      onShowToast({
+        title: 'Folder Deleted',
+        description: 'Folder has been deleted successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete folder';
+      setError(errorMessage);
+      onShowToast({
+        title: 'Error Deleting Folder',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, [handleCreateFolder, handleUpdateFolder]);
+  }, [userId, selectedFolderId, folders, fetchFolders, onShowToast]);
 
-  const handleCancelFolder = useCallback(() => {
-    console.log('🔵 handleCancelFolder called');
-    // No cleanup needed since we're using global modal
+  // Game-Folder operations
+  const assignGame = useCallback(async (gameId: string, folderId: string) => {
+    if (!userId) return;
+    
+    try {
+      await assignGameToFolder(gameId, folderId, userId);
+      await fetchFolders(); // Refresh data
+      
+      onShowToast({
+        title: 'Game Assigned',
+        description: 'Game has been assigned to folder successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to assign game to folder';
+      onShowToast({
+        title: 'Error Assigning Game',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  }, [userId, fetchFolders, onShowToast]);
+
+  const removeGame = useCallback(async (gameId: string) => {
+    if (!userId) return;
+    
+    try {
+      await removeGameFromFolder(gameId, userId);
+      await fetchFolders(); // Refresh data
+      
+      onShowToast({
+        title: 'Game Removed',
+        description: 'Game has been removed from folder successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove game from folder';
+      onShowToast({
+        title: 'Error Removing Game',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  }, [userId, fetchFolders, onShowToast]);
+
+  // Drag and drop operations
+  const handleDrop = useCallback(async (dropResult: DropResult) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      await handleFolderDrop(folders, dropResult);
+      await fetchFolders(); // Refresh data
+      
+      onShowToast({
+        title: 'Item Moved',
+        description: 'Item has been moved successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to move item';
+      setError(errorMessage);
+      onShowToast({
+        title: 'Error Moving Item',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [folders, fetchFolders, onShowToast]);
+
+  // Tree operations
+  const expandFolder = useCallback((folderId: string) => {
+    setExpandedFolders(prev => new Set([...prev, folderId]));
   }, []);
 
-  const getGamesInFolder = useCallback((folderId: string | null) => {
+  const collapseFolder = useCallback((folderId: string) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(folderId);
+      return newSet;
+    });
+  }, []);
+
+  // Selection and navigation
+  const selectFolder = useCallback((folderId: string | null) => {
+    setSelectedFolderId(folderId);
+  }, []);
+
+  const getFolderBreadcrumbs = useCallback((folderId: string): GameFolder[] => {
+    return getFolderPath(folders, folderId);
+  }, [folders]);
+
+  // Utility functions
+  const getGamesInFolder = useCallback((folderId: string): GameWithFolder[] => {
     return games.filter(game => game.folderId === folderId);
   }, [games]);
 
-  const getUnorganizedGames = useCallback(() => {
-    return games.filter(game => !game.folderId);
-  }, [games]);
+  const getGamesInFolderTree = useCallback((folderId: string): GameWithFolder[] => {
+    const folderIds = [folderId, ...getAllDescendantIds(folders, folderId)];
+    return games.filter(game => game.folderId && folderIds.includes(game.folderId));
+  }, [games, folders]);
 
-  // Drag and drop handlers
-  const handleDragStart = useCallback((e: React.DragEvent, gameId: string) => {
-    console.log('🐲 Drag started for game:', gameId);
-    setDraggedGameId(gameId);
-    e.dataTransfer.effectAllowed = 'move';
-    
-    // Find the game being dragged to get its info
-    const draggedGame = games.find(g => g.id === gameId);
-    console.log('🐲 Found dragged game:', draggedGame);
-    
-    if (!draggedGame) {
-      console.warn('🐲 Game not found, using default drag image');
-      return;
-    }
-    
-    try {
-      // Create a simple HTML element as drag image instead of canvas
-      const dragElement = document.createElement('div');
-      dragElement.style.cssText = `
-        width: 120px;
-        height: 80px;
-        background: white;
-        border: 2px solid #4299E1;
-        border-radius: 8px;
-        padding: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        font-family: Arial, sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        position: absolute;
-        top: -1000px;
-        left: -1000px;
-        z-index: 9999;
-        pointer-events: none;
-      `;
-      
-      // Get game type icon
-      const gameTypeIcon = draggedGame.gameType?.includes('whack') ? '🔨' : 
-                          draggedGame.gameType?.includes('spinner') ? '🎡' : '🥚';
-      
-      // Add content
-      dragElement.innerHTML = `
-        <div style="
-          width: 30px;
-          height: 30px;
-          background: #EBF8FF;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 18px;
-          margin-bottom: 4px;
-        ">${gameTypeIcon}</div>
-        <div style="
-          font-size: 10px;
-          font-weight: bold;
-          color: #2D3748;
-          text-align: center;
-          line-height: 1;
-          margin-bottom: 2px;
-          max-width: 100px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        ">${draggedGame.title || 'Game'}</div>
-        <div style="
-          font-size: 8px;
-          color: #4299E1;
-          text-align: center;
-        ">Moving...</div>
-      `;
-      
-      // Add to DOM temporarily
-      document.body.appendChild(dragElement);
-      
-      console.log('🐲 Setting custom drag image with HTML element');
-      
-      // Set the custom drag image
-      e.dataTransfer.setDragImage(dragElement, 60, 40);
-      
-      // Clean up after a short delay
-      requestAnimationFrame(() => {
-        document.body.removeChild(dragElement);
-        console.log('🐲 Custom drag image set and element cleaned up');
-      });
-      
-    } catch (error) {
-      console.error('🐲 Error creating custom drag image:', error);
-      // Fall back to default behavior
-    }
-  }, [games]);
+  const canCreateSubfolderCallback = useCallback((parentId: string | null): boolean => {
+    return canCreateSubfolder(folders, parentId);
+  }, [folders]);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  }, []);
+  const getFolderStatsCallback = useCallback(() => {
+    return getFolderStats(folderTree);
+  }, [folderTree]);
 
-  const handleDrop = useCallback((e: React.DragEvent, folderId: string | null) => {
-    e.preventDefault();
-    if (draggedGameId) {
-      handleGameDrop(draggedGameId, folderId);
-      setDraggedGameId(null);
-    }
-  }, [draggedGameId, handleGameDrop]);
+  const searchFolders = useCallback((searchTerm: string): GameFolder[] => {
+    const term = searchTerm.toLowerCase();
+    return folders.filter(folder => 
+      folder.name.toLowerCase().includes(term) ||
+      folder.description.toLowerCase().includes(term)
+    );
+  }, [folders]);
+
+  const refreshData = useCallback(async () => {
+    await fetchFolders();
+  }, [fetchFolders]);
 
   return {
+    // State
     folders,
+    folderTree,
+    assignments,
     selectedFolderId,
-    setSelectedFolderId,
-    getGamesInFolder,
-    getUnorganizedGames,
-    openCreateFolderModal,
-    openEditFolderModal,
-    handleDeleteFolder,
-    confirmDeleteFolder,
-    handleSaveFolder,
-    handleCancelFolder,
-    handleDragStart,
-    handleDragOver,
-    handleDrop,
     isLoading,
-    refreshFolders: fetchFolders
+    error,
+    
+    // Folder operations
+    createNewFolder,
+    updateExistingFolder,
+    deleteExistingFolder,
+    
+    // Game-Folder operations
+    assignGame,
+    removeGame,
+    
+    // Tree operations
+    handleDrop,
+    expandFolder,
+    collapseFolder,
+    
+    // Selection and navigation
+    selectFolder,
+    getFolderBreadcrumbs,
+    
+    // Utility functions
+    getGamesInFolder,
+    getGamesInFolderTree,
+    canCreateSubfolder: canCreateSubfolderCallback,
+    getFolderStats: getFolderStatsCallback,
+    searchFolders,
+    
+    // Data refresh
+    refreshData
   };
 }; 

@@ -13,39 +13,150 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { GameFolder, GameFolderAssignment } from '../types/game';
+import { GameFolder, GameFolderAssignment, FolderTreeNode, GameWithFolder, DragItem, DropResult } from '../types/game';
+
+const FOLDERS_COLLECTION = 'gameFolders';
+const MAX_DEPTH = 3; // 0, 1, 2, 3 = 4 levels total
+
+// Enhanced tree building with level calculation and game counts
+export const buildFolderTree = (
+  folders: GameFolder[], 
+  games: GameWithFolder[] = [],
+  parentId: string | null = null, 
+  level: number = 0
+): FolderTreeNode[] => {
+  return folders
+    .filter(folder => folder.parentId === parentId)
+    .map(folder => {
+      const children = buildFolderTree(folders, games, folder.id, level + 1);
+      const directGames = games.filter(game => game.folderId === folder.id);
+      const totalGameCount = directGames.length + children.reduce((sum, child) => sum + (child.gameCount || 0), 0);
+      
+      return {
+        ...folder,
+        children,
+        level,
+        gameCount: totalGameCount,
+        isExpanded: level < 2 // Auto-expand first 2 levels
+      };
+    })
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+};
+
+// Validate folder depth for 4-level hierarchy
+export const validateFolderDepth = (folders: GameFolder[], parentId: string | null): boolean => {
+  if (!parentId) return true; // Root level is always valid
+  
+  let currentDepth = 0;
+  let currentParentId: string | null = parentId;
+  
+  while (currentParentId && currentDepth <= MAX_DEPTH) {
+    const parent = folders.find(f => f.id === currentParentId);
+    if (!parent) break;
+    
+    currentDepth++;
+    currentParentId = parent.parentId || null;
+  }
+  
+  return currentDepth <= MAX_DEPTH;
+};
+
+// Get all descendant folder IDs (for deletion validation)
+export const getAllDescendantIds = (folders: GameFolder[], folderId: string): string[] => {
+  const descendants: string[] = [];
+  const children = folders.filter(f => f.parentId === folderId);
+  
+  children.forEach(child => {
+    descendants.push(child.id);
+    descendants.push(...getAllDescendantIds(folders, child.id));
+  });
+  
+  return descendants;
+};
+
+// Get folder path for breadcrumb navigation
+export const getFolderPath = (folders: GameFolder[], folderId: string): GameFolder[] => {
+  const path: GameFolder[] = [];
+  let currentId: string | null = folderId;
+  
+  while (currentId) {
+    const folder = folders.find(f => f.id === currentId);
+    if (!folder) break;
+    
+    path.unshift(folder);
+    currentId = folder.parentId || null;
+  }
+  
+  return path;
+};
+
+// Check if folder can have subfolders (not at max depth)
+export const canCreateSubfolder = (folders: GameFolder[], parentId: string | null): boolean => {
+  return validateFolderDepth(folders, parentId);
+};
+
+// Prevent circular references when moving folders
+export const isValidFolderMove = (
+  folders: GameFolder[], 
+  folderId: string, 
+  newParentId: string | null
+): boolean => {
+  if (!newParentId) return true; // Moving to root is always valid
+  if (folderId === newParentId) return false; // Can't be parent of itself
+  
+  // Check if newParentId is a descendant of folderId
+  const descendants = getAllDescendantIds(folders, folderId);
+  return !descendants.includes(newParentId);
+};
+
+// Handle drag and drop operations
+export const handleFolderDrop = async (
+  folders: GameFolder[],
+  dropResult: DropResult
+): Promise<void> => {
+  const { draggedItem, targetFolderId, newParentId } = dropResult;
+  
+  if (draggedItem.type === 'folder') {
+    // Moving a folder
+    if (!isValidFolderMove(folders, draggedItem.id, newParentId || null)) {
+      throw new Error('Invalid folder move: would create circular reference');
+    }
+    
+    if (!validateFolderDepth(folders, newParentId || null)) {
+      throw new Error('Invalid folder move: would exceed maximum depth of 4 levels');
+    }
+    
+    await updateFolder(draggedItem.id, { parentId: newParentId || null });
+  } else {
+    // Moving a game to a folder
+    // This would be handled by the game service
+    console.log('Game drop handling would be implemented in game service');
+  }
+};
 
 // Folder CRUD operations
 export const createFolder = async (folderData: Omit<GameFolder, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  try {
-    const now = Timestamp.now();
-    const dataToSend = {
-      ...folderData,
-      createdAt: now,
-      updatedAt: now
-    };
-    
-    console.log('Creating folder with data:', dataToSend);
-    console.log('User ID:', folderData.userId);
-    
-    const docRef = await addDoc(collection(db, 'gameFolders'), dataToSend);
-    console.log('Folder created successfully with ID:', docRef.id);
-    return docRef.id;
-  } catch (error) {
-    console.error('Error creating folder:', error);
-    console.error('Error details:', {
-      code: (error as any)?.code,
-      message: (error as any)?.message,
-      details: (error as any)?.details
-    });
-    throw error;
+  // Validate depth before creating
+  const allFolders = await getUserFolders(folderData.userId);
+  if (!validateFolderDepth(allFolders, folderData.parentId || null)) {
+    throw new Error('Cannot create folder: would exceed maximum depth of 4 levels');
   }
+  
+  const now = new Date();
+  const docRef = await addDoc(collection(db, FOLDERS_COLLECTION), {
+    ...folderData,
+    createdAt: now,
+    updatedAt: now,
+    depth: calculateDepth(allFolders, folderData.parentId || null)
+  });
+  
+  return docRef.id;
 };
 
 export const getUserFolders = async (userId: string): Promise<GameFolder[]> => {
   try {
     const foldersQuery = query(
-      collection(db, 'gameFolders'),
+      collection(db, FOLDERS_COLLECTION),
       where('userId', '==', userId),
       orderBy('order', 'asc')
     );
@@ -53,8 +164,10 @@ export const getUserFolders = async (userId: string): Promise<GameFolder[]> => {
     const snapshot = await getDocs(foldersQuery);
     return snapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
-    } as GameFolder));
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date()
+    })) as GameFolder[];
   } catch (error) {
     console.error('Error fetching folders:', error);
     throw error;
@@ -62,108 +175,16 @@ export const getUserFolders = async (userId: string): Promise<GameFolder[]> => {
 };
 
 export const updateFolder = async (folderId: string, updates: Partial<GameFolder>): Promise<void> => {
-  try {
-    const folderRef = doc(db, 'gameFolders', folderId);
-    await updateDoc(folderRef, {
-      ...updates,
-      updatedAt: Timestamp.now()
-    });
-  } catch (error) {
-    console.error('Error updating folder:', error);
-    throw error;
-  }
+  const folderRef = doc(db, FOLDERS_COLLECTION, folderId);
+  await updateDoc(folderRef, {
+    ...updates,
+    updatedAt: new Date()
+  });
 };
 
 export const deleteFolder = async (folderId: string): Promise<void> => {
-  try {
-    console.log('Attempting to delete folder:', folderId);
-    
-    // First, try to remove all game assignments to this folder
-    try {
-      const assignmentsQuery = query(
-        collection(db, 'gameFolderAssignments'),
-        where('folderId', '==', folderId)
-      );
-      
-      const assignmentsSnapshot = await getDocs(assignmentsQuery);
-      console.log(`Found ${assignmentsSnapshot.docs.length} assignments to delete`);
-      
-      // Delete assignments one by one to avoid batch issues
-      for (const assignmentDoc of assignmentsSnapshot.docs) {
-        try {
-          await deleteDoc(assignmentDoc.ref);
-          console.log('Deleted assignment:', assignmentDoc.id);
-        } catch (assignmentError) {
-          console.warn('Failed to delete assignment:', assignmentDoc.id, assignmentError);
-          // Continue with other assignments - this is expected for some permission scenarios
-        }
-      }
-    } catch (assignmentError: any) {
-      // Log assignment deletion issues but don't prevent folder deletion
-      const isPermissionError = assignmentError?.code === 'permission-denied' || 
-                               assignmentError?.message?.includes('Missing or insufficient permissions');
-      
-      if (isPermissionError) {
-        console.log('Assignment deletion skipped due to permissions - this is normal for some folder configurations');
-      } else {
-        console.warn('Error deleting folder assignments:', assignmentError);
-      }
-      // Continue with folder deletion regardless
-    }
-    
-    // Then delete the folder itself
-    const folderRef = doc(db, 'gameFolders', folderId);
-    
-    // First, try to get the folder to check its data
-    try {
-      const folderDoc = await getDoc(folderRef);
-      if (folderDoc.exists()) {
-        const folderData = folderDoc.data();
-        console.log('Folder data before deletion:', folderData);
-        
-        // Check if folder has invalid data (empty name)
-        if (!folderData.name || folderData.name.trim() === '') {
-          console.log('Folder has empty name, updating with temporary name for deletion compatibility');
-          
-          // Try to update the folder with a valid name first, then delete
-          try {
-            await updateDoc(folderRef, {
-              name: 'Temporary Name for Deletion',
-              updatedAt: new Date()
-            });
-            console.log('Updated folder with temporary valid name');
-          } catch (updateError) {
-            console.warn('Failed to update folder with valid name:', updateError);
-            // Continue with deletion attempt anyway
-          }
-        }
-      }
-    } catch (getError) {
-      console.warn('Failed to get folder data before deletion:', getError);
-      // Continue with deletion attempt anyway
-    }
-    
-    // Now attempt to delete the folder
-    await deleteDoc(folderRef);
-    console.log('Successfully deleted folder:', folderId);
-    
-  } catch (error) {
-    console.error('Error deleting folder:', error);
-    console.error('Error details:', {
-      code: (error as any)?.code,
-      message: (error as any)?.message,
-      folderId
-    });
-    
-    // Provide more specific error information
-    if (error instanceof Error) {
-      if (error.message.includes('Missing or insufficient permissions')) {
-        throw new Error('Cannot delete folder: This folder contains invalid data that prevents deletion. The folder may have been created with missing required fields.');
-      }
-    }
-    
-    throw error;
-  }
+  const folderRef = doc(db, FOLDERS_COLLECTION, folderId);
+  await deleteDoc(folderRef);
 };
 
 // Game-Folder assignment operations
@@ -249,7 +270,7 @@ export const reorderFolders = async (folderUpdates: { id: string; order: number 
     const batch = writeBatch(db);
     
     folderUpdates.forEach(({ id, order }) => {
-      const folderRef = doc(db, 'gameFolders', id);
+      const folderRef = doc(db, FOLDERS_COLLECTION, id);
       batch.update(folderRef, { 
         order,
         updatedAt: Timestamp.now()
@@ -261,4 +282,60 @@ export const reorderFolders = async (folderUpdates: { id: string; order: number 
     console.error('Error reordering folders:', error);
     throw error;
   }
+};
+
+// Batch operations for better performance
+export const batchUpdateFolders = async (updates: Array<{ id: string; data: Partial<GameFolder> }>): Promise<void> => {
+  const batch = writeBatch(db);
+  
+  updates.forEach(({ id, data }) => {
+    const folderRef = doc(db, FOLDERS_COLLECTION, id);
+    batch.update(folderRef, { ...data, updatedAt: Timestamp.now() });
+  });
+  
+  await batch.commit();
+};
+
+// Helper function to calculate depth
+const calculateDepth = (folders: GameFolder[], parentId: string | null): number => {
+  if (!parentId) return 0;
+  
+  const parent = folders.find(f => f.id === parentId);
+  return parent ? (parent.depth || 0) + 1 : 0;
+};
+
+// Search folders by name (for large folder structures)
+export const searchFolders = (folders: GameFolder[], searchTerm: string): GameFolder[] => {
+  const term = searchTerm.toLowerCase();
+  return folders.filter(folder => 
+    folder.name.toLowerCase().includes(term) ||
+    folder.description.toLowerCase().includes(term)
+  );
+};
+
+// Get folder statistics
+export const getFolderStats = (tree: FolderTreeNode[]): {
+  totalFolders: number;
+  totalGames: number;
+  maxDepth: number;
+} => {
+  let totalFolders = 0;
+  let totalGames = 0;
+  let maxDepth = 0;
+  
+  const traverse = (nodes: FolderTreeNode[], currentDepth: number = 0) => {
+    nodes.forEach(node => {
+      totalFolders++;
+      totalGames += node.gameCount || 0;
+      maxDepth = Math.max(maxDepth, currentDepth);
+      
+      if (node.children.length > 0) {
+        traverse(node.children, currentDepth + 1);
+      }
+    });
+  };
+  
+  traverse(tree);
+  
+  return { totalFolders, totalGames, maxDepth };
 }; 

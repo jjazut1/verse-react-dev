@@ -1,6 +1,6 @@
 import { Timestamp, FieldValue } from 'firebase/firestore';
 
-// Folder-related interfaces
+// Enhanced Folder-related interfaces for 4-level hierarchy
 export interface GameFolder {
   id: string;
   name: string;
@@ -8,14 +8,60 @@ export interface GameFolder {
   color: string;
   userId: string;
   order: number;
+  parentId?: string | null; // null means root folder
+  depth?: number; // 0 = root, 1 = level 1, 2 = level 2, 3 = level 3 (max 4 levels)
+  children?: GameFolder[]; // Populated when building tree structure
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Tree node type for recursive rendering
+export interface FolderTreeNode extends GameFolder {
+  children: FolderTreeNode[];
+  level: number; // Computed level for rendering
+  isExpanded?: boolean; // For collapsible folders
+  gameCount?: number; // Total games in this folder and subfolders
 }
 
 export interface GameWithFolder {
   folderId?: string;
   folderName?: string;
   folderColor?: string;
+}
+
+export interface GameWithFolderAndId extends GameWithFolder {
+  id: string;
+  title?: string;
+  gameType?: string;
+}
+
+export interface GameFolderAssignment {
+  id: string;
+  gameId: string;
+  folderId: string;
+  userId: string;
+  assignedAt: Date;
+}
+
+// Drag and drop types
+export interface DragItem {
+  id: string;
+  type: 'folder' | 'game';
+  data: GameFolder | GameWithFolderAndId;
+}
+
+export interface DropResult {
+  draggedItem: DragItem;
+  targetFolderId: string | null;
+  newParentId?: string; // For folder reparenting
+}
+
+// Folder operation types
+export interface FolderOperation {
+  type: 'create' | 'update' | 'delete' | 'move';
+  folderId: string;
+  parentId?: string | null;
+  data?: Partial<GameFolder>;
 }
 
 interface BaseGameConfig {

@@ -53,6 +53,32 @@ service cloud.firestore {
                request.auth.token.email == "firebase-adminsdk-fbsvc@verse-dev-central.iam.gserviceaccount.com"
              );
     }
+
+    // Enhanced folder validation for 4-level hierarchy
+    function isValidFolderData(data) {
+      return data.keys().hasAll(['name', 'description', 'color', 'userId', 'order']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.description is string && data.description.size() <= 500 &&
+             data.color is string && data.color.size() > 0 &&
+             data.userId is string &&
+             data.order is number &&
+             (!data.keys().hasAny(['parentId']) || data.parentId == null || data.parentId is string) &&
+             (!data.keys().hasAny(['depth']) || (data.depth is number && data.depth >= 0 && data.depth <= 3));
+    }
+    
+    // Validate folder depth doesn't exceed 4 levels (0, 1, 2, 3)
+    function isValidFolderDepth(data) {
+      return !data.keys().hasAny(['depth']) || (data.depth is number && data.depth <= 3);
+    }
+    
+    // Validate parentId ownership (parent must belong to same user)
+    function isValidParentOwnership(data) {
+      return !data.keys().hasAny(['parentId']) || 
+             data.parentId == null || 
+             (data.parentId is string && 
+              exists(/databases/$(database)/documents/gameFolders/$(data.parentId)) &&
+              get(/databases/$(database)/documents/gameFolders/$(data.parentId)).data.userId == data.userId);
+    }
     
     // Allow anyone to read high scores
     match /highScores/{highScoreId} {
@@ -91,7 +117,7 @@ service cloud.firestore {
     
     // Games collection
     match /games/{gameId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow create, update, delete: if isTeacherOrAdmin();
     }
     
@@ -166,7 +192,11 @@ service cloud.firestore {
     
     match /assignments/{assignmentId} {
       // Read allowed for everyone - explicitly set to true for clarity
-      allow read: if true;
+      allow read: if isAuthenticated() && (
+        isTeacherOrAdmin() || 
+        resource.data.studentEmail == request.auth.token.email ||
+        isAdmin()
+      );
 
       // Allow service accounts full access
       allow read, write: if isServiceAccount();
@@ -215,7 +245,7 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       // Allow public read access
-      allow read: if true;
+      allow read: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
       
       // New permission model:
       // 1. Allow admins to perform any operations on any user document
@@ -295,90 +325,46 @@ service cloud.firestore {
     // Game Folders collection - for organizing games into folders
     match /gameFolders/{folderId} {
       // Users can read their own folders
-      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
       
       // Users can create folders for themselves with enhanced validation
       allow create: if isAuthenticated() && 
+        isTeacherOrAdmin() && 
         request.resource.data.userId == request.auth.uid &&
-        // Required fields validation
-        request.resource.data.name is string &&
-        request.resource.data.name.size() > 0 &&
-        request.resource.data.name.size() <= 100 &&
-        request.resource.data.order is number &&
-        request.resource.data.order >= 0 &&
-        // Optional fields validation
-        (!('description' in request.resource.data) || 
-         (request.resource.data.description is string && request.resource.data.description.size() <= 500)) &&
-        (!('color' in request.resource.data) || 
-         (request.resource.data.color is string && request.resource.data.color.matches('^#[0-9A-Fa-f]{6}$'))) &&
-        (!('parentId' in request.resource.data) || 
-         (request.resource.data.parentId is string && request.resource.data.parentId.size() > 0)) &&
-        // Ensure timestamps are properly set
-        request.resource.data.createdAt is timestamp &&
-        request.resource.data.updatedAt is timestamp;
+        isValidFolderData(request.resource.data) &&
+        isValidFolderDepth(request.resource.data) &&
+        isValidParentOwnership(request.resource.data);
       
       // Users can update their own folders with field restrictions
       allow update: if isAuthenticated() && 
+        isTeacherOrAdmin() && 
         request.auth.uid == resource.data.userId &&
-        request.resource.data.userId == request.auth.uid &&
-        // Only allow updating specific fields
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['name', 'description', 'color', 'order', 'updatedAt']) &&
-        // Validate updated fields
-        request.resource.data.name is string &&
-        request.resource.data.name.size() > 0 &&
-        request.resource.data.name.size() <= 100 &&
-        request.resource.data.order is number &&
-        request.resource.data.order >= 0 &&
-        (!('description' in request.resource.data) || 
-         (request.resource.data.description is string && request.resource.data.description.size() <= 500)) &&
-        (!('color' in request.resource.data) || 
-         (request.resource.data.color is string && request.resource.data.color.matches('^#[0-9A-Fa-f]{6}$'))) &&
-        request.resource.data.updatedAt is timestamp;
+        isValidFolderData(request.resource.data) &&
+        isValidFolderDepth(request.resource.data) &&
+        isValidParentOwnership(request.resource.data) &&
+        request.resource.data.userId == resource.data.userId;
       
       // Users can delete their own folders
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
     }
 
     // Game Folder Assignments collection - for assigning games to folders
     match /gameFolderAssignments/{assignmentId} {
       // Users can read their own assignments
-      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
       
       // Users can create assignments for themselves with enhanced validation
       allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid &&
-        // Required fields validation
-        request.resource.data.gameId is string &&
-        request.resource.data.gameId.size() > 0 &&
-        request.resource.data.gameId.size() <= 100 &&
-        request.resource.data.folderId is string &&
-        request.resource.data.folderId.size() > 0 &&
-        request.resource.data.folderId.size() <= 100 &&
-        // Ensure timestamp is properly set
-        request.resource.data.assignedAt is timestamp &&
-        // Verify the folder exists and belongs to the user (cross-reference validation)
-        exists(/databases/$(database)/documents/gameFolders/$(request.resource.data.folderId)) &&
-        get(/databases/$(database)/documents/gameFolders/$(request.resource.data.folderId)).data.userId == request.auth.uid;
+        isTeacherOrAdmin() && 
+        request.resource.data.userId == request.auth.uid;
       
       // Users can update their own assignments with field restrictions
       allow update: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId &&
-        request.resource.data.userId == request.auth.uid &&
-        // Only allow updating the folderId (moving games between folders)
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['folderId', 'assignedAt']) &&
-        // Validate the new folder assignment
-        request.resource.data.folderId is string &&
-        request.resource.data.folderId.size() > 0 &&
-        request.resource.data.folderId.size() <= 100 &&
-        request.resource.data.assignedAt is timestamp &&
-        // Verify the new folder exists and belongs to the user
-        exists(/databases/$(database)/documents/gameFolders/$(request.resource.data.folderId)) &&
-        get(/databases/$(database)/documents/gameFolders/$(request.resource.data.folderId)).data.userId == request.auth.uid;
+        isTeacherOrAdmin() && 
+        request.auth.uid == resource.data.userId;
       
       // Users can delete their own assignments
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
     }
 
     // Email Link Authentication Requests - for converting email link users to authenticated users
@@ -401,6 +387,12 @@ service cloud.firestore {
       
       // Allow cleanup - service accounts can delete processed requests
       allow delete: if isServiceAccount();
+    }
+
+    // System configuration (admin only)
+    match /config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 } 
