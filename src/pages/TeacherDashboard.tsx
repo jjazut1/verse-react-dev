@@ -9,6 +9,7 @@ import { generateAndUploadThumbnail } from '../utils/thumbnailGenerator';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
 import { useFolderManager } from '../components/FolderManager';
+import { FolderTree } from '../components/FolderTree';
 import { GameWithFolder } from '../types/game';
 import { useModal } from '../contexts/ModalContext';
 import { GlobalModals } from '../components/GlobalModals';
@@ -1870,139 +1871,49 @@ const TeacherDashboard = () => {
                       </div>
                     </div>
                     
-                    {/* Folder List */}
-                    {folderManager.folders.length > 0 && (
-                      <div style={{ 
-                        display: 'flex', 
-                        gap: '8px', 
-                        flexWrap: 'wrap',
-                        marginBottom: '12px'
-                      }}>
+                    {/* New 4-Level Folder Tree */}
+                    {folderManager.folderTree.length > 0 && (
+                      <div style={{ marginBottom: '12px' }}>
                         {/* All Games Button */}
-                        <button
-                          onClick={() => {
-                            folderManager.setSelectedFolderId(null);
-                            // Clear folder filter when viewing all games
+                        <div style={{ marginBottom: '8px' }}>
+                          <button
+                            onClick={() => {
+                              folderManager.setSelectedFolderId(null);
+                              setGameFolderFilter('all');
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: folderManager.selectedFolderId === null ? '#E2E8F0' : 'white',
+                              color: folderManager.selectedFolderId === null ? '#2D3748' : '#4A5568',
+                              border: '1px solid #E2E8F0',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: folderManager.selectedFolderId === null ? '600' : '400'
+                            }}
+                          >
+                            📋 All Games ({myGames.length})
+                          </button>
+                        </div>
+                        
+                        {/* Use FolderTree component with correct props */}
+                        <FolderTree 
+                          folders={folderManager.folderTree}
+                          selectedFolderId={folderManager.selectedFolderId}
+                          onFolderClick={(folderId: string) => {
+                            folderManager.setSelectedFolderId(folderId);
                             setGameFolderFilter('all');
                           }}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: folderManager.selectedFolderId === null ? '#E2E8F0' : 'white',
-                            color: folderManager.selectedFolderId === null ? '#2D3748' : '#4A5568',
-                            border: '1px solid #E2E8F0',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: folderManager.selectedFolderId === null ? '600' : '400'
-                          }}
-                        >
-                          📋 All Games ({myGames.length})
-                        </button>
-                        
-                        {/* Folder Buttons */}
-                        {folderManager.folders.map(folder => {
-                          const gamesInFolder = folderManager.getGamesInFolder(folder.id);
-                          return (
-                            <div key={folder.id} style={{ position: 'relative' }}>
-                              <button
-                                data-folder-button
-                                onClick={() => {
-                                  // Toggle behavior: if same folder is clicked, deselect it
-                                  if (folderManager.selectedFolderId === folder.id) {
-                                    folderManager.setSelectedFolderId(null);
-                                    setGameFolderFilter('all');
-                                  } else {
-                                    folderManager.setSelectedFolderId(folder.id);
-                                    // Clear folder filter when selecting a specific folder
-                                    setGameFolderFilter('all');
-                                  }
-                                }}
-                                onDrop={(e) => folderManager.handleDrop(e, folder.id)}
-                                onDragOver={(e) => {
-                                  folderManager.handleDragOver(e);
-                                  e.currentTarget.classList.add('folder-drop-zone-active');
-                                }}
-                                onDragLeave={(e) => {
-                                  e.currentTarget.classList.remove('folder-drop-zone-active');
-                                }}
-                                style={{
-                                  padding: '6px 12px',
-                                  backgroundColor: folderManager.selectedFolderId === folder.id ? folder.color || '#4299E1' : 'white',
-                                  color: folderManager.selectedFolderId === folder.id ? 'white' : '#4A5568',
-                                  border: `2px solid ${folder.color || '#4299E1'}`,
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  fontSize: '14px',
-                                  fontWeight: folderManager.selectedFolderId === folder.id ? '600' : '400',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  transition: 'all 0.2s ease'
-                                }}
-                              >
-                                📁 {folder.name} ({gamesInFolder.length})
-                              </button>
-                              
-                              {/* Folder Actions */}
-                              {folderManager.selectedFolderId === folder.id && (
-                                <div 
-                                  data-folder-actions
-                                  style={{
-                                    position: 'absolute',
-                                    top: '100%',
-                                    left: '0',
-                                    zIndex: 10,
-                                    backgroundColor: 'white',
-                                    border: '1px solid #E2E8F0',
-                                    borderRadius: '6px',
-                                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                    padding: '4px',
-                                    marginTop: '4px',
-                                    display: 'flex',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  <button
-                                    onClick={() => {
-                                      folderManager.openEditFolderModal(folder);
-                                      // Auto-close actions after opening edit modal
-                                      folderManager.setSelectedFolderId(null);
-                                    }}
-                                    style={{
-                                      padding: '4px 8px',
-                                      backgroundColor: '#F7FAFC',
-                                      color: '#4A5568',
-                                      border: 'none',
-                                      borderRadius: '4px',
-                                      cursor: 'pointer',
-                                      fontSize: '12px'
-                                    }}
-                                  >
-                                    ✏️ Edit
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      folderManager.confirmDeleteFolder(folder.id);
-                                      // Auto-close actions after opening delete confirmation
-                                      folderManager.setSelectedFolderId(null);
-                                    }}
-                                    style={{
-                                      padding: '4px 8px',
-                                      backgroundColor: '#FED7D7',
-                                      color: '#C53030',
-                                      border: 'none',
-                                      borderRadius: '4px',
-                                      cursor: 'pointer',
-                                      fontSize: '12px'
-                                    }}
-                                  >
-                                    🗑️ Delete
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                          onCreateSubfolder={folderManager.openCreateFolderModal}
+                          onEditFolder={folderManager.openEditFolderModal}
+                          onDeleteFolder={(folderId: string) => folderManager.deleteExistingFolder(folderId)}
+                          onFolderDrop={(dropResult: any) => folderManager.handleDrop(dropResult)}
+                          getGamesInFolder={folderManager.getGamesInFolder}
+                          canCreateSubfolder={folderManager.canCreateSubfolder}
+                          maxDepth={3}
+                          showGameCounts={true}
+                          collapsible={true}
+                        />
                       </div>
                     )}
                     
