@@ -95,6 +95,11 @@ const TeacherDashboard = () => {
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
   
+  // Public games search and filter state
+  const [publicGameSearchQuery, setPublicGameSearchQuery] = useState<string>('');
+  const [publicGameTypeFilter, setPublicGameTypeFilter] = useState<string>('all');
+  const [publicGameCreatorFilter, setPublicGameCreatorFilter] = useState<string>('all');
+  
   // Add state to track last visited tab for returning from student view
   const [lastTabBeforeStudentView, setLastTabBeforeStudentView] = useState<TabType>('students');
   
@@ -513,6 +518,28 @@ const TeacherDashboard = () => {
       return matchesSearch && matchesType && matchesFolder;
     });
   }, [myGames, gameSearchQuery, gameTypeFilter, gameFolderFilter, folderManager.selectedFolderId, folderManager]);
+
+  // Filter public games based on search query, type, and creator
+  const getFilteredPublicGames = useCallback(() => {
+    return publicGames.filter(game => {
+      // Text search filter
+      const matchesSearch = !publicGameSearchQuery || 
+        game.title.toLowerCase().includes(publicGameSearchQuery.toLowerCase()) ||
+        (game.description || '').toLowerCase().includes(publicGameSearchQuery.toLowerCase()) ||
+        (game.gameType || '').toLowerCase().includes(publicGameSearchQuery.toLowerCase()) ||
+        (game.createdBy || '').toLowerCase().includes(publicGameSearchQuery.toLowerCase());
+      
+      // Game type filter
+      const matchesType = publicGameTypeFilter === 'all' || 
+        (game.gameType || '').toLowerCase().includes(publicGameTypeFilter.toLowerCase());
+      
+      // Creator filter
+      const matchesCreator = publicGameCreatorFilter === 'all' || 
+        (game.createdBy || '').toLowerCase().includes(publicGameCreatorFilter.toLowerCase());
+      
+      return matchesSearch && matchesType && matchesCreator;
+    });
+  }, [publicGames, publicGameSearchQuery, publicGameTypeFilter, publicGameCreatorFilter]);
 
   const handleCreateAssignment = (game: Game) => {
     // Use global modal for assignment creation
@@ -2330,6 +2357,107 @@ const TeacherDashboard = () => {
                 Public Games
               </h2>
               
+              {/* Search and Filter Section */}
+              <div style={{ 
+                marginBottom: '24px',
+                padding: '16px',
+                backgroundColor: '#FAFAFA',
+                borderRadius: '8px',
+                border: '1px solid #E2E8F0'
+              }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr auto auto auto', 
+                  gap: '12px', 
+                  alignItems: 'center' 
+                }}>
+                  {/* Search Input */}
+                  <input
+                    type="text"
+                    placeholder="Search public games..."
+                    value={publicGameSearchQuery}
+                    onChange={(e) => setPublicGameSearchQuery(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      backgroundColor: 'white'
+                    }}
+                  />
+                  
+                  {/* Game Type Filter */}
+                  <select
+                    value={publicGameTypeFilter}
+                    onChange={(e) => setPublicGameTypeFilter(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      backgroundColor: 'white',
+                      minWidth: '150px'
+                    }}
+                  >
+                    <option value="all">All Types</option>
+                    <option value="whack-a-mole">Whack-a-Mole</option>
+                    <option value="spinner-wheel">Spinner Wheel</option>
+                    <option value="sort-categories-egg">Sort Categories</option>
+                    <option value="anagram">Anagram</option>
+                    <option value="sentence-sense">Sentence Sense</option>
+                    <option value="place-value-showdown">Place Value Showdown</option>
+                  </select>
+                  
+                  {/* Creator Filter */}
+                  <select
+                    value={publicGameCreatorFilter}
+                    onChange={(e) => setPublicGameCreatorFilter(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      backgroundColor: 'white',
+                      minWidth: '150px'
+                    }}
+                  >
+                    <option value="all">All Creators</option>
+                    {Array.from(new Set(publicGames.map(game => game.createdBy).filter(Boolean))).map(creator => (
+                      <option key={creator} value={creator}>{creator}</option>
+                    ))}
+                  </select>
+                  
+                  {/* Clear Filters Button */}
+                  <button
+                    onClick={() => {
+                      setPublicGameSearchQuery('');
+                      setPublicGameTypeFilter('all');
+                      setPublicGameCreatorFilter('all');
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#F3F4F6',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      color: '#374151'
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+                
+                {/* Results Count */}
+                <div style={{ 
+                  marginTop: '12px', 
+                  fontSize: '14px', 
+                  color: '#6B7280' 
+                }}>
+                  Showing {getFilteredPublicGames().length} of {publicGames.length} public games
+                </div>
+              </div>
+              
               {isLoading ? (
                 <div style={{ 
                   textAlign: 'center', 
@@ -2341,12 +2469,13 @@ const TeacherDashboard = () => {
                   <div style={{ fontSize: '16px', color: '#718096' }}>Loading public games...</div>
                 </div>
               ) : publicGames.length > 0 ? (
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
-                  gap: '20px' 
-                }}>
-                  {publicGames.map((game) => (
+                getFilteredPublicGames().length > 0 ? (
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+                    gap: '20px' 
+                  }}>
+                    {getFilteredPublicGames().map((game) => (
                     <div key={game.id} style={{ 
                       backgroundColor: 'white',
                       borderRadius: '12px',
@@ -2545,7 +2674,42 @@ const TeacherDashboard = () => {
                       </div>
                     </div>
                   ))}
-                </div>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '40px',
+                    backgroundColor: '#F7FAFC',
+                    borderRadius: '12px',
+                    border: '2px dashed #CBD5E0'
+                  }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: '#2D3748' }}>
+                      No games match your search
+                    </h3>
+                    <p style={{ color: '#718096', marginBottom: '16px' }}>
+                      Try adjusting your search terms or filters
+                    </p>
+                    <button
+                      onClick={() => {
+                        setPublicGameSearchQuery('');
+                        setPublicGameTypeFilter('all');
+                        setPublicGameCreatorFilter('all');
+                      }}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#4299E1',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      Clear All Filters
+                    </button>
+                  </div>
+                )
               ) : (
                 <div style={{ 
                   textAlign: 'center', 
