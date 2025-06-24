@@ -53,7 +53,7 @@ export interface DragItem {
 export interface DropResult {
   draggedItem: DragItem;
   targetFolderId: string | null;
-  newParentId?: string; // For folder reparenting
+  newParentId?: string | null; // For folder reparenting
 }
 
 // Folder operation types

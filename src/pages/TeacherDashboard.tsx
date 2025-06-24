@@ -10,6 +10,20 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
 import { useFolderManager } from '../components/FolderManager';
 import { FolderTree } from '../components/FolderTree';
+import { DraggableGamesContainer } from '../components/DraggableGamesContainer';
+import { UnorganizedDropZone } from '../components/UnorganizedDropZone';
+import { DraggableGameCard } from '../components/DraggableGameCard';
+import { SimpleFolderTree } from '../components/SimpleFolderTree';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
 import { GameWithFolder } from '../types/game';
 import { useModal } from '../contexts/ModalContext';
 import { GlobalModals } from '../components/GlobalModals';
@@ -123,6 +137,100 @@ const TeacherDashboard = () => {
     onGamesUpdate: (games) => setMyGames(games as Game[]),
     onShowToast: showToast
   });
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 3, // Reduced distance for more responsive drag start
+      },
+    })
+  );
+
+  // Drag state for visual feedback
+  const [activeItem, setActiveItem] = useState<any>(null);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event;
+    const dragData = active.data.current;
+    
+    console.log('🚀 Drag start:', { activeId: active.id, dragData });
+    
+    if (dragData) {
+      setActiveItem({
+        id: active.id as string,
+        type: dragData.type,
+        data: dragData.folder || dragData.game
+      });
+    }
+  }, []);
+
+  const handleDragOver = useCallback((event: any) => {
+    const { active, over } = event;
+    
+    if (over && over.id && over.data.current?.type === 'folder') {
+      console.log('🎯 Drag over folder:', { 
+        activeId: active.id, 
+        overId: over.id,
+        overFolder: over.data.current?.folder?.name,
+        overType: over.data.current?.type
+      });
+    }
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    console.log('🎯 Drag end:', { 
+      activeId: active.id, 
+      overId: over?.id,
+      activeType: active.data.current?.type,
+      overType: over?.data.current?.type,
+      overData: over?.data.current
+    });
+    
+    if (active && over && active.id !== over.id) {
+      const dragData = active.data.current;
+      const dropData = over.data.current;
+      
+      console.log('📦 Drop data detailed:', { 
+        dragData, 
+        dropData,
+        activeId: active.id,
+        overId: over.id,
+        dragType: dragData?.type,
+        dropType: dropData?.type 
+      });
+      
+      if (dragData && dropData) {
+        const dropResult = {
+          draggedItem: {
+            id: active.id as string,
+            type: dragData.type,
+            data: dragData.folder || dragData.game
+          },
+          targetFolderId: over.id as string,
+          newParentId: dropData.type === 'folder' ? over.id as string : 
+                      dropData.type === 'unorganized' ? null : null
+        };
+        
+        console.log('🔄 Calling handleDrop with:', dropResult);
+        folderManager.handleDrop(dropResult);
+      } else {
+        console.log('❌ Missing drag or drop data:', { dragData, dropData });
+      }
+    } else {
+      console.log('❌ Drop conditions not met:', {
+        hasActive: !!active,
+        hasOver: !!over,
+        sameId: active?.id === over?.id,
+        activeId: active?.id,
+        overId: over?.id
+      });
+    }
+    
+    setActiveItem(null);
+  }, [folderManager]);
 
   // Debug logging for folder manager
   useEffect(() => {
@@ -1815,61 +1923,109 @@ const TeacherDashboard = () => {
                     </div>
                   </div>
 
-                  {/* Folder Management Section */}
-                  <div style={{ 
-                    marginBottom: '24px',
-                    padding: '16px',
-                    backgroundColor: '#F8FAFC',
-                    borderRadius: '8px',
-                    border: '1px solid #E2E8F0'
-                  }}>
+                  {/* Unified Drag & Drop Context for Folders and Games */}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDragEnd={handleDragEnd}
+                  >
+                    {/* Folder Management Section */}
+                    <div style={{ 
+                      marginBottom: '24px',
+                      padding: '16px',
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: '8px',
+                      border: '1px solid #E2E8F0'
+                    }}>
                     <div style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between', 
                       alignItems: 'center',
                       marginBottom: '12px'
                     }}>
-                      <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#2D3748' }}>
-                        📁 Organize Your Games
-                      </h3>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => {
-                            console.log('Manual refresh clicked');
-                            console.log('Current user ID:', currentUser?.uid);
-                            console.log('Current folders:', folderManager.folders);
-                            folderManager.refreshFolders();
-                          }}
-                          style={{
-                            padding: '4px 8px',
-                            backgroundColor: '#E2E8F0',
-                            color: '#4A5568',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                          }}
-                        >
-                          🔄 Refresh
-                        </button>
-                        <button
-                          onClick={folderManager.openCreateFolderModal}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#4299E1',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          ➕ New Folder
-                        </button>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#2D3748' }}>
+                          📁 Organize Your Games
+                        </h3>
+                        
+                        {/* Undo/Redo Controls */}
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            onClick={folderManager.undo}
+                            disabled={!folderManager.canUndo}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: folderManager.canUndo ? '#2B6CB0' : '#EDF2F7',
+                              color: folderManager.canUndo ? 'white' : '#A0AEC0',
+                              border: `2px solid ${folderManager.canUndo ? '#2B6CB0' : '#CBD5E0'}`,
+                              borderRadius: '6px',
+                              cursor: folderManager.canUndo ? 'pointer' : 'not-allowed',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.2s ease',
+                              boxShadow: folderManager.canUndo ? '0 2px 4px rgba(43, 108, 176, 0.2)' : 'none'
+                            }}
+                            title={folderManager.canUndo ? `Undo: ${folderManager.undoStack[folderManager.undoStack.length - 1]?.description || 'Last action'}` : 'Nothing to undo'}
+                            onMouseEnter={(e) => {
+                              if (folderManager.canUndo) {
+                                const target = e.target as HTMLButtonElement;
+                                target.style.backgroundColor = '#2C5282';
+                                target.style.transform = 'translateY(-1px)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (folderManager.canUndo) {
+                                const target = e.target as HTMLButtonElement;
+                                target.style.backgroundColor = '#2B6CB0';
+                                target.style.transform = 'translateY(0)';
+                              }
+                            }}
+                          >
+                            ↶ Undo
+                          </button>
+                          
+                          <button
+                            onClick={folderManager.redo}
+                            disabled={!folderManager.canRedo}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: folderManager.canRedo ? '#38A169' : '#EDF2F7',
+                              color: folderManager.canRedo ? 'white' : '#A0AEC0',
+                              border: `2px solid ${folderManager.canRedo ? '#38A169' : '#CBD5E0'}`,
+                              borderRadius: '6px',
+                              cursor: folderManager.canRedo ? 'pointer' : 'not-allowed',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.2s ease',
+                              boxShadow: folderManager.canRedo ? '0 2px 4px rgba(56, 161, 105, 0.2)' : 'none'
+                            }}
+                            title={folderManager.canRedo ? `Redo: ${folderManager.redoStack[folderManager.redoStack.length - 1]?.description || 'Last undone action'}` : 'Nothing to redo'}
+                            onMouseEnter={(e) => {
+                              if (folderManager.canRedo) {
+                                const target = e.target as HTMLButtonElement;
+                                target.style.backgroundColor = '#2F855A';
+                                target.style.transform = 'translateY(-1px)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (folderManager.canRedo) {
+                                const target = e.target as HTMLButtonElement;
+                                target.style.backgroundColor = '#38A169';
+                                target.style.transform = 'translateY(0)';
+                              }
+                            }}
+                          >
+                            ↷ Redo
+                          </button>
+                        </div>
                       </div>
                     </div>
                     
@@ -1878,28 +2034,28 @@ const TeacherDashboard = () => {
                       <div style={{ marginBottom: '12px' }}>
                         {/* All Games Button */}
                         <div style={{ marginBottom: '8px' }}>
-                          <button
-                            onClick={() => {
-                              folderManager.setSelectedFolderId(null);
-                              setGameFolderFilter('all');
-                            }}
-                            style={{
-                              padding: '6px 12px',
-                              backgroundColor: folderManager.selectedFolderId === null ? '#E2E8F0' : 'white',
-                              color: folderManager.selectedFolderId === null ? '#2D3748' : '#4A5568',
-                              border: '1px solid #E2E8F0',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              fontWeight: folderManager.selectedFolderId === null ? '600' : '400'
-                            }}
-                          >
-                            📋 All Games ({myGames.length})
-                          </button>
+                        <button
+                          onClick={() => {
+                            folderManager.setSelectedFolderId(null);
+                            setGameFolderFilter('all');
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: folderManager.selectedFolderId === null ? '#E2E8F0' : 'white',
+                            color: folderManager.selectedFolderId === null ? '#2D3748' : '#4A5568',
+                            border: '1px solid #E2E8F0',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: folderManager.selectedFolderId === null ? '600' : '400'
+                          }}
+                        >
+                          📋 All Games ({myGames.length})
+                        </button>
                         </div>
                         
-                        {/* Use FolderTree component with correct props */}
-                        <FolderTree 
+                        {/* Use SimpleFolderTree component (already inside unified DndContext) */}
+                        <SimpleFolderTree 
                           folders={folderManager.folderTree}
                           selectedFolderId={folderManager.selectedFolderId}
                           onFolderClick={(folderId: string) => {
@@ -1909,13 +2065,17 @@ const TeacherDashboard = () => {
                           onCreateSubfolder={folderManager.openCreateFolderModal}
                           onEditFolder={folderManager.openEditFolderModal}
                           onDeleteFolder={(folderId: string) => folderManager.deleteExistingFolder(folderId)}
-                          onFolderDrop={(dropResult: any) => folderManager.handleDrop(dropResult)}
                           getGamesInFolder={folderManager.getGamesInFolder}
                           canCreateSubfolder={folderManager.canCreateSubfolder}
                           maxDepth={3}
                           showGameCounts={true}
                           collapsible={true}
                         />
+                        
+                        {/* Unorganized Games Drop Zone (inside unified DndContext) */}
+                        <div style={{ marginTop: '12px' }}>
+                          <UnorganizedDropZone unorganizedGamesCount={folderManager.getUnorganizedGames().length} />
+                        </div>
                       </div>
                     ) : (
                       /* Temporary fallback: show flat folder list if tree is empty */
@@ -1944,34 +2104,19 @@ const TeacherDashboard = () => {
                                 📁 {folder.name} (level: {folder.depth || 0})
                               </button>
                             ))}
-                          </div>
-                        )}
+                                </div>
+                              )}
                       </div>
                     )}
                     
-                    {/* Unorganized Games Drop Zone - Temporarily disabled during folder system transition */}
-                    {false && folderManager.getUnorganizedGames().length > 0 && (
-                      <div style={{
-                        padding: '8px',
-                        border: '2px dashed #CBD5E0',
-                        borderRadius: '6px',
-                        backgroundColor: '#F7FAFC',
-                        textAlign: 'center',
-                        fontSize: '14px',
-                        color: '#718096',
-                        transition: 'all 0.2s ease'
-                      }}>
-                        📤 Drop games here to remove from folders
-                      </div>
-                    )}
                   </div>
 
-                  {/* Games Grid */}
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
-                    gap: '20px' 
-                  }}>
+                    {/* Games Grid (already inside unified DndContext) */}
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+                      gap: '20px' 
+                    }}>
                     {(() => {
                       // Use filtered games instead of the original logic
                       const gamesToShow = getFilteredGames();
@@ -2017,239 +2162,95 @@ const TeacherDashboard = () => {
                       }
                       
                       return gamesToShow.map((game) => (
-                        <div 
-                          key={game.id}
-                          style={{ 
-                            backgroundColor: 'white',
-                            borderRadius: '12px',
-                            padding: '20px',
-                            border: '1px solid #E2E8F0',
-                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-                            transition: 'all 0.2s ease',
-                            cursor: 'grab'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                            <div style={{ 
-                              width: '64px', 
-                              height: '64px', 
-                              backgroundColor: (game.gameType || '').includes('whack') ? '#C6F6D5' : 
-                                              (game.gameType || '').includes('spinner') ? '#FED7D7' : 
-                                              (game.gameType || '').includes('anagram') ? '#BFDBFE' : 
-                                              (game.gameType || '').includes('sentence') ? '#E0F2FE' : 
-                                              (game.gameType || '').includes('place') ? '#FFEBE6' : '#E9D8FD',
-                              borderRadius: '8px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              overflow: 'hidden',
-                              flexShrink: 0
-                            }}>
-                              {game.thumbnailUrl ? (
-                                <img src={game.thumbnailUrl} alt={game.title} style={{ 
-                                  width: '100%', 
-                                  height: '100%', 
-                                  objectFit: 'cover',
-                                  borderRadius: '8px'
-                                }} />
-                              ) : (
-                                <div style={{ fontSize: '24px', color: '#718096' }}>
-                                  {(game.gameType || '').includes('whack') ? '🔨' : 
-                                   (game.gameType || '').includes('spinner') ? '🎡' : 
-                                   (game.gameType || '').includes('anagram') ? '🧩' : 
-                                   (game.gameType || '').includes('sentence') ? '📝' : 
-                                   (game.gameType || '').includes('place') ? '🎯' : '🥚'}
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <h3 style={{ 
-                                fontSize: '18px', 
-                                fontWeight: '600', 
-                                marginBottom: '4px',
-                                color: '#2D3748',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {game.title}
-                              </h3>
-                              
-                              {/* Folder Badge */}
-                              {game.folderName && (
-                                <div style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '2px 6px',
-                                  backgroundColor: game.folderColor || '#E2E8F0',
-                                  color: 'white',
-                                  borderRadius: '12px',
-                                  fontSize: '12px',
-                                  fontWeight: '500',
-                                  marginBottom: '8px'
-                                }}>
-                                  📁 {game.folderName}
-                                </div>
-                              )}
-                              
-                              <p style={{ 
-                                color: '#718096', 
-                                fontSize: '14px',
-                                marginBottom: '16px',
-                                textTransform: 'capitalize'
-                              }}>
-                                {(game.gameType || 'Unknown').replace('-', ' ')}
-                              </p>
-                              
-                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handlePlayGame(game.id);
-                                  }}
-                                  style={{
-                                    padding: '4px 8px',
-                                    backgroundColor: '#E3F2FD',
-                                    color: '#1976D2',
-                                    border: '1px solid #BBDEFB',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    transition: 'all 0.2s',
-                                    minWidth: 'auto',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#BBDEFB';
-                                    e.currentTarget.style.transform = 'translateY(-1px)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#E3F2FD';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                  }}
-                                >
-                                  ▶️ Play
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditGame(game);
-                                  }}
-                                  style={{
-                                    padding: '4px 8px',
-                                    backgroundColor: '#F3E5F5',
-                                    color: '#7B1FA2',
-                                    border: '1px solid #E1BEE7',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    transition: 'all 0.2s',
-                                    minWidth: 'auto',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#E1BEE7';
-                                    e.currentTarget.style.transform = 'translateY(-1px)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#F3E5F5';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                  }}
-                                >
-                                  ✏️ Edit
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAssignGameFromCreated(game);
-                                  }}
-                                  style={{
-                                    padding: '4px 8px',
-                                    backgroundColor: '#E8F5E8',
-                                    color: '#2E7D32',
-                                    border: '1px solid #C8E6C9',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    transition: 'all 0.2s',
-                                    minWidth: 'auto',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#C8E6C9';
-                                    e.currentTarget.style.transform = 'translateY(-1px)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#E8F5E8';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                  }}
-                                >
-                                  📋 Assign
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    confirmDeleteGame(game.id);
-                                  }}
-                                  style={{
-                                    padding: '4px 8px',
-                                    backgroundColor: '#FFEBEE',
-                                    color: '#C62828',
-                                    border: '1px solid #FFCDD2',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    transition: 'all 0.2s',
-                                    minWidth: 'auto',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#FFCDD2';
-                                    e.currentTarget.style.transform = 'translateY(-1px)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#FFEBEE';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                  }}
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <DraggableGameCard
+                          key={game.id} 
+                          game={game}
+                          onPlay={handlePlayGame}
+                          onEdit={handleEditGame}
+                          onAssign={handleAssignGameFromCreated}
+                          onDelete={confirmDeleteGame}
+                        />
                       ));
+                          
                     })()}
-                  </div>
+                    </div>
+
+                    {/* Drag Overlay for visual feedback */}
+                    <DragOverlay
+                      adjustScale={false}
+                      dropAnimation={null}
+                    >
+                      {activeItem && (
+                        activeItem.type === 'game' ? (
+                          // Game thumbnail drag overlay
+                          <div style={{ 
+                            width: '64px', 
+                            height: '64px', 
+                            backgroundColor: (activeItem.data?.gameType || '').includes('whack') ? '#C6F6D5' : 
+                                            (activeItem.data?.gameType || '').includes('spinner') ? '#FED7D7' : 
+                                            (activeItem.data?.gameType || '').includes('anagram') ? '#BFDBFE' : 
+                                            (activeItem.data?.gameType || '').includes('sentence') ? '#E0F2FE' : 
+                                            (activeItem.data?.gameType || '').includes('place') ? '#FFEBE6' : '#E9D8FD',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            border: '3px solid #4299E1',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                            cursor: 'grabbing',
+                            pointerEvents: 'none',
+                            opacity: 0.95,
+                            transform: 'rotate(3deg) scale(1.1)',
+                            zIndex: 1000
+                          }}>
+                            {activeItem.data?.thumbnailUrl ? (
+                              <img src={activeItem.data.thumbnailUrl} alt={activeItem.data.title} style={{ 
+                                width: '100%', 
+                                height: '100%', 
+                                objectFit: 'cover',
+                                borderRadius: '5px',
+                                pointerEvents: 'none'
+                              }} />
+                            ) : (
+                              <div style={{ fontSize: '24px', color: '#718096', pointerEvents: 'none' }}>
+                                {(activeItem.data?.gameType || '').includes('whack') ? '🔨' : 
+                                 (activeItem.data?.gameType || '').includes('spinner') ? '🎡' : 
+                                 (activeItem.data?.gameType || '').includes('anagram') ? '🧩' : 
+                                 (activeItem.data?.gameType || '').includes('sentence') ? '📝' : 
+                                 (activeItem.data?.gameType || '').includes('place') ? '🎯' : '🥚'}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // Folder drag overlay (original style)
+                          <div style={{
+                            padding: '8px 12px',
+                            backgroundColor: 'white',
+                            border: '2px solid #4299E1',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            transform: 'rotate(2deg)',
+                            zIndex: 1000,
+                            cursor: 'grabbing',
+                            pointerEvents: 'none',
+                            opacity: 0.9
+                          }}>
+                            <span>📁</span>
+                            <span>{activeItem.data?.name || 'Folder'}</span>
+                          </div>
+                        )
+                      )}
+                    </DragOverlay>
+                  </DndContext>
                 </div>
               ) : (
-                <div style={{ 
+                            <div style={{ 
                   textAlign: 'center', 
                   padding: '40px',
                   backgroundColor: '#F7FAFC',
@@ -2263,60 +2264,60 @@ const TeacherDashboard = () => {
                   <p style={{ color: '#718096', marginBottom: '20px' }}>
                     Start by creating your first game using the templates below
                   </p>
-                </div>
-              )}
-            </div>
-
+                                </div>
+                              )}
+                            </div>
+                            
             {/* Public Games Section */}
             <div style={{ marginBottom: '48px' }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
                 marginBottom: '20px',
-                color: '#2D3748',
+                                color: '#2D3748',
                 borderBottom: '2px solid #38A169',
                 paddingBottom: '8px'
-              }}>
+                              }}>
                 Public Games
               </h2>
-              
+                              
               {/* Search and Filter Section */}
-              <div style={{ 
+                                <div style={{
                 marginBottom: '24px',
                 padding: '16px',
                 backgroundColor: '#FAFAFA',
                 borderRadius: '8px',
                 border: '1px solid #E2E8F0'
-              }}>
+                                }}>
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: '1fr auto auto auto', 
                   gap: '12px', 
                   alignItems: 'center' 
-                }}>
+                              }}>
                   {/* Search Input */}
                   <input
                     type="text"
                     placeholder="Search public games..."
                     value={publicGameSearchQuery}
                     onChange={(e) => setPublicGameSearchQuery(e.target.value)}
-                    style={{
+                                  style={{
                       padding: '8px 12px',
                       border: '1px solid #D1D5DB',
-                      borderRadius: '6px',
+                                    borderRadius: '6px',
                       fontSize: '14px',
                       backgroundColor: 'white'
-                    }}
+                                  }}
                   />
                   
                   {/* Game Type Filter */}
                   <select
                     value={publicGameTypeFilter}
                     onChange={(e) => setPublicGameTypeFilter(e.target.value)}
-                    style={{
+                                  style={{
                       padding: '8px 12px',
                       border: '1px solid #D1D5DB',
-                      borderRadius: '6px',
+                                    borderRadius: '6px',
                       fontSize: '14px',
                       backgroundColor: 'white',
                       minWidth: '150px'
@@ -2335,14 +2336,14 @@ const TeacherDashboard = () => {
                   <select
                     value={publicGameCreatorFilter}
                     onChange={(e) => setPublicGameCreatorFilter(e.target.value)}
-                    style={{
+                                  style={{
                       padding: '8px 12px',
                       border: '1px solid #D1D5DB',
-                      borderRadius: '6px',
+                                    borderRadius: '6px',
                       fontSize: '14px',
                       backgroundColor: 'white',
                       minWidth: '150px'
-                    }}
+                                  }}
                   >
                     <option value="all">All Creators</option>
                     {Array.from(new Set(publicGames.map(game => game.createdBy).filter(Boolean))).map(creator => (
@@ -2351,25 +2352,25 @@ const TeacherDashboard = () => {
                   </select>
                   
                   {/* Clear Filters Button */}
-                  <button
+                                <button
                     onClick={() => {
                       setPublicGameSearchQuery('');
                       setPublicGameTypeFilter('all');
                       setPublicGameCreatorFilter('all');
-                    }}
-                    style={{
+                                  }}
+                                  style={{
                       padding: '8px 16px',
                       backgroundColor: '#F3F4F6',
                       border: '1px solid #D1D5DB',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
                       fontSize: '14px',
                       color: '#374151'
-                    }}
-                  >
+                                  }}
+                                >
                     Clear
-                  </button>
-                </div>
+                                </button>
+                              </div>
                 
                 {/* Results Count */}
                 <div style={{ 
@@ -2379,7 +2380,7 @@ const TeacherDashboard = () => {
                 }}>
                   Showing {getFilteredPublicGames().length} of {publicGames.length} public games
                 </div>
-              </div>
+            </div>
               
               {isLoading ? (
                 <div style={{ 
@@ -2393,11 +2394,11 @@ const TeacherDashboard = () => {
                 </div>
               ) : publicGames.length > 0 ? (
                 getFilteredPublicGames().length > 0 ? (
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
-                    gap: '20px' 
-                  }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+                  gap: '20px' 
+                }}>
                     {getFilteredPublicGames().map((game) => (
                     <div key={game.id} style={{ 
                       backgroundColor: 'white',
@@ -2597,7 +2598,7 @@ const TeacherDashboard = () => {
                       </div>
                     </div>
                   ))}
-                  </div>
+                </div>
                 ) : (
                   <div style={{ 
                     textAlign: 'center', 

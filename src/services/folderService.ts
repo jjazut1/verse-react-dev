@@ -25,8 +25,13 @@ export const buildFolderTree = (
   parentId: string | null = null, 
   level: number = 0
 ): FolderTreeNode[] => {
-  return folders
-    .filter(folder => folder.parentId === parentId)
+  const filteredFolders = folders.filter(folder => {
+    // Handle folders that don't have parentId field (treat as root folders)
+    const folderParentId = folder.parentId === undefined ? null : folder.parentId;
+    return folderParentId === parentId;
+  });
+  
+  return filteredFolders
     .map(folder => {
       const children = buildFolderTree(folders, games, folder.id, level + 1);
       const directGames = games.filter(game => game.folderId === folder.id);

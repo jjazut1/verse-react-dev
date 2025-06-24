@@ -181,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log(`   Current UID: ${user.uid}`);
             
             // This is a real legacy document - perform migration
-          try {
+            try {
             const newUserData: any = {
               ...existingUserData,
               userId: user.uid,
@@ -204,12 +204,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             await setDoc(doc(db, 'users', user.uid), newUserData);
             
-              // Delete the old document ONLY if it has a different UID
+            // Delete the old document ONLY if it has a different UID
             await deleteDoc(existingUserDoc.ref);
-              console.log('✅ Successfully migrated legacy user document');
+            console.log('✅ Successfully migrated legacy user document');
             
             // Set their role based on the migrated data
-              if (existingUserData.role === 'teacher' || existingUserData.role === 'admin') {
+            if (existingUserData.role === 'teacher' || existingUserData.role === 'admin') {
               setIsTeacher(true);
               setIsStudent(false);
             } else if (existingUserData.role === 'student') {
@@ -217,8 +217,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setIsStudent(true);
             }
             return;
-          } catch (error) {
-            console.error('Error creating new user document with correct UID:', error);
+            } catch (error) {
+              console.error('Error creating new user document with correct UID:', error);
             }
           }
         }

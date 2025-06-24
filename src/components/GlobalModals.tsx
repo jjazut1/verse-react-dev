@@ -1638,6 +1638,42 @@ export const GlobalModals: React.FC<{
     );
   }
 
+  // Create folder modal (from FolderManager)
+  if (modalId === 'createFolder') {
+    const { onSave } = modalProps;
+    
+    if (!onSave || typeof onSave !== 'function') {
+      console.warn('🟡 GlobalModals: Missing onSave function for createFolder modal');
+      return null;
+    }
+    
+    return (
+      <FolderModal
+        folder={undefined} // No folder means create new
+        onSave={onSave}
+        onCancel={onCancelFolder || (() => {})}
+      />
+    );
+  }
+
+  // Edit folder modal (from FolderManager)
+  if (modalId === 'editFolder') {
+    const { folder, onSave } = modalProps;
+    
+    if (!onSave || typeof onSave !== 'function') {
+      console.warn('🟡 GlobalModals: Missing onSave function for editFolder modal');
+      return null;
+    }
+    
+    return (
+      <FolderModal
+        folder={folder}
+        onSave={onSave}
+        onCancel={onCancelFolder || (() => {})}
+      />
+    );
+  }
+
   // Student modal (create/edit)
   if (modalId === 'student-modal') {
     const { student } = modalProps;

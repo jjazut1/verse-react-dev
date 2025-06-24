@@ -2,14 +2,14 @@ import React, { useState, useCallback } from 'react';
 import {
   DndContext,
   closestCenter,
-  useDroppable,
-  useDraggable,
-  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
   DragStartEvent,
   DragEndEvent,
+  useDroppable,
+  useDraggable,
+  DragOverlay,
 } from '@dnd-kit/core';
 import { FolderTreeNode, GameFolder, DragItem, DropResult } from '../types/game';
 
@@ -26,6 +26,7 @@ interface FolderTreeProps {
   maxDepth?: number;
   showGameCounts?: boolean;
   collapsible?: boolean;
+  activeItem?: DragItem | null;
 }
 
 interface FolderItemProps {
@@ -75,7 +76,7 @@ const FolderItem: React.FC<FolderItemProps> = ({
   const indentSize = folder.level * 24;
   
   // Drag and drop setup
-  const { setNodeRef: setDropRef } = useDroppable({ 
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ 
     id: folder.id,
     data: { type: 'folder', folder }
   });
@@ -130,9 +131,9 @@ const FolderItem: React.FC<FolderItemProps> = ({
           onClick={handleFolderClick}
           style={{
             padding: '8px 12px',
-            backgroundColor: isSelected ? folder.color || '#4299E1' : 'white',
+            backgroundColor: isOver ? '#E6FFFA' : (isSelected ? folder.color || '#4299E1' : 'white'),
             color: isSelected ? 'white' : '#4A5568',
-            border: `2px solid ${folder.color || '#4299E1'}`,
+            border: `2px solid ${isOver ? '#38B2AC' : (folder.color || '#4299E1')}`,
             borderRadius: '8px',
             cursor: 'pointer',
             fontSize: '14px',
@@ -145,22 +146,36 @@ const FolderItem: React.FC<FolderItemProps> = ({
             width: 'calc(100% - 8px)',
             position: 'relative',
             opacity: isDragging ? 0.5 : 1,
-            boxShadow: isDragging ? '0 4px 8px rgba(0,0,0,0.2)' : 'none',
-            transform: isDragging ? 'rotate(2deg)' : 'none'
+            boxShadow: isDragging ? '0 4px 8px rgba(0,0,0,0.2)' : (isOver ? '0 4px 12px rgba(56, 178, 172, 0.3)' : 'none'),
+            transform: isDragging ? 'rotate(2deg)' : (isOver ? 'scale(1.02)' : 'none')
           }}
           onMouseEnter={(e) => {
-            if (!isDragging) {
+            if (!isDragging && !isOver) {
               e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
               e.currentTarget.style.transform = 'translateY(-1px)';
             }
           }}
           onMouseLeave={(e) => {
-            if (!isDragging) {
+            if (!isDragging && !isOver) {
               e.currentTarget.style.boxShadow = 'none';
               e.currentTarget.style.transform = 'translateY(0)';
             }
           }}
         >
+          {/* Drop zone indicator */}
+          {isOver && (
+            <div style={{
+              position: 'absolute',
+              top: '-2px',
+              left: '-2px',
+              right: '-2px',
+              bottom: '-2px',
+              border: '2px dashed #38B2AC',
+              borderRadius: '10px',
+              pointerEvents: 'none',
+              animation: 'pulse 1s infinite'
+            }} />
+          )}
           {/* Expand/Collapse button */}
           {collapsible && hasChildren && (
             <button
