@@ -9,8 +9,6 @@ import { generateAndUploadThumbnail } from '../utils/thumbnailGenerator';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
 import { useFolderManager } from '../components/FolderManager';
-import { FolderTree } from '../components/FolderTree';
-import { DraggableGamesContainer } from '../components/DraggableGamesContainer';
 import { UnorganizedDropZone } from '../components/UnorganizedDropZone';
 import { DraggableGameCard } from '../components/DraggableGameCard';
 import { SimpleFolderTree } from '../components/SimpleFolderTree';
