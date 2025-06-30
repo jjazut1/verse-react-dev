@@ -35,15 +35,7 @@ export const DraggableGameCard: React.FC<DraggableGameCardProps> = ({
     data: { type: 'game', game }
   });
 
-  // Debug logging
-  console.log('🎮 DraggableGameCard setup:', {
-    gameId: game.id,
-    gameTitle: game.title,
-    isDragging,
-    hasAttributes: !!attributes,
-    hasListeners: !!listeners,
-    hasSetNodeRef: !!setNodeRef
-  });
+
   
   return (
     <div 
@@ -84,7 +76,8 @@ export const DraggableGameCard: React.FC<DraggableGameCardProps> = ({
                             (game.gameType || '').includes('spinner') ? '#FED7D7' : 
                             (game.gameType || '').includes('anagram') ? '#BFDBFE' : 
                             (game.gameType || '').includes('sentence') ? '#E0F2FE' : 
-                            (game.gameType || '').includes('place') ? '#FFEBE6' : '#E9D8FD',
+                            (game.gameType || '').includes('place') ? '#FFEBE6' :
+                            (game.gameType || '').includes('word-volley') ? '#FFF2E6' : '#E9D8FD',
             borderRadius: '8px',
             display: 'flex',
             alignItems: 'center',
@@ -124,7 +117,8 @@ export const DraggableGameCard: React.FC<DraggableGameCardProps> = ({
                (game.gameType || '').includes('spinner') ? '🎡' : 
                (game.gameType || '').includes('anagram') ? '🧩' : 
                (game.gameType || '').includes('sentence') ? '📝' : 
-               (game.gameType || '').includes('place') ? '🎯' : '🥚'}
+               (game.gameType || '').includes('place') ? '🎯' :
+               (game.gameType || '').includes('word-volley') ? '🏓' : '🥚'}
             </div>
           )}
           

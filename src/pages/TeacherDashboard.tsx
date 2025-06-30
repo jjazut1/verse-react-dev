@@ -25,6 +25,7 @@ import {
 import { GameWithFolder } from '../types/game';
 import { useModal } from '../contexts/ModalContext';
 import { GlobalModals } from '../components/GlobalModals';
+import { StudentsTab, AssignmentsTab } from './teacher-dashboard';
 
 interface Game extends GameWithFolder {
   id: string;
@@ -117,7 +118,10 @@ const TeacherDashboard = () => {
   const [lastTabBeforeStudentView, setLastTabBeforeStudentView] = useState<TabType>('students');
   
   // Add state for assignment status filter
-  const [activeStatusFilter, setActiveStatusFilter] = useState('all');
+  const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'active' | 'overdue' | 'completed'>('all');
+  
+  // State for assignment folder handlers
+  const [assignmentFolderHandlers, setAssignmentFolderHandlers] = useState<any>(null);
   
   // Function to get student display name from email
   const getStudentDisplayName = (studentEmail: string): string => {
@@ -125,7 +129,7 @@ const TeacherDashboard = () => {
     return student?.name || studentEmail.split('@')[0]; // Fallback to email prefix if name not found
   };
   
-  // Ref to store the current game being edited
+  // Refs for edit handlers
   const gameToEditRef = useRef<Game | null>(null);
 
   // Initialize folder manager hook
@@ -230,19 +234,7 @@ const TeacherDashboard = () => {
     setActiveItem(null);
   }, [folderManager]);
 
-  // Debug logging for folder manager
-  useEffect(() => {
-    console.log('=== FOLDER MANAGER DEBUG ===');
-    console.log('Current user:', currentUser);
-    console.log('Current user ID:', currentUser?.uid);
-    console.log('My games count:', myGames.length);
-    console.log('My games:', myGames);
-    console.log('Folder manager folders:', folderManager.folders);
-    console.log('Folder manager folderTree:', folderManager.folderTree);
-    console.log('Folder manager folderTree length:', folderManager.folderTree.length);
-    console.log('Folder manager loading:', folderManager.isLoading);
-    console.log('============================');
-  }, [currentUser, myGames, folderManager.folders, folderManager.isLoading]);
+
 
   // Add click-away handler and keyboard support for folder actions
   useEffect(() => {
@@ -279,18 +271,14 @@ const TeacherDashboard = () => {
 
   const fetchGames = useCallback(async () => {
     setIsLoading(true);
-    console.log('Fetching games from userGameConfigs collection...');
     
     try {
       // Fetch from userGameConfigs collection instead of games
       const userGameConfigsCollection = collection(db, 'userGameConfigs');
-      console.log('Querying userGameConfigs collection');
       
       const gameSnapshot = await getDocs(userGameConfigsCollection);
-      console.log(`Found ${gameSnapshot.docs.length} game configs`);
       
       if (gameSnapshot.empty) {
-        console.log('No game configs found in the collection');
         setMyGames([]);
         setPublicGames([]);
         setIsLoading(false);
@@ -300,7 +288,6 @@ const TeacherDashboard = () => {
       // Convert all games to our Game interface
       const allGames = gameSnapshot.docs.map(doc => {
         const data = doc.data();
-        console.log('Game config data:', data);
         
         // Adapt the userGameConfigs data structure to our Game interface
         return {
@@ -319,8 +306,6 @@ const TeacherDashboard = () => {
         };
       });
       
-      console.log('Processed games:', allGames);
-      
       // Filter games into my games and public games
       // My games: games created by current user (based on email)
       const myGamesList = allGames.filter(game => 
@@ -333,9 +318,6 @@ const TeacherDashboard = () => {
         game.createdBy !== currentUser?.email && 
         game.userId !== currentUser?.uid
       );
-      
-      console.log('My games:', myGamesList);
-      console.log('Public games:', publicGamesList);
       
       setMyGames(myGamesList);
       setPublicGames(publicGamesList);
@@ -370,7 +352,6 @@ const TeacherDashboard = () => {
   // Function to fetch game templates
   const fetchGameTemplates = useCallback(async () => {
     setIsLoadingTemplates(true);
-    console.log('Fetching game templates...');
     
     try {
       // Fetch blank game templates
@@ -400,9 +381,6 @@ const TeacherDashboard = () => {
           createdBy: data.createdBy || data.email || ''
         };
       }) as GameTemplate[];
-      
-      console.log('Blank templates:', blankTemplatesList);
-      console.log('Category templates:', categoryTemplatesList);
       
       setBlankTemplates(blankTemplatesList);
       setCategoryTemplates(categoryTemplatesList);
@@ -749,6 +727,16 @@ const TeacherDashboard = () => {
         console.log('🎯 Navigating without template ID');
         navigate('/configure/sentence-sense');
       }
+    } else if (template.type === 'word-volley') {
+      console.log('🎯 Navigating to word-volley configuration');
+      // If there's a template ID for editing, include it in the path
+      if (template.id) {
+        console.log('🎯 Navigating with template ID:', template.id);
+        navigate(`/configure/word-volley/${template.id}`);
+      } else {
+        console.log('🎯 Navigating without template ID');
+        navigate('/configure/word-volley');
+      }
     } else {
       console.log('🎯 Unknown template type, navigating to default /configure');
       // Default to the configuration router for unknown types
@@ -777,6 +765,8 @@ const TeacherDashboard = () => {
           return { bgColor: '#ffe6e6', icon: '🎯' };
         case 'sentence-sense':
           return { bgColor: '#e8f5e8', icon: '📝' };
+        case 'word-volley':
+          return { bgColor: '#fff2e6', icon: '🏓' };
         default:
           return { bgColor: '#f0f0f0', icon: '🎮' };
       }
@@ -1476,140 +1466,15 @@ const TeacherDashboard = () => {
 
 
         {activeTab === 'assignments' && (
-          <div>
-            {/* Search input */}
-            <div style={{ marginBottom: '16px' }}>
-              <input
-                type="text"
-                placeholder="Search by title or email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  padding: '12px 16px',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '4px',
-                  width: '100%',
-                  fontSize: '16px',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-                }}
-              />
-            </div>
-            
-            {/* Add assignment status tabs */}
-            {renderStatusTabs()}
-            
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
-                  <th style={{ padding: '12px', textAlign: 'left' }}>Title</th>
-                  <th style={{ padding: '12px', textAlign: 'left' }}>Game</th>
-                  <th style={{ padding: '12px', textAlign: 'left' }}>Created Date</th>
-                  <th style={{ padding: '12px', textAlign: 'left' }}>Due Date</th>
-                  <th style={{ padding: '12px', textAlign: 'left' }}>Student</th>
-                  <th style={{ padding: '12px', textAlign: 'left' }}>Status</th>
-                  <th style={{ padding: '12px', textAlign: 'left' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getStatusFilteredAssignments().map((assignment) => (
-                  <tr key={assignment.id} style={{ 
-                    borderBottom: '1px solid #E2E8F0',
-                    backgroundColor: assignment.status === 'completed' ? '#F0FFF4' : // Light green for completed
-                      (assignment.deadline?.toDate() < new Date() && 
-                      (assignment.status === 'assigned' || assignment.status === 'started')) ? '#FFF5F5' : // Light red for overdue
-                      'transparent'
-                  }}>
-                    <td style={{ padding: '12px' }}>{assignment.gameName}</td>
-                    <td style={{ padding: '12px' }}>{assignment.gameType}</td>
-                    <td style={{ padding: '12px' }}>
-                      {assignment.createdAt?.toDate().toLocaleDateString()}
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      {assignment.deadline?.toDate().toLocaleDateString()}
-                      {assignment.deadline?.toDate() < new Date() && 
-                       (assignment.status === 'assigned' || assignment.status === 'started') && 
-                         <span style={{ 
-                           color: '#E53E3E', 
-                           fontSize: '12px', 
-                           fontWeight: 'bold',
-                           display: 'block' 
-                         }}>
-                           Overdue
-                         </span>
-                      }
-                    </td>
-                    <td style={{ padding: '12px' }}>{getStudentDisplayName(assignment.studentEmail)}</td>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: 'medium',
-                        backgroundColor: assignment.status === 'completed' ? '#C6F6D5' : // Green bg for completed
-                          (assignment.deadline?.toDate() < new Date() && 
-                          (assignment.status === 'assigned' || assignment.status === 'started')) ? '#FED7D7' : // Red bg for overdue
-                          '#E2E8F0', // Default gray
-                        color: assignment.status === 'completed' ? '#2F855A' : // Green text for completed
-                          (assignment.deadline?.toDate() < new Date() && 
-                          (assignment.status === 'assigned' || assignment.status === 'started')) ? '#C53030' : // Red text for overdue
-                          '#4A5568' // Default text color
-                      }}>
-                        {assignment.status === 'completed' ? 'Completed' : 
-                         (assignment.deadline?.toDate() < new Date() ? 'Overdue' : 'Assigned')}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => handleViewAssignment(assignment)}
-                          style={{
-                            padding: '6px 16px',
-                            backgroundColor: '#3182CE',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                          }}
-                        >
-                          View
-                        </button>
-                      <button
-                          onClick={() => confirmDeleteAssignment(assignment.id || '')}
-                        style={{
-                            padding: '6px 16px',
-                          backgroundColor: '#F56565',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '14px'
-                        }}
-                      >
-                        Delete
-                      </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            
-            {/* Show message when no assignments match the filter */}
-            {getStatusFilteredAssignments().length === 0 && (
-              <div style={{ 
-                padding: '24px', 
-                textAlign: 'center',
-                backgroundColor: '#EBF8FF',
-                borderRadius: '8px',
-                marginTop: '16px'
-              }}>
-                <p style={{ color: '#4A5568', fontSize: '16px' }}>
-                  No {activeStatusFilter !== 'all' ? activeStatusFilter : ''} assignments found.
-                </p>
-              </div>
-            )}
-          </div>
+          <AssignmentsTab
+            currentUser={currentUser}
+            showToast={showToast}
+            students={students}
+            onAssignmentHandlersReady={(handlers) => {
+              // Store handlers for use by GlobalModals
+              window.assignmentHandlers = handlers;
+            }}
+          />
         )}
 
         {activeTab === 'create' && (
@@ -1678,7 +1543,8 @@ const TeacherDashboard = () => {
                                         template.type === 'spinner-wheel' ? '#FED7D7' : 
                                         template.type === 'anagram' ? '#BFDBFE' : 
                                         template.type === 'sentence-sense' ? '#E8F5E8' :
-                                        template.type === 'place-value-showdown' ? '#FFE6E6' : '#E9D8FD',
+                                        template.type === 'place-value-showdown' ? '#FFE6E6' :
+                                        template.type === 'word-volley' ? '#FFF2E6' : '#E9D8FD',
                         borderRadius: '12px',
                         display: 'flex',
                         alignItems: 'center',
@@ -1702,7 +1568,8 @@ const TeacherDashboard = () => {
                           template.type === 'spinner-wheel' ? '🎡' : 
                           template.type === 'anagram' ? '🧩' : 
                           template.type === 'sentence-sense' ? '📝' :
-                          template.type === 'place-value-showdown' ? '🎯' : '🥚'
+                          template.type === 'place-value-showdown' ? '🎯' :
+                          template.type === 'word-volley' ? '🏓' : '🥚'
                         )}
                       </div>
                       
@@ -1929,14 +1796,14 @@ const TeacherDashboard = () => {
                     onDragOver={handleDragOver}
                     onDragEnd={handleDragEnd}
                   >
-                    {/* Folder Management Section */}
-                    <div style={{ 
-                      marginBottom: '24px',
-                      padding: '16px',
-                      backgroundColor: '#F8FAFC',
-                      borderRadius: '8px',
-                      border: '1px solid #E2E8F0'
-                    }}>
+                  {/* Folder Management Section */}
+                  <div style={{ 
+                    marginBottom: '24px',
+                    padding: '16px',
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0'
+                  }}>
                     <div style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between', 
@@ -1944,16 +1811,16 @@ const TeacherDashboard = () => {
                       marginBottom: '12px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#2D3748' }}>
-                          📁 Organize Your Games
-                        </h3>
+                      <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#2D3748' }}>
+                        📁 Organize Your Games
+                      </h3>
                         
                         {/* Undo/Redo Controls */}
                         <div style={{ display: 'flex', gap: '4px' }}>
-                          <button
+                        <button
                             onClick={folderManager.undo}
                             disabled={!folderManager.canUndo}
-                            style={{
+                          style={{
                               padding: '6px 12px',
                               backgroundColor: folderManager.canUndo ? '#2B6CB0' : '#EDF2F7',
                               color: folderManager.canUndo ? 'white' : '#A0AEC0',
@@ -1967,7 +1834,7 @@ const TeacherDashboard = () => {
                               gap: '4px',
                               transition: 'all 0.2s ease',
                               boxShadow: folderManager.canUndo ? '0 2px 4px rgba(43, 108, 176, 0.2)' : 'none'
-                            }}
+                          }}
                             title={folderManager.canUndo ? `Undo: ${folderManager.undoStack[folderManager.undoStack.length - 1]?.description || 'Last action'}` : 'Nothing to undo'}
                             onMouseEnter={(e) => {
                               if (folderManager.canUndo) {
@@ -1985,22 +1852,22 @@ const TeacherDashboard = () => {
                             }}
                           >
                             ↶ Undo
-                          </button>
+                        </button>
                           
-                          <button
+                        <button
                             onClick={folderManager.redo}
                             disabled={!folderManager.canRedo}
-                            style={{
-                              padding: '6px 12px',
+                          style={{
+                            padding: '6px 12px',
                               backgroundColor: folderManager.canRedo ? '#38A169' : '#EDF2F7',
                               color: folderManager.canRedo ? 'white' : '#A0AEC0',
                               border: `2px solid ${folderManager.canRedo ? '#38A169' : '#CBD5E0'}`,
-                              borderRadius: '6px',
+                            borderRadius: '6px',
                               cursor: folderManager.canRedo ? 'pointer' : 'not-allowed',
-                              fontSize: '14px',
+                            fontSize: '14px',
                               fontWeight: '600',
-                              display: 'flex',
-                              alignItems: 'center',
+                            display: 'flex',
+                            alignItems: 'center',
                               gap: '4px',
                               transition: 'all 0.2s ease',
                               boxShadow: folderManager.canRedo ? '0 2px 4px rgba(56, 161, 105, 0.2)' : 'none'
@@ -2022,7 +1889,7 @@ const TeacherDashboard = () => {
                             }}
                           >
                             ↷ Redo
-                          </button>
+                        </button>
                         </div>
                       </div>
                     </div>
@@ -2058,7 +1925,7 @@ const TeacherDashboard = () => {
                           selectedFolderId={folderManager.selectedFolderId}
                           onFolderClick={(folderId: string) => {
                             folderManager.setSelectedFolderId(folderId);
-                            setGameFolderFilter('all');
+                                    setGameFolderFilter('all');
                           }}
                           onCreateSubfolder={folderManager.openCreateFolderModal}
                           onEditFolder={folderManager.openEditFolderModal}
@@ -2110,11 +1977,11 @@ const TeacherDashboard = () => {
                   </div>
 
                     {/* Games Grid (already inside unified DndContext) */}
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
-                      gap: '20px' 
-                    }}>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+                    gap: '20px' 
+                  }}>
                     {(() => {
                       // Use filtered games instead of the original logic
                       const gamesToShow = getFilteredGames();
@@ -2181,19 +2048,19 @@ const TeacherDashboard = () => {
                       {activeItem && (
                         activeItem.type === 'game' ? (
                           // Game thumbnail drag overlay
-                          <div style={{ 
-                            width: '64px', 
-                            height: '64px', 
+                            <div style={{ 
+                              width: '64px', 
+                              height: '64px', 
                             backgroundColor: (activeItem.data?.gameType || '').includes('whack') ? '#C6F6D5' : 
                                             (activeItem.data?.gameType || '').includes('spinner') ? '#FED7D7' : 
                                             (activeItem.data?.gameType || '').includes('anagram') ? '#BFDBFE' : 
                                             (activeItem.data?.gameType || '').includes('sentence') ? '#E0F2FE' : 
                                             (activeItem.data?.gameType || '').includes('place') ? '#FFEBE6' : '#E9D8FD',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
                             border: '3px solid #4299E1',
                             boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
                             cursor: 'grabbing',
@@ -2201,28 +2068,28 @@ const TeacherDashboard = () => {
                             opacity: 0.95,
                             transform: 'rotate(3deg) scale(1.1)',
                             zIndex: 1000
-                          }}>
+                            }}>
                             {activeItem.data?.thumbnailUrl ? (
                               <img src={activeItem.data.thumbnailUrl} alt={activeItem.data.title} style={{ 
-                                width: '100%', 
-                                height: '100%', 
-                                objectFit: 'cover',
+                                  width: '100%', 
+                                  height: '100%', 
+                                  objectFit: 'cover',
                                 borderRadius: '5px',
                                 pointerEvents: 'none'
-                              }} />
-                            ) : (
+                                }} />
+                              ) : (
                               <div style={{ fontSize: '24px', color: '#718096', pointerEvents: 'none' }}>
                                 {(activeItem.data?.gameType || '').includes('whack') ? '🔨' : 
                                  (activeItem.data?.gameType || '').includes('spinner') ? '🎡' : 
                                  (activeItem.data?.gameType || '').includes('anagram') ? '🧩' : 
                                  (activeItem.data?.gameType || '').includes('sentence') ? '📝' : 
                                  (activeItem.data?.gameType || '').includes('place') ? '🎯' : '🥚'}
-                              </div>
-                            )}
-                          </div>
+                                </div>
+                              )}
+                            </div>
                         ) : (
                           // Folder drag overlay (original style)
-                          <div style={{
+                                <div style={{
                             padding: '8px 12px',
                             backgroundColor: 'white',
                             border: '2px solid #4299E1',
@@ -2231,24 +2098,24 @@ const TeacherDashboard = () => {
                             fontSize: '14px',
                             fontWeight: '600',
                             display: 'flex',
-                            alignItems: 'center',
+                                  alignItems: 'center',
                             gap: '8px',
                             transform: 'rotate(2deg)',
                             zIndex: 1000,
                             cursor: 'grabbing',
                             pointerEvents: 'none',
                             opacity: 0.9
-                          }}>
+                                }}>
                             <span>📁</span>
                             <span>{activeItem.data?.name || 'Folder'}</span>
-                          </div>
+                                </div>
                         )
                       )}
                     </DragOverlay>
                   </DndContext>
                 </div>
               ) : (
-                            <div style={{ 
+                <div style={{ 
                   textAlign: 'center', 
                   padding: '40px',
                   backgroundColor: '#F7FAFC',
@@ -2262,20 +2129,20 @@ const TeacherDashboard = () => {
                   <p style={{ color: '#718096', marginBottom: '20px' }}>
                     Start by creating your first game using the templates below
                   </p>
-                                </div>
-                              )}
-                            </div>
-                            
+                </div>
+              )}
+            </div>
+
             {/* Public Games Section */}
             <div style={{ marginBottom: '48px' }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
                 marginBottom: '20px',
-                                color: '#2D3748',
+                color: '#2D3748',
                 borderBottom: '2px solid #38A169',
                 paddingBottom: '8px'
-                              }}>
+              }}>
                 Public Games
               </h2>
                               
@@ -2328,6 +2195,7 @@ const TeacherDashboard = () => {
                     <option value="anagram">Anagram</option>
                     <option value="sentence-sense">Sentence Sense</option>
                     <option value="place-value-showdown">Place Value Showdown</option>
+                    <option value="word-volley">Word Volley</option>
                   </select>
                   
                   {/* Creator Filter */}
@@ -2423,7 +2291,8 @@ const TeacherDashboard = () => {
                                           (game.gameType || '').includes('spinner') ? '#FED7D7' : 
                                           (game.gameType || '').includes('anagram') ? '#BFDBFE' : 
                                           (game.gameType || '').includes('sentence') ? '#E0F2FE' : 
-                                          (game.gameType || '').includes('place') ? '#FFEBE6' : '#E9D8FD',
+                                          (game.gameType || '').includes('place') ? '#FFEBE6' :
+                                          (game.gameType || '').includes('word-volley') ? '#FFF2E6' : '#E9D8FD',
                           borderRadius: '8px',
                           display: 'flex',
                           alignItems: 'center',
@@ -2444,7 +2313,8 @@ const TeacherDashboard = () => {
                                (game.gameType || '').includes('spinner') ? '🎡' : 
                                (game.gameType || '').includes('anagram') ? '🧩' : 
                                (game.gameType || '').includes('sentence') ? '📝' : 
-                               (game.gameType || '').includes('place') ? '🎯' : '🥚'}
+                               (game.gameType || '').includes('place') ? '🎯' :
+                               (game.gameType || '').includes('word-volley') ? '🏓' : '🥚'}
                             </div>
                           )}
                         </div>
@@ -2528,6 +2398,8 @@ const TeacherDashboard = () => {
                                   configRoute = '/configure/sentence-sense';
                                 } else if (gameType === 'place-value-showdown') {
                                   configRoute = '/configure/place-value-showdown';
+                                } else if (gameType === 'word-volley') {
+                                  configRoute = '/configure/word-volley';
                                 }
                                 
                                 navigate(`${configRoute}/${game.id}?copy=true`);

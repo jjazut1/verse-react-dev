@@ -116,6 +116,11 @@ interface FolderManagerReturn {
   // Modal management (for backward compatibility)
   openCreateFolderModal: (parentId?: string | null) => void;
   openEditFolderModal: (folder: GameFolder) => void;
+  
+  // Handler functions for GlobalModals compatibility
+  handleSaveFolder: (folderData: { name: string; description: string; color: string }, folderId?: string) => Promise<void>;
+  handleDeleteFolder: (folderId: string) => Promise<void>;
+  handleCancelFolder: () => void;
 }
 
 export const useFolderManager = ({
@@ -208,18 +213,10 @@ export const useFolderManager = ({
         return;
       }
 
-      console.log('📁 Loading game folder assignments...', {
-        userId,
-        foldersCount: folders.length,
-        gamesCount: games.length
-      });
-
       try {
         const assignments = await getGameFolderAssignments(userId);
-        console.log('📁 Retrieved assignments:', assignments);
 
         if (assignments.length === 0) {
-          console.log('📁 No folder assignments found');
           return;
         }
 
@@ -235,8 +232,6 @@ export const useFolderManager = ({
             });
           }
         });
-
-        console.log('📁 Game to folder mapping:', gameToFolderMap);
 
         // Update games with folder information
         const updatedGames = games.map(game => {
@@ -260,10 +255,7 @@ export const useFolderManager = ({
         );
 
         if (hasChanges) {
-          console.log('📁 Updating games with folder assignments');
           onGamesUpdate(updatedGames);
-        } else {
-          console.log('📁 No changes needed - games already have correct folder info');
         }
 
       } catch (error) {
@@ -877,6 +869,30 @@ export const useFolderManager = ({
     });
   }, [onShowToast]);
 
+  // Handler functions for GlobalModals compatibility
+  const handleSaveFolder = useCallback(async (folderData: { name: string; description: string; color: string }, folderId?: string) => {
+    if (folderId) {
+      // Update existing folder
+      await updateExistingFolder(folderId, folderData);
+    } else {
+      // Create new folder
+      await createNewFolder({
+        ...folderData,
+        parentId: null,
+        order: folders.length,
+        userId
+      });
+    }
+  }, [updateExistingFolder, createNewFolder, folders.length, userId]);
+
+  const handleDeleteFolder = useCallback(async (folderId: string) => {
+    await deleteExistingFolder(folderId);
+  }, [deleteExistingFolder]);
+
+  const handleCancelFolder = useCallback(() => {
+    // No specific cleanup needed for folder operations
+  }, []);
+
   return {
     // State
     folders,
@@ -930,6 +946,11 @@ export const useFolderManager = ({
     
     // Modal management (for backward compatibility)
     openCreateFolderModal,
-    openEditFolderModal
+    openEditFolderModal,
+    
+    // Handler functions for GlobalModals compatibility
+    handleSaveFolder,
+    handleDeleteFolder,
+    handleCancelFolder
   };
 }; 

@@ -80,6 +80,15 @@ service cloud.firestore {
               get(/databases/$(database)/documents/gameFolders/$(data.parentId)).data.userId == data.userId);
     }
     
+    // Validate parentId ownership for assignment folders (parent must belong to same user)
+    function isValidAssignmentParentOwnership(data) {
+      return !data.keys().hasAny(['parentId']) || 
+             data.parentId == null || 
+             (data.parentId is string && 
+              exists(/databases/$(database)/documents/assignmentFolders/$(data.parentId)) &&
+              get(/databases/$(database)/documents/assignmentFolders/$(data.parentId)).data.userId == data.userId);
+    }
+    
     // Allow anyone to read high scores
     match /highScores/{highScoreId} {
       allow read: if true;
@@ -111,7 +120,7 @@ service cloud.firestore {
             request.resource.data.configId in ['xOoA0q7ILtrdqdJt1ki5', 'Ua17C8DK6ZFsujj9Z1ZC']
         ) &&
         // Validate game type is one of the supported types
-        request.resource.data.gameType in ['sort-categories-egg', 'whack-a-mole', 'spinner-wheel', 'anagram', 'sentence-sense', 'place-value-showdown'];
+        request.resource.data.gameType in ['sort-categories-egg', 'whack-a-mole', 'spinner-wheel', 'anagram', 'sentence-sense', 'place-value-showdown', 'word-volley'];
     }
 
     
@@ -182,7 +191,18 @@ service cloud.firestore {
       request.resource.data.objective is string &&
       request.resource.data.objective in ['largest', 'smallest'] &&
       request.resource.data.winningScore is number &&
-      request.resource.data.winningScore > 0)
+      request.resource.data.winningScore > 0) ||
+      
+      // Word Volley game validation
+      (request.resource.data.type == 'word-volley' &&
+      request.resource.data.title is string &&
+      request.resource.data.title.size() > 0 &&
+      request.resource.data.targetCategory is map &&
+      request.resource.data.targetCategory.words is list &&
+      request.resource.data.targetCategory.words.size() > 0 &&
+      request.resource.data.nonTargetCategory is map &&
+      request.resource.data.nonTargetCategory.words is list &&
+      request.resource.data.nonTargetCategory.words.size() > 0)
     ) &&
         // Common fields validation
         request.resource.data.userId == request.auth.uid;
@@ -244,8 +264,12 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      // Allow public read access
-      allow read: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
+      // Allow users to read their own document + teachers/admins can read others
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||  // Users can read their own document
+        isTeacherOrAdmin() || 
+        isAdmin()
+      );
       
       // New permission model:
       // 1. Allow admins to perform any operations on any user document
@@ -350,6 +374,51 @@ service cloud.firestore {
 
     // Game Folder Assignments collection - for assigning games to folders
     match /gameFolderAssignments/{assignmentId} {
+      // Users can read their own assignments
+      allow read: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
+      
+      // Users can create assignments for themselves with enhanced validation
+      allow create: if isAuthenticated() && 
+        isTeacherOrAdmin() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // Users can update their own assignments with field restrictions
+      allow update: if isAuthenticated() && 
+        isTeacherOrAdmin() && 
+        request.auth.uid == resource.data.userId;
+      
+      // Users can delete their own assignments
+      allow delete: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
+    }
+
+    // Assignment Folders collection - for organizing assignments into folders
+    match /assignmentFolders/{folderId} {
+      // Users can read their own folders
+      allow read: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
+      
+      // Users can create folders for themselves with enhanced validation
+      allow create: if isAuthenticated() && 
+        isTeacherOrAdmin() && 
+        request.resource.data.userId == request.auth.uid &&
+        isValidFolderData(request.resource.data) &&
+        isValidFolderDepth(request.resource.data) &&
+        isValidAssignmentParentOwnership(request.resource.data);
+      
+      // Users can update their own folders with field restrictions
+      allow update: if isAuthenticated() && 
+        isTeacherOrAdmin() && 
+        request.auth.uid == resource.data.userId &&
+        isValidFolderData(request.resource.data) &&
+        isValidFolderDepth(request.resource.data) &&
+        isValidAssignmentParentOwnership(request.resource.data) &&
+        request.resource.data.userId == resource.data.userId;
+      
+      // Users can delete their own folders
+      allow delete: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
+    }
+
+    // Assignment Folder Assignments collection - for assigning assignments to folders
+    match /assignmentFolderAssignments/{assignmentId} {
       // Users can read their own assignments
       allow read: if isAuthenticated() && (isTeacherOrAdmin() || isAdmin());
       

@@ -11,7 +11,7 @@ self.addEventListener('message', async (event) => {
                            event.data.type === undefined;
                            
   if (!isInternalMessage) {
-    console.log('[SW] Received message:', event.data);
+  console.log('[SW] Received message:', event.data);
   }
 
   if (event.data?.type === 'NAVIGATE_TO_ASSIGNMENT_ACK') {

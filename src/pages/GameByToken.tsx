@@ -20,6 +20,7 @@ import WhackAMoleAdapter from '../components/games/whack-a-mole/WhackAMoleAdapte
 import SpinnerWheel from '../components/games/spinner-wheel/SpinnerWheel';
 import SortCategoriesEggRevealAdapter from '../components/games/sort-categories-egg-reveal/SortCategoriesEggRevealAdapter';
 import AnagramAdapter from '../components/games/anagram/AnagramAdapter';
+import WordVolleyAdapter from '../components/games/word-volley/WordVolleyAdapter';
 
 
 interface Props {}
@@ -1133,6 +1134,16 @@ const GameByToken: React.FC<Props> = () => {
               config={gameConfig}
               onGameComplete={handleGameComplete}
               playerName={studentName}
+              onHighScoreProcessStart={handleHighScoreProcessStart}
+              onHighScoreProcessComplete={handleHighScoreProcessComplete}
+            />
+          );
+        case 'word-volley':
+          return (
+            <WordVolleyAdapter
+              gameConfig={gameConfig}
+              playerName={studentName}
+              onGameComplete={handleGameComplete}
               onHighScoreProcessStart={handleHighScoreProcessStart}
               onHighScoreProcessComplete={handleHighScoreProcessComplete}
             />

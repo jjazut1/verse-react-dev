@@ -596,7 +596,8 @@ const Home = () => {
               'spinner-wheel', 
               'anagram', 
               'sentence-sense', 
-              'place-value-showdown'
+              'place-value-showdown',
+              'word-volley'
             ];
             
             // Make sure the type is one of our supported game types
@@ -710,7 +711,8 @@ const Home = () => {
       'spinner-wheel', 
       'anagram', 
       'sentence-sense', 
-      'place-value-showdown'
+      'place-value-showdown',
+      'word-volley'
     ];
 
     console.log('🔍 Supported game types:', supportedGameTypes);

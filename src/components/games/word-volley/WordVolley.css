@@ -1,0 +1,869 @@
+/* WordVolley Game Styles */
+.word-volley-game {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.game-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.game-header {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.game-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.game-stats {
+  display: flex;
+  gap: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.game-stats span {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 12px;
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+}
+
+/* Enhanced paddle status indicator */
+.game-stats .paddle-status {
+  background: rgba(0, 255, 0, 0.3) !important;
+  color: #fff;
+  font-weight: 600;
+  animation: paddleStatusPulse 2s ease-in-out infinite;
+}
+
+@keyframes paddleStatusPulse {
+  0%, 100% {
+    background: rgba(0, 255, 0, 0.3) !important;
+  }
+  50% {
+    background: rgba(0, 255, 0, 0.5) !important;
+  }
+}
+
+.canvas-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+  background: #f8f9fa;
+  /* Enhanced container for better mouse tracking */
+  min-height: 500px;
+  overflow: hidden;
+  /* Enhanced cursor feedback */
+  transition: background-color 0.2s ease;
+}
+
+/* Canvas container states for better UX feedback */
+.canvas-container:hover {
+  background: #f8f9fa;
+}
+
+.canvas-container.paddle-engaged {
+  background: #f8f9fa;
+}
+
+/* Enhanced canvas with better interaction feedback and crisp text rendering */
+.game-canvas {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  touch-action: none;
+  user-select: none;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+  
+  /* Optimize text rendering for crisp, non-fuzzy text */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  backface-visibility: hidden;
+  
+  /* Ensure pixel-perfect rendering for moving elements */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  
+  /* Force hardware acceleration with GPU layer promotion */
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  transform-origin: center center;
+}
+
+/* Dedicated class for ball text rendering optimization */
+.ball-text-optimized {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1;
+  font-kerning: normal;
+}
+
+/* Canvas hover state for better visual feedback */
+.canvas-container:hover .game-canvas {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+/* Enhanced canvas state when paddle is engaged */
+.game-canvas.paddle-engaged {
+  box-shadow: 0 12px 32px rgba(0, 255, 0, 0.2);
+  transform: scale(1.01);
+}
+
+/* Theme-specific canvas styles */
+.game-canvas.theme-classic {
+  border: 3px solid #333;
+}
+
+.game-canvas.theme-classic.paddle-engaged {
+  border-color: #00aa00;
+  box-shadow: 0 0 20px rgba(0, 170, 0, 0.3);
+}
+
+.game-canvas.theme-space {
+  border: 3px solid #1E1A78;
+  box-shadow: 0 0 30px rgba(55, 66, 250, 0.3);
+}
+
+.game-canvas.theme-space.paddle-engaged {
+  border-color: #00ff88;
+  box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+}
+
+.game-canvas.theme-neon {
+  border: 3px solid #FF00FF;
+  box-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
+}
+
+.game-canvas.theme-neon.paddle-engaged {
+  border-color: #00ff00;
+  box-shadow: 0 0 30px rgba(0, 255, 0, 0.6);
+}
+
+.game-canvas.theme-ocean {
+  border: 3px solid #4ECDC4;
+  box-shadow: 0 0 30px rgba(78, 205, 196, 0.3);
+}
+
+.game-canvas.theme-ocean.paddle-engaged {
+  border-color: #00ff88;
+  box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+}
+
+.game-canvas.theme-forest {
+  border: 3px solid #52B788;
+  box-shadow: 0 0 30px rgba(82, 183, 136, 0.3);
+}
+
+.game-canvas.theme-forest.paddle-engaged {
+  border-color: #00ff00;
+  box-shadow: 0 0 30px rgba(0, 255, 0, 0.4);
+}
+
+.game-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  z-index: 10;
+}
+
+.start-message,
+.pause-message {
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  width: 90%;
+}
+
+.start-message h3,
+.pause-message h3 {
+  font-size: 1.8rem;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.start-message p {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  color: #666;
+  line-height: 1.4;
+}
+
+/* Enhanced start message with tip styling */
+.start-message p small {
+  color: #007AFF;
+  font-weight: 500;
+  display: block;
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+
+.start-button,
+.resume-button {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  border: none;
+  padding: 16px 32px;
+  border-radius: 25px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+.start-button:hover,
+.resume-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+}
+
+.game-instructions {
+  padding: 24px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.instruction-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+  color: #555;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.instruction-item:last-child {
+  margin-bottom: 0;
+}
+
+.instruction-item:hover {
+  color: #333;
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* Highlight the main instruction */
+.instruction-item:first-child {
+  background-color: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  font-weight: 500;
+}
+
+.instruction-item:first-child:hover {
+  background-color: rgba(255, 193, 7, 0.15);
+}
+
+.instruction-icon {
+  font-size: 1.2rem;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Enhanced visual feedback styles */
+.cursor-indicator {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  transition: opacity 0.1s ease;
+}
+
+.paddle-highlight {
+  animation: paddleGlow 2s ease-in-out infinite;
+}
+
+@keyframes paddleGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+  }
+}
+
+/* Paddle engagement hint animation */
+@keyframes paddleHint {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+.paddle-hint {
+  animation: paddleHint 2s ease-in-out infinite;
+}
+
+/* Scoring button styles */
+.scoring-button {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 15px !important;
+  color: white !important;
+  padding: 4px 12px !important;
+  font-size: 0.85rem !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(10px) !important;
+  transition: all 0.2s ease !important;
+  font-weight: 500 !important;
+}
+
+.scoring-button:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+.scoring-button:active {
+  transform: translateY(0) !important;
+}
+
+/* Countdown timer styles */
+.countdown-urgent {
+  animation: countdownPulse 1s ease-in-out infinite;
+  color: #ff4444 !important;
+  font-weight: bold !important;
+}
+
+.countdown-warning {
+  color: #ff9800 !important;
+  font-weight: 600 !important;
+}
+
+@keyframes countdownPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* Game info section styles */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+/* Canvas container adjustments for relocated UI */
+.canvas-container {
+  border-radius: 0 0 12px 12px !important;
+  margin-top: 0 !important;
+}
+
+/* Enhanced responsive design with better touch targets */
+@media (max-width: 900px) {
+  .word-volley-game {
+    padding: 10px;
+  }
+
+  .game-header {
+    flex-direction: column;
+    text-align: center;
+    padding: 16px;
+  }
+
+  .game-title {
+    font-size: 1.6rem;
+  }
+
+  .game-stats {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .canvas-container {
+    padding: 10px;
+    min-height: 400px;
+  }
+
+  .game-canvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .game-instructions {
+    padding: 16px;
+  }
+
+  .instruction-item {
+    font-size: 0.9rem;
+    gap: 10px;
+  }
+
+  /* Responsive controls container */
+  .word-volley-game div[style*="padding: 20px 24px"] {
+    padding: 16px !important;
+  }
+
+  .word-volley-game div[style*="gap: 12px"] button {
+    padding: 8px 16px !important;
+    font-size: 0.85rem !important;
+  }
+
+  .word-volley-game select {
+    padding: 6px 10px !important;
+    font-size: 0.85rem !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .game-title {
+    font-size: 1.4rem;
+  }
+
+  .game-stats {
+    font-size: 0.8rem;
+  }
+
+  .scoring-button {
+    padding: 6px 10px !important;
+    font-size: 0.8rem !important;
+    border-radius: 12px !important;
+  }
+
+  .start-message,
+  .pause-message {
+    padding: 24px;
+    margin: 10px;
+  }
+
+  .start-message h3,
+  .pause-message h3 {
+    font-size: 1.4rem;
+  }
+
+  .start-message p {
+    font-size: 1rem;
+  }
+
+  .start-button,
+  .resume-button {
+    padding: 12px 24px;
+    font-size: 1rem;
+  }
+
+  .canvas-container {
+    min-height: 350px;
+    padding: 8px;
+  }
+
+  .instruction-item {
+    font-size: 0.85rem;
+  }
+
+  /* Mobile controls adjustments */
+  .word-volley-game div[style*="padding: 20px 24px"] {
+    padding: 12px !important;
+  }
+
+  .word-volley-game div[style*="gap: 12px"] {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .word-volley-game div[style*="gap: 16px"] {
+    flex-direction: column !important;
+    gap: 12px !important;
+    align-items: center !important;
+  }
+
+  .word-volley-game div[style*="gap: 12px"] button {
+    width: 100% !important;
+    max-width: 200px !important;
+    padding: 10px 16px !important;
+    font-size: 0.9rem !important;
+  }
+
+  .word-volley-game select {
+    width: 100% !important;
+    max-width: 200px !important;
+    padding: 8px 12px !important;
+    font-size: 0.9rem !important;
+  }
+
+  .word-volley-game div[style*="gap: 8px"] {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+  }
+}
+
+/* Touch-specific enhancements */
+@media (hover: none) and (pointer: coarse) {
+  .canvas-container {
+    /* Larger touch area for mobile */
+    padding: 15px;
+    min-height: 450px;
+  }
+  
+  .game-canvas {
+    /* Ensure canvas is easily touchable */
+    min-height: 300px;
+  }
+  
+  .instruction-item {
+    /* Larger touch targets for mobile instructions */
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.5);
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+  
+  /* Make the first instruction more prominent on touch devices */
+  .instruction-item:first-child {
+    background-color: rgba(255, 193, 7, 0.2);
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  /* Touch-friendly scoring button */
+  .scoring-button {
+    padding: 8px 14px !important;
+    font-size: 0.9rem !important;
+    min-height: 36px !important;
+    min-width: 80px !important;
+  }
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .game-canvas.paddle-engaged {
+    transform: none;
+  }
+  
+  .paddle-status {
+    animation: none !important;
+  }
+}
+
+/* Focus styles for keyboard navigation */
+.start-button:focus,
+.resume-button:focus,
+.game-canvas:focus {
+  outline: 3px solid #4CAF50;
+  outline-offset: 2px;
+}
+
+.canvas-container:focus-within {
+  outline: 2px solid #007AFF;
+  outline-offset: 2px;
+}
+
+/* Cat animation styles for Enchanted Forest theme */
+.forest-cat-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+  overflow: hidden;
+}
+
+.forest-cat {
+  position: absolute;
+  bottom: 15px;
+  font-size: 3rem;
+  z-index: 4;
+  pointer-events: none;
+  filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
+  transition: opacity 0.3s ease-in-out;
+}
+
+.forest-cat.walking {
+  animation: catWalk 0.5s infinite alternate ease-in-out;
+}
+
+@keyframes catWalk {
+  0% {
+    transform: translateY(0px) scaleY(1);
+  }
+  100% {
+    transform: translateY(-2px) scaleY(0.98);
+  }
+}
+
+/* Cat paw prints that fade in and out */
+.cat-pawprint {
+  position: absolute;
+  bottom: 5px;
+  width: 8px;
+  height: 8px;
+  background: rgba(139, 69, 19, 0.3);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: pawprintFade 3s ease-out forwards;
+}
+
+@keyframes pawprintFade {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  20% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* Enhanced forest theme canvas effects */
+.game-canvas.theme-forest {
+  position: relative;
+}
+
+.game-canvas.theme-forest::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(34, 139, 34, 0.05) 0%,
+    rgba(34, 139, 34, 0.02) 50%,
+    rgba(139, 69, 19, 0.03) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Enhanced ocean theme canvas effects */
+.game-canvas.theme-ocean {
+  position: relative;
+}
+
+.game-canvas.theme-ocean::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(78, 205, 196, 0.08) 0%,
+    rgba(52, 152, 219, 0.05) 50%,
+    rgba(41, 128, 185, 0.08) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Enhanced space theme canvas effects */
+.game-canvas.theme-space {
+  position: relative;
+}
+
+.game-canvas.theme-space::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(30, 26, 120, 0.1) 0%,
+    rgba(55, 66, 250, 0.05) 50%,
+    rgba(138, 43, 226, 0.08) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Subtle forest ambiance effects */
+@keyframes forestGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(34, 139, 34, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(34, 139, 34, 0.4);
+  }
+}
+
+.game-canvas.theme-forest.paddle-engaged {
+  animation: forestGlow 3s ease-in-out infinite;
+}
+
+/* Subtle ocean ambiance effects */
+@keyframes oceanGlow {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(78, 205, 196, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(52, 152, 219, 0.5);
+  }
+}
+
+.game-canvas.theme-ocean.paddle-engaged {
+  animation: oceanGlow 4s ease-in-out infinite;
+}
+
+/* Subtle space ambiance effects */
+@keyframes spaceGlow {
+  0%, 100% {
+    box-shadow: 0 0 30px rgba(55, 66, 250, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(138, 43, 226, 0.6);
+  }
+}
+
+.game-canvas.theme-space.paddle-engaged {
+  animation: spaceGlow 3.5s ease-in-out infinite;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .game-header {
+    background: #000;
+    color: #fff;
+  }
+  
+  .game-canvas {
+    border: 3px solid #000;
+  }
+  
+  .game-canvas.paddle-engaged {
+    border-color: #00ff00;
+  }
+  
+  .start-button,
+  .resume-button {
+    background: #000;
+    color: #fff;
+    border: 2px solid #fff;
+  }
+  
+  .instruction-item {
+    color: #000;
+    font-weight: 600;
+    border: 1px solid #000;
+  }
+  
+  .instruction-item:first-child {
+    background-color: #ffff00;
+    color: #000;
+  }
+  
+  /* Disable animations in high contrast mode */
+  .forest-cat {
+    display: none;
+  }
+  
+  /* Note: Dolphin and rocket animations are canvas-based and automatically disabled in high contrast mode */
+} 

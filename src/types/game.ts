@@ -159,7 +159,26 @@ export interface PlaceValueShowdownConfig extends BaseGameConfig {
   gameMode: 'student-vs-teacher' | 'practice'; // Competition vs practice mode
 }
 
-export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig | AnagramConfig | SentenceSenseConfig | PlaceValueShowdownConfig;
+export interface WordVolleyConfig extends BaseGameConfig {
+  type: 'word-volley';
+  gameSpeed: number; // 1-5 speed levels
+  paddleSize: number; // 1-10 paddle size
+  theme: 'classic' | 'space' | 'neon' | 'ocean' | 'forest';
+  targetCategory: {
+    id: string;
+    name: string;
+    words: string[];
+  };
+  nonTargetCategory: {
+    id: string;
+    name: string;
+    words: string[];
+  };
+  gameTime: number; // Game duration in seconds
+  winningScore: number; // Score needed to win
+}
+
+export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig | AnagramConfig | SentenceSenseConfig | PlaceValueShowdownConfig | WordVolleyConfig;
 
 export interface Word {
   text: string;

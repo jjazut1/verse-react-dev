@@ -23,6 +23,7 @@ import SpinnerWheelConfig from './pages/configurations/SpinnerWheelConfig'
 import AnagramConfig from './pages/configurations/AnagramConfig'
 import SentenceSenseConfig from './pages/configurations/SentenceSenseConfig'
 import PlaceValueShowdownConfig from './pages/configurations/PlaceValueShowdownConfig'
+import WordVolleyConfig from './pages/configurations/WordVolleyConfig'
 import LinkInterceptor from './components/LinkInterceptor'
 import SmartRouter from './pages/SmartRouter'
 import EmailLinkRouter from './pages/EmailLinkRouter'
@@ -507,6 +508,14 @@ const router = createBrowserRouter([
       {
         path: "place-value-showdown/:templateId",
         element: <PlaceValueShowdownConfig />
+      },
+      {
+        path: "word-volley",
+        element: <WordVolleyConfig />
+      },
+      {
+        path: "word-volley/:templateId",
+        element: <WordVolleyConfig />
       }
       // Additional game configuration routes will be added here
     ]

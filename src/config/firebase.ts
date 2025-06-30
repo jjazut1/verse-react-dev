@@ -11,19 +11,12 @@ const getRequiredEnvVar = (key: string): string => {
     // Return an empty string instead of hardcoded fallback
     return '';
   }
-  console.log(`Using environment variable for ${key}`);
+  // Only log in development mode
+  if (import.meta.env.DEV) {
+    console.log(`Using environment variable for ${key}`);
+  }
   return value;
 };
-
-// Log all raw environment variables for debugging (only showing if they exist, not their values)
-console.log('Environment variables status:', {
-  VITE_FIREBASE_API_KEY: !!import.meta.env.VITE_FIREBASE_API_KEY,
-  VITE_FIREBASE_AUTH_DOMAIN: !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, 
-  VITE_FIREBASE_PROJECT_ID: !!import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  VITE_FIREBASE_STORAGE_BUCKET: !!import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  VITE_FIREBASE_MESSAGING_SENDER_ID: !!import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  VITE_FIREBASE_APP_ID: !!import.meta.env.VITE_FIREBASE_APP_ID
-});
 
 // Firebase configuration with environment variables
 const firebaseConfig = {
@@ -34,9 +27,6 @@ const firebaseConfig = {
   messagingSenderId: getRequiredEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID'),
   appId: getRequiredEnvVar('VITE_FIREBASE_APP_ID')
 };
-
-// Log only the project ID for verification, not the full config with sensitive values
-console.log('Firebase project ID:', firebaseConfig.projectId);
 
 // Verify project ID to ensure we're using the correct project
 if (firebaseConfig.projectId !== 'verse-dev-central') {
@@ -53,9 +43,6 @@ const functions = getFunctions(app);
 // This will keep the user logged in even if they close the browser
 // and come back later within a reasonable timeframe (typically several days to weeks)
 setPersistence(auth, browserLocalPersistence)
-  .then(() => {
-    console.log('Firebase auth persistence set to LOCAL');
-  })
   .catch((error) => {
     console.error('Error setting auth persistence:', error);
   });

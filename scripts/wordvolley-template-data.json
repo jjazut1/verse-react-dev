@@ -1,0 +1,23 @@
+{
+  "title": "Short A Words vs Long A Words",
+  "type": "word-volley",
+  "description": "Educational Pong-style game where students hit short A words while avoiding long A words",
+  "difficulty": "medium",
+  "gameSpeed": 3,
+  "paddleSize": 5,
+  "theme": "classic",
+  "targetCategory": {
+    "id": "target",
+    "name": "Short A Words",
+    "words": ["cat", "bat", "hat", "mat", "rat", "sat", "fat", "pat", "van", "can", "man", "pan", "ran", "tan", "fan", "bag", "tag", "rag", "wag", "lag"]
+  },
+  "nonTargetCategory": {
+    "id": "non-target",
+    "name": "Long A Words", 
+    "words": ["cake", "make", "take", "bake", "lake", "wake", "snake", "grape", "plate", "gate", "late", "date", "rate", "hate", "mate", "fate", "game", "name", "same", "came"]
+  },
+  "gameTime": 60,
+  "winningScore": 10,
+  "userId": "system",
+  "createdBy": "System Template"
+} 

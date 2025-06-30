@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useModal } from '../contexts/ModalContext';
 import { Timestamp, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -229,13 +229,20 @@ const FolderModal: React.FC<FolderModalProps> = ({
 }) => {
   const { hideModal, isModalReady } = useModal();
   
-  // Local state for the form inputs
   const [localName, setLocalName] = useState(folder?.name || '');
   const [localDescription, setLocalDescription] = useState(folder?.description || '');
   const [localColor, setLocalColor] = useState(folder?.color || DEFAULT_FOLDER_COLORS[0]);
   
-  // Ref for the name input to handle focus
-  const nameInputRef = React.useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  console.log('🔵 FolderModal: Component initialized with props:', {
+    hasFolder: !!folder,
+    folderId: folder?.id,
+    folderName: folder?.name,
+    hasOnSave: typeof onSave,
+    hasOnCancel: typeof onCancel,
+    isModalReady
+  });
 
   // Update local state when folder changes (when modal opens)
   useEffect(() => {
@@ -263,11 +270,13 @@ const FolderModal: React.FC<FolderModalProps> = ({
   }, [isModalReady, folder?.id]);
 
   const handleSubmit = (e: React.FormEvent) => {
+    console.log('🔵 FolderModal: Form submit triggered!', e);
     e.preventDefault();
     
     // Validate folder name
     const trimmedName = localName.trim();
     if (!trimmedName) {
+      console.log('🔵 FolderModal: Form validation failed - empty name');
       return;
     }
     
@@ -428,6 +437,14 @@ const FolderModal: React.FC<FolderModalProps> = ({
             <button
               type="submit"
               disabled={!isModalReady}
+              onClick={(e) => {
+                console.log('🔵 FolderModal: Create Folder button clicked!', {
+                  isModalReady,
+                  buttonDisabled: !isModalReady,
+                  folderName: localName,
+                  event: e
+                });
+              }}
               style={{
                 padding: '10px 20px',
                 backgroundColor: '#3182CE',
@@ -1597,8 +1614,6 @@ export const GlobalModals: React.FC<{
 }) => {
   const { modalId, modalProps } = useModal();
 
-  console.log('🔵 GlobalModals: Rendering with modalId:', modalId, 'props:', modalProps);
-
   // Delete folder modal
   if (modalId === 'delete-folder') {
     const { folderId, folderName, gamesCount } = modalProps;
@@ -1662,6 +1677,24 @@ export const GlobalModals: React.FC<{
     
     if (!onSave || typeof onSave !== 'function') {
       console.warn('🟡 GlobalModals: Missing onSave function for editFolder modal');
+      return null;
+    }
+    
+    return (
+      <FolderModal
+        folder={folder}
+        onSave={onSave}
+        onCancel={onCancelFolder || (() => {})}
+      />
+    );
+  }
+
+  // Assignment folder modal (create/edit)
+  if (modalId === 'assignment-folder-modal') {
+    const { folder, onSave } = modalProps;
+    
+    if (!onSave || typeof onSave !== 'function') {
+      console.warn('🟡 GlobalModals: Missing onSave function for assignment-folder-modal');
       return null;
     }
     
@@ -1755,8 +1788,9 @@ export const GlobalModals: React.FC<{
   if (modalId === 'assignment-creation') {
     const { game } = modalProps;
     
+    // Only show warning if modal is ready but handlers are missing
     if (!onAssignGame || !onCancelAssignment || !showToast) {
-      console.warn('🟡 GlobalModals: Missing handlers for assignment-creation modal');
+      // Don't warn during initial render, only if modal is actually being displayed
       return null;
     }
     

@@ -9,6 +9,7 @@ import SpinnerWheel from './games/spinner-wheel/SpinnerWheel';
 import AnagramAdapter from './games/anagram/AnagramAdapter';
 import SentenceSenseAdapter from './games/sentence-sense/SentenceSenseAdapter';
 import PlaceValueShowdownAdapter from './games/place-value-showdown/PlaceValueShowdownAdapter';
+import WordVolleyAdapter from './games/word-volley/WordVolleyAdapter';
 import { useCustomToast } from '../hooks/useCustomToast';
 import { GameConfig } from '../types/game';
 
@@ -135,6 +136,14 @@ const GamePlayer = () => {
             playerName="Player"
             onGameComplete={handleGameComplete}
             config={gameConfig}
+          />
+        );
+      case 'word-volley':
+        return (
+          <WordVolleyAdapter
+            gameConfig={gameConfig}
+            playerName="Player"
+            onGameComplete={handleGameComplete}
           />
         );
       default:

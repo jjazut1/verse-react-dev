@@ -28,6 +28,7 @@ const ConfigurationRouter = () => {
     if (path.includes('anagram')) return 'anagram';
     if (path.includes('sentence-sense')) return 'sentence-sense';
     if (path.includes('place-value-showdown')) return 'place-value-showdown';
+    if (path.includes('word-volley')) return 'word-volley';
     return null;
   };
 
@@ -104,6 +105,7 @@ const ConfigurationRouter = () => {
     if (gameType === 'anagram') return 3;
     if (gameType === 'sentence-sense') return 4;
     if (gameType === 'place-value-showdown') return 5;
+    if (gameType === 'word-volley') return 6;
     return 0;
   };
 
@@ -115,6 +117,7 @@ const ConfigurationRouter = () => {
     if (index === 3) navigate('/configure/anagram');
     if (index === 4) navigate('/configure/sentence-sense');
     if (index === 5) navigate('/configure/place-value-showdown');
+    if (index === 6) navigate('/configure/word-volley');
   };
 
   // Display configuration page title and content
@@ -131,6 +134,7 @@ const ConfigurationRouter = () => {
             <Tab>Anagram</Tab>
             <Tab>Sentence Sense</Tab>
             <Tab>Place Value Showdown</Tab>
+            <Tab>Pong</Tab>
           </TabList>
         </Tabs>
       </Box>

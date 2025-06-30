@@ -173,9 +173,9 @@ export const createAssignmentEmailTemplate = (
                         <li><strong>Click "Install"</strong> - Select the install option when prompted</li>
                         <li><strong>Important!</strong> The next time you click an email link, you'll see an "Open in app" icon in the address bar - click it!</li>
                         <li><strong>Choose "Always use"</strong> - When you see the banner asking about opening links in the app, select "Always use"</li>
-                    </ol>
-                </div>
-                
+            </ol>
+        </div>
+
                 <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin: 15px 0;">
                     <p style="margin: 0; color: #92400e; font-size: 14px;">
                         <strong>💡 Pro Tip:</strong> After installation, future email links will open directly in the app - no more browser steps needed!
@@ -192,7 +192,7 @@ export const createAssignmentEmailTemplate = (
                     No problem! The link above works perfectly in your browser too. You can always access 
                     your assignments whether you install the app or not.
                 </p>
-            </div>
+        </div>
         </div>
 
         <div class="footer">

@@ -281,16 +281,7 @@ const Navbar = () => {
   const studentInUse = isStudentInActiveUse();
   const shouldShowAuthButtons = !currentUser && !studentInUse;
   
-  // Debug logging for navbar button visibility
-  console.log('🧭 Navbar Detection:', {
-    currentUser: !!currentUser,
-    isStudent,
-    pathname: location.pathname,
-    searchParams: location.search,
-    studentInUse,
-    shouldShowAuthButtons,
-    shouldShowHomeButton: !currentUser && !studentInUse
-  });
+
   
   // Check if user is an admin
   useEffect(() => {

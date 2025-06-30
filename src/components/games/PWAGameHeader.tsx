@@ -78,7 +78,7 @@ export const PWAGameHeader: React.FC<PWAGameHeaderProps> = ({
 
   if (variant === 'compact') {
     return (
-      <HStack spacing={2} justify="space-between" w="full" p={2}>
+      <HStack spacing={2} justify="space-between" w="full" p={1}>
         <HStack spacing={2}>
           {showBackButton && (
             <Tooltip label="Go Back" placement="bottom">

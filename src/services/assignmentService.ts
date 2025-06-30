@@ -216,4 +216,52 @@ export const createAssignmentWithEmailLink = async (assignmentData: Omit<Assignm
     console.error('Error creating assignment with email link auth:', error);
     throw error;
   }
+};
+
+// Get all assignments for a specific teacher with folder information
+export const getTeacherAssignmentsWithFolders = async (teacherId: string): Promise<Assignment[]> => {
+  try {
+    // First get all assignments for the teacher
+    const assignmentsRef = collection(db, 'assignments');
+    const assignmentsQuery = query(assignmentsRef, where('teacherId', '==', teacherId));
+    const assignmentsSnapshot = await getDocs(assignmentsQuery);
+    
+    const assignments: Assignment[] = [];
+    assignmentsSnapshot.forEach((doc) => {
+      const data = doc.data();
+      assignments.push({
+        id: doc.id,
+        ...data,
+      } as Assignment);
+    });
+
+    // Then get all folder assignments for this teacher
+    const folderAssignmentsRef = collection(db, 'assignmentFolderAssignments');
+    const folderAssignmentsQuery = query(folderAssignmentsRef, where('userId', '==', teacherId));
+    const folderAssignmentsSnapshot = await getDocs(folderAssignmentsQuery);
+    
+    // Create a map of assignmentId -> folderId
+    const assignmentToFolderMap = new Map<string, string>();
+    folderAssignmentsSnapshot.forEach((doc) => {
+      const data = doc.data();
+      assignmentToFolderMap.set(data.assignmentId, data.folderId);
+    });
+
+    // Enrich assignments with folder information
+    const enrichedAssignments = assignments.map(assignment => ({
+      ...assignment,
+      folderId: assignmentToFolderMap.get(assignment.id || '') || undefined
+    }));
+
+    console.log('Loaded assignments with folder info:', {
+      totalAssignments: enrichedAssignments.length,
+      assignmentsInFolders: enrichedAssignments.filter(a => a.folderId).length,
+      unorganizedAssignments: enrichedAssignments.filter(a => !a.folderId).length
+    });
+
+    return enrichedAssignments;
+  } catch (error) {
+    console.error('Error getting teacher assignments with folders:', error);
+    throw error;
+  }
 }; 
