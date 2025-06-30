@@ -69,6 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsStudent(false);
       return;
     }
+
+    // 🔍 ENHANCED DEBUG LOGGING for Google Workspace Migration Issue
+    console.log('🔍 DEBUG: Starting user role check');
+    console.log('📧 User Email:', user.email);
+    console.log('🆔 User UID:', user.uid);
+    console.log('👤 Display Name:', user.displayName);
     
     try {
       // First check if email is in our demo teacher list
@@ -80,10 +86,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Check if they have a role in their user document
       try {
+        console.log('🔍 DEBUG: Checking for direct UID match in users collection');
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
         
         if (userDoc.exists()) {
+          console.log('✅ DEBUG: Found user document by direct UID lookup');
+          console.log('   👑 Role:', userDoc.data().role);
           const userData = userDoc.data();
           
           // Update lastLogin timestamp - preserve existing createdAt
@@ -121,6 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsStudent(true);
             return;
           }
+        } else {
+          console.log('❌ DEBUG: No user document found by direct UID lookup');
         }
       } catch (error) {
         console.error('Error checking user document by UID:', error);
@@ -128,13 +139,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Fallback: try to find user by email (for legacy documents)
       try {
+        console.log('🔍 DEBUG: Searching for user document by email (fallback for legacy documents)');
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where('email', '==', user.email));
         const querySnapshot = await getDocs(q);
         
         if (!querySnapshot.empty) {
+          console.log(`🔍 DEBUG: Found ${querySnapshot.docs.length} document(s) for email ${user.email}`);
+          
           const existingUserDoc = querySnapshot.docs[0];
           const existingUserData = existingUserDoc.data();
+          
+          console.log('🔍 DEBUG: Document details:');
+          console.log('   📄 Document UID:', existingUserDoc.id);
+          console.log('   📧 Document Email:', existingUserData.email);
+          console.log('   👑 Document Role:', existingUserData.role);
+          console.log('   🆔 Current Auth UID:', user.uid);
+          console.log('   🔗 UIDs Match:', existingUserDoc.id === user.uid);
           
           // 🛡️ IMPORTANT: Check if this document is already using the correct UID
           // If the document ID matches the user's UID, then it's NOT a legacy document
@@ -221,6 +242,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.error('Error creating new user document with correct UID:', error);
             }
           }
+        } else {
+          console.log('❌ DEBUG: No user documents found by email search');
         }
       } catch (error) {
         console.error('Error checking user by email:', error);
