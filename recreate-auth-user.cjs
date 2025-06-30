@@ -2,7 +2,7 @@ const admin = require('firebase-admin');
 
 // Configuration
 const PROJECT_ID = 'verse-dev-central';
-const USER_EMAIL = 'james@learnwithverse.com';
+const USER_EMAIL = 'james@luminatelearn.com';
 const USER_UID = 'U2oL4UHCZhSj6ggauxsKudkYD3h1'; // From Firestore document
 const DISPLAY_NAME = 'James Alspaugh';
 

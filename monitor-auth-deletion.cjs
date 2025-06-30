@@ -2,7 +2,7 @@ const admin = require('firebase-admin');
 
 // Configuration
 const PROJECT_ID = 'verse-dev-central';
-const USER_EMAIL = 'james@learnwithverse.com';
+const USER_EMAIL = 'james@luminatelearn.com';
 const USER_UID = 'U2oL4UHCZhSj6ggauxsKudkYD3h1';
 const CHECK_INTERVAL = 5000; // Check every 5 seconds
 

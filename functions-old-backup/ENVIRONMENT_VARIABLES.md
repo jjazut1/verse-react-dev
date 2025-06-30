@@ -7,7 +7,7 @@ This file documents the environment variables needed for Firebase Functions to w
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `sendgrid.key` | SendGrid API key for sending emails | `SG.XXXXXXXXXXXXXXXXXXXX.XXXXXXXXXXXXXXX` |
-| `email.sender` | The email address used as sender | `Verse Learning <james@learnwithverse.com>` |
+| `email.sender` | The email address used as sender | `Lumino Learning <james@luminatelearn.com>` |
 | `app.url` | The base URL of the application | `https://r2process.com` |
 
 ## Setting Environment Variables
@@ -16,7 +16,7 @@ These variables are set using Firebase Functions Configuration:
 
 ```bash
 firebase functions:config:set sendgrid.key="YOUR_SENDGRID_API_KEY"
-firebase functions:config:set email.sender="Verse Learning <james@learnwithverse.com>"
+firebase functions:config:set email.sender="Lumino Learning <james@luminatelearn.com>"
 firebase functions:config:set app.url="https://r2process.com"
 ```
 
@@ -30,6 +30,6 @@ These variables are accessed in the code as follows:
 
 ```typescript
 const SENDGRID_API_KEY = functions.config().sendgrid?.key || '';
-const SENDER_EMAIL = functions.config().email?.sender || 'Verse Learning <james@learnwithverse.com>';
+const SENDER_EMAIL = functions.config().email?.sender || 'Lumino Learning <james@luminatelearn.com>';
 const APP_URL = functions.config().app?.url || 'https://r2process.com';
 ``` 

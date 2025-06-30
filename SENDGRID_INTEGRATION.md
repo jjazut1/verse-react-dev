@@ -114,8 +114,8 @@ Logs mask sensitive information:
 Email payload for debugging: { 
   "to": "ja***h@sunriseoasisacademy.com", 
   "from": { 
-    "email": "ja***s@learnwithverse.com",
-    "name": "Verse Learning" 
+    "email": "ja***s@luminatelearn.com",
+         "name": "Lumino Learning" 
   },
   ...
 }

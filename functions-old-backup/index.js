@@ -11,7 +11,7 @@ admin.initializeApp();
 
 // Get environment variables from Firebase config
 const SENDGRID_API_KEY = functions.config().sendgrid?.key || '';
-const SENDER_EMAIL = functions.config().email?.sender || 'Verse Learning <james@learnwithverse.com>';
+const SENDER_EMAIL = functions.config().email?.sender || 'Lumino Learning <james@luminatelearn.com>';
 
 // Initialize SendGrid with the key
 console.log("Configuring SendGrid with key:", SENDGRID_API_KEY ? 'Key set' : 'No key set');

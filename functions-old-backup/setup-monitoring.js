@@ -70,7 +70,7 @@ function setupNotificationChannels() {
     
     if (!channels.includes('EMAIL')) {
       console.log('Creating email notification channel...');
-      const email = 'james@learnwithverse.com'; // Use your preferred email
+      const email = 'james@luminatelearn.com'; // Use your preferred email
       execSync(`
         gcloud alpha monitoring channels create --project=${PROJECT_ID} \\
           --display-name="Email Alerts" \\
