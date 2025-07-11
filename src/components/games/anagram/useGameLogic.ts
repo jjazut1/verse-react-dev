@@ -1,15 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { collection, addDoc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../../../config/firebase';
 import { AnagramConfig } from '../../../types/game';
-import { GameState, AnagramItem, HighScore, GameStats } from './types';
+import { GameState, AnagramItem, GameStats } from './types';
 import { 
   initializeAnagrams, 
   checkAnswerCorrectness, 
-  calculateScore, 
-  checkHighScore as checkHighScoreUtil,
+  calculateScore,
   formatTime 
 } from './utils';
+import { useHighScore } from '../../../hooks/useHighScore';
 
 export const useGameLogic = (
   config: AnagramConfig,
@@ -33,7 +31,7 @@ export const useGameLogic = (
     },
     showHint: false,
     showDefinition: false,
-    highScores: [],
+    highScores: [], // This will be managed by the new hook
     showHighScoreModal: false,
     isNewHighScore: false,
     feedback: '',
@@ -45,10 +43,19 @@ export const useGameLogic = (
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const incorrectFeedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Use the new unified high score system
+  const highScoreSystem = useHighScore({
+    gameType: 'anagram',
+    configId: config.id || 'demo',
+    scoringSystem: 'miss-based', // Lower misses = better score
+    enableRateLimit: true,
+    onHighScoreProcessStart,
+    onHighScoreProcessComplete,
+  });
+
   // Initialize game on mount
   useEffect(() => {
     initializeGame();
-    loadHighScores();
 
     return () => {
       if (gameTimerRef.current) clearInterval(gameTimerRef.current);
@@ -64,17 +71,27 @@ export const useGameLogic = (
         setGameState(prev => ({ ...prev, timeElapsed: prev.timeElapsed + 1 }));
       }, 1000);
     } else {
-      if (gameTimerRef.current) clearInterval(gameTimerRef.current);
+      if (gameTimerRef.current) {
+        clearInterval(gameTimerRef.current);
+      }
     }
 
     return () => {
-      if (gameTimerRef.current) clearInterval(gameTimerRef.current);
+      if (gameTimerRef.current) {
+        clearInterval(gameTimerRef.current);
+      }
     };
   }, [gameState.gameStarted, gameState.gameCompleted]);
 
   const initializeGame = useCallback(() => {
-    const initializedAnagrams = initializeAnagrams(config);
-    setGameState(prev => ({ ...prev, anagrams: initializedAnagrams }));
+    const anagrams = initializeAnagrams(config);
+    setGameState(prev => ({
+      ...prev,
+      anagrams,
+      currentAnagramIndex: 0,
+      showHint: false,
+      showDefinition: false
+    }));
   }, [config]);
 
   const handleLetterClick = useCallback((letter: string, index: number, fromType: 'scrambled' | 'answer') => {
@@ -236,66 +253,18 @@ export const useGameLogic = (
       gameStats: {
         ...prev.gameStats,
         timeElapsed: prev.timeElapsed
-      }
+      },
+      // Update with the unified high score data
+      highScores: highScoreSystem.highScores,
+      isNewHighScore: highScoreSystem.isNewHighScore,
+      showHighScoreModal: true // We'll handle this differently now
     }));
 
-    // Check for high score (lower misses = better score)
-    const isHighScore = checkHighScoreUtil(totalMisses, gameState.highScores);
-    if (isHighScore && onHighScoreProcessStart) {
-      onHighScoreProcessStart();
-    }
-
-    if (isHighScore) {
-      await saveHighScore(totalMisses);
-    }
-
-    if (onHighScoreProcessComplete) {
-      onHighScoreProcessComplete();
-    }
+    // Use the new unified high score system
+    await highScoreSystem.saveHighScore(totalMisses, playerName);
 
     onGameComplete(totalMisses);
-  }, [gameState.gameStats.totalMisses, gameState.timeElapsed, gameState.highScores, onHighScoreProcessStart, onHighScoreProcessComplete, onGameComplete]);
-
-  const loadHighScores = useCallback(async () => {
-    try {
-      const scoresQuery = query(
-        collection(db, 'highScores'),
-        where('configId', '==', config.id || 'demo'),
-        orderBy('score', 'asc'), // Ascending order for miss-based scoring (lower is better)
-        limit(10)
-      );
-      const querySnapshot = await getDocs(scoresQuery);
-      const scores = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as HighScore[];
-      setGameState(prev => ({ ...prev, highScores: scores }));
-    } catch (error) {
-      console.error('Error loading high scores:', error);
-    }
-  }, [config.id]);
-
-  const saveHighScore = useCallback(async (finalScore: number) => {
-    try {
-      const newHighScore = {
-        playerName: playerName,
-        score: finalScore,
-        configId: config.id || 'demo',
-        createdAt: new Date(),
-        gameType: 'anagram'
-      };
-
-      await addDoc(collection(db, 'highScores'), newHighScore);
-      setGameState(prev => ({
-        ...prev,
-        isNewHighScore: true,
-        showHighScoreModal: true
-      }));
-      await loadHighScores();
-    } catch (error) {
-      console.error('Error saving high score:', error);
-    }
-  }, [playerName, config.id, loadHighScores]);
+  }, [gameState.gameStats.totalMisses, gameState.timeElapsed, highScoreSystem, playerName, onGameComplete]);
 
   const startGame = useCallback(() => {
     setGameState(prev => ({
@@ -321,7 +290,7 @@ export const useGameLogic = (
       },
       showHint: false,
       showDefinition: false,
-      highScores: gameState.highScores, // Keep existing high scores
+      highScores: highScoreSystem.highScores, // Keep current high scores
       showHighScoreModal: false,
       isNewHighScore: false,
       feedback: '',
@@ -329,14 +298,24 @@ export const useGameLogic = (
       showIncorrectFeedback: false
     });
     initializeGame();
-  }, [gameState.highScores, initializeGame]);
+  }, [highScoreSystem.highScores, initializeGame]);
 
   const closeHighScoreModal = useCallback(() => {
     setGameState(prev => ({ ...prev, showHighScoreModal: false }));
-  }, []);
+    highScoreSystem.setShowHighScoreModal(false);
+  }, [highScoreSystem]);
 
   return {
-    gameState,
+    gameState: {
+      ...gameState,
+      // Merge in the high score system state
+      highScores: highScoreSystem.highScores,
+      showHighScoreModal: highScoreSystem.showHighScoreModal,
+      isNewHighScore: highScoreSystem.isNewHighScore,
+    },
+    // High score system functions and state
+    highScoreSystem,
+    // Game functions
     handleLetterClick,
     checkAnswer,
     useHint,

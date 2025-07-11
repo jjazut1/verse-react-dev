@@ -1,20 +1,13 @@
 import React from 'react';
-import {
-  Box,
-  VStack,
-  Center,
-  Spinner,
-  Text,
-  useColorModeValue
-} from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { AnagramProps } from './types';
 import { useGameLogic } from './useGameLogic';
 import StartScreen from './StartScreen';
-import GameHeader from './GameHeader';
 import GameArea from './GameArea';
 import GameComplete from './GameComplete';
-import HighScoreModal from './HighScoreModal';
 import PWAGameHeader from '../PWAGameHeader';
+import { HighScoreModal } from '../../common/HighScoreModal';
+import './WordSentenceMode.css';
 
 const Anagram: React.FC<AnagramProps> = ({
   playerName,
@@ -31,71 +24,60 @@ const Anagram: React.FC<AnagramProps> = ({
     onHighScoreProcessComplete
   );
 
-  const bgColor = useColorModeValue('gray.50', 'gray.900');
+  const { gameState, highScoreSystem } = gameLogic;
 
-  // Start screen
-  if (!gameLogic.gameState.gameStarted) {
+  if (!gameState.gameStarted) {
     return (
-      <Box>
+      <Box w="100vw" h="100vh" overflow="hidden">
         <PWAGameHeader gameTitle="Anagram" variant="compact" />
         <StartScreen config={config} onStartGame={gameLogic.startGame} />
       </Box>
     );
   }
 
-  // Game complete screen
-  if (gameLogic.gameState.gameCompleted) {
+  if (gameState.gameCompleted) {
     return (
-      <Box>
+      <Box w="100vw" h="100vh" overflow="hidden">
         <PWAGameHeader gameTitle="Anagram" variant="compact" />
-        <GameComplete
-          gameState={gameLogic.gameState}
-          formatTime={gameLogic.formatTime}
+        <GameComplete 
+          gameState={gameState} 
           onResetGame={gameLogic.resetGame}
-        />
-      </Box>
-    );
-  }
-
-  // Loading screen
-  const currentAnagram = gameLogic.gameState.anagrams[gameLogic.gameState.currentAnagramIndex];
-  if (!currentAnagram) {
-    return (
-      <Box minH="100vh" bg={bgColor}>
-        <PWAGameHeader gameTitle="Anagram" variant="compact" />
-        <Center h="100vh">
-          <VStack spacing={4}>
-            <Spinner size="xl" color="purple.500" thickness="4px" />
-            <Text color="gray.600">Loading word...</Text>
-          </VStack>
-        </Center>
-      </Box>
-    );
-  }
-
-  // Main game screen
-  return (
-    <Box minH="100vh" bg={bgColor} p={4}>
-      <PWAGameHeader gameTitle="Anagram" variant="compact" />
-      
-      <VStack spacing={6} maxW="4xl" mx="auto">
-        <GameHeader 
-          gameState={gameLogic.gameState} 
-          formatTime={gameLogic.formatTime} 
+          formatTime={gameLogic.formatTime}
         />
         
-        <GameArea
-          gameState={gameLogic.gameState}
-          config={config}
-          onLetterClick={gameLogic.handleLetterClick}
-          onUseHint={gameLogic.useHint}
-          onToggleDefinition={gameLogic.toggleDefinition}
+        {/* Use the new unified HighScoreModal */}
+        <HighScoreModal
+          isOpen={highScoreSystem.showHighScoreModal}
+          onClose={gameLogic.closeHighScoreModal}
+          score={gameState.score}
+          isNewHighScore={highScoreSystem.isNewHighScore}
+          highScores={highScoreSystem.highScores}
+          scoringSystem="miss-based"
+          gameTitle="Anagram"
+          timeElapsed={gameState.timeElapsed}
+          additionalStats={[
+            { label: 'Correct Answers', value: gameState.gameStats.correctAnswers, colorScheme: 'green' },
+            { label: 'Hints Used', value: gameState.gameStats.hintsUsed, colorScheme: 'yellow' },
+          ]}
+          isLoading={highScoreSystem.isLoading}
+          isSubmittingScore={highScoreSystem.isSubmittingScore}
+          error={highScoreSystem.error}
+          onClearError={highScoreSystem.clearError}
+          onPlayAgain={gameLogic.resetGame}
         />
-      </VStack>
+      </Box>
+    );
+  }
 
-      <HighScoreModal
-        gameState={gameLogic.gameState}
-        onClose={gameLogic.closeHighScoreModal}
+  return (
+    <Box w="100vw" h="100vh" overflow="hidden">
+      <PWAGameHeader gameTitle="Anagram" variant="compact" />
+      <GameArea 
+        gameState={gameState}
+        config={config}
+        onLetterClick={gameLogic.handleLetterClick}
+        onUseHint={gameLogic.useHint}
+        onToggleDefinition={gameLogic.toggleDefinition}
       />
     </Box>
   );
