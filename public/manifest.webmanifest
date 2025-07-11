@@ -1,6 +1,6 @@
 {
-  "name": "Lumino Learning - Student",
-  "short_name": "Lumino Student",
+  "name": "LuminateLearn - Student",
+  "short_name": "LuminateLearn Student",
   "description": "Educational games and assignments for students",
   "start_url": "/student?pwa=true",
   "display": "standalone",

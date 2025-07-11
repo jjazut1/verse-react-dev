@@ -60,8 +60,8 @@ export default defineConfig(({ mode }) => {
           importScripts: ['sw-custom.js']
         },
         manifest: {
-          name: 'Lumino Learning - Student',
-          short_name: 'Lumino Student',
+          name: 'LuminateLearn - Student',
+          short_name: 'LuminateLearn Student',
           description: 'Educational games and assignments for students',
           theme_color: '#4299E1',
           background_color: '#ffffff',
@@ -112,7 +112,7 @@ export default defineConfig(({ mode }) => {
               sizes: '512x512',
               type: 'image/png',
               form_factor: 'wide',
-              label: 'Lumino Learning Desktop View'
+              label: 'LuminateLearn Desktop View'
             }
           ]
         },

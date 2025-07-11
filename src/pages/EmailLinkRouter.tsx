@@ -240,7 +240,7 @@ const EmailLinkRouter: React.FC = () => {
               📧 Processing Email Link
             </Text>
             <Text color="gray.600">
-              Lumino Learning Assignment Access
+              LuminateLearn Assignment Access
             </Text>
           </VStack>
 

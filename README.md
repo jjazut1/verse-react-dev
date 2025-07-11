@@ -1,4 +1,4 @@
-# Lumino Learning Platform
+# LuminateLearn Platform
 
 [![React](https://img.shields.io/badge/React-18.x-blue)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.x-purple)](https://vitejs.dev/)
@@ -7,7 +7,7 @@
 
 ## Overview
 
-Lumino Learning is a comprehensive educational platform designed for K-12 teachers and students. It enables educators to create engaging custom games, manage student assignments, and track progress through an intuitive dashboard system. Students enjoy a personalized learning experience with visual feedback, achievement tracking, and seamless access to both assigned and public games.
+LuminateLearn is a comprehensive educational platform designed for K-12 teachers and students. It enables educators to create engaging custom games, manage student assignments, and track progress through an intuitive dashboard system. Students enjoy a personalized learning experience with visual feedback, achievement tracking, and seamless access to both assigned and public games.
 
 **Tagline:** Create Efficiently. Spark Curiosity. Shape Minds.
 
@@ -321,7 +321,7 @@ The **streamlined authentication system** and **enhanced email templates** creat
 
 **📧 Email System Updates**:
 - **Sender Address**: Transition from `james@learnwithverse.com` to `james@luminatelearn.com`
-- **Organization Name**: Updated from "Verse Learning" to "Lumino Learning"
+- **Organization Name**: Updated from "Verse Learning" to "LuminateLearn"
 - **Authentication Systems**: Google Workspace SSO configuration updated
 - **Domain Verification**: New domain properly configured for Firebase Auth
 
@@ -363,7 +363,7 @@ firebase functions:config:set email.sender="Lumino Learning <james@luminatelearn
 #### **🌟 Benefits of Migration**
 
 **🎓 Professional Identity**:
-- **Unified Branding**: All communications now reflect "Lumino Learning" identity
+- **Unified Branding**: All communications now reflect "LuminateLearn" identity
 - **Professional Domain**: Enhanced credibility with educational institutions
 - **Consistent Messaging**: Aligned domain with platform rebrand and mission
 
@@ -389,6 +389,162 @@ firebase functions:config:set email.sender="Lumino Learning <james@luminatelearn
 This **Google Workspace migration** represents a **significant organizational milestone** in the evolution of the Lumino Learning platform. The transition from `learnwithverse.com` to `luminatelearn.com` reflects our commitment to **professional growth** and **brand consistency**.
 
 The migration ensures **seamless communication**, **enhanced credibility**, and **scalable infrastructure** to support our mission to **Create Efficiently. Spark Curiosity. Shape Minds.**
+
+### 📧 **EMAIL-BASED STUDENT CREDENTIAL SETUP** ✅
+
+#### **🎯 TEACHER-TO-STUDENT EMAIL FLOW**
+
+**✨ STREAMLINED AUTHENTICATION**: Lumino Learning provides a comprehensive email-based system for teachers to set up student credentials, supporting both **Google Sign-In** and **email/password** authentication methods.
+
+#### **📊 Student Credential Setup Overview**
+
+| Component | Functionality | Status |
+|-----------|--------------|---------|
+| **Password Setup Emails** | Automatic Firebase Auth password reset links | ✅ Active |
+| **Assignment Notifications** | Direct links to assignments with authentication | ✅ Active |
+| **Google Sign-In Integration** | Seamless Google authentication for students | ✅ Active |
+| **Account Linking** | Automatic linking of Google accounts to existing student records | ✅ Active |
+
+#### **🔧 How Teachers Send Student Credentials**
+
+**📋 Step-by-Step Process**:
+
+1. **Create Student Account**:
+   - Navigate to Teacher Dashboard → Students Tab
+   - Click "Add New Student"
+   - Enter student details (name, email, grade, age, notes)
+   - System automatically creates student record with role: 'student'
+
+2. **Automatic Email Trigger**:
+   - Firebase function `sendPasswordSetupEmail` automatically triggers
+   - Creates Firebase Auth user account
+   - Generates secure password reset link (1-hour expiration)
+   - Sends professional email to student
+
+3. **Student Receives Email**:
+   - Subject: "Set Your Password for Lumino Learning"
+   - Contains welcome message and "Set Your Password" button
+   - Includes instructions and platform benefits
+
+4. **Student Authentication Options**:
+   - **Option A**: Click email link → Set password → Login with email/password
+   - **Option B**: Use Google Sign-In → Automatic account linking
+
+#### **🛠️ Technical Implementation Details**
+
+**🔐 Firebase Functions**:
+```typescript
+// Auto-triggered when student document is created
+export const sendPasswordSetupEmail = onDocumentCreated({
+  document: "users/{userId}",
+  secrets: [SENDGRID_API_KEY, SENDER_EMAIL],
+}, async (event) => {
+  // Creates Firebase Auth user
+  // Generates password reset link
+  // Sends email via SendGrid
+  // Updates student record with email status
+});
+```
+
+**📧 Email Infrastructure**:
+- **SendGrid Integration**: Professional email delivery with validation
+- **Email Templates**: Branded HTML templates with responsive design
+- **Tracking**: Password setup status tracking in student records
+- **Security**: 1-hour link expiration, email address validation
+
+**🔗 Account Linking System**:
+- **Automatic Detection**: Students with temporary passwords auto-link to Google accounts
+- **Conflict Resolution**: Handles existing accounts with different providers
+- **Data Preservation**: Maintains all student data during account linking
+
+#### **📈 Student Authentication Flow**
+
+**🌟 New Student Experience**:
+1. **Teacher Creates Account** → Student receives password setup email
+2. **Student Clicks Link** → Directed to Firebase Auth password setup
+3. **Student Sets Password** → Account activated with email/password
+4. **Alternative: Google Sign-In** → Automatic account linking without password needed
+
+**🔄 Existing Student Experience**:
+- **Students with existing accounts** can use Google Sign-In
+- **Account linking** preserves all assignment history and progress
+- **Seamless transition** between authentication methods
+
+#### **📊 Teacher Dashboard Features**
+
+**👥 Student Management**:
+- **Status Indicators**: "🔐 Password Setup Sent" vs "📧 Email Only"
+- **Email Tracking**: Track which students have received setup emails
+- **Re-send Capability**: Teachers can recreate students to re-trigger emails
+- **Student List**: View all students with authentication status
+
+**📝 Assignment System**:
+- **Assignment Emails**: Automatic notifications when assignments are created
+- **Direct Links**: Students can access assignments directly from email
+- **Authentication Integration**: Seamless login from assignment emails
+
+#### **🔧 Configuration Requirements**
+
+**🛠️ Firebase Setup**:
+```bash
+# Required Firebase secrets
+firebase functions:secrets:set SENDGRID_API_KEY
+firebase functions:secrets:set SENDER_EMAIL  # james@luminatelearn.com
+firebase functions:secrets:set APP_URL       # https://verse-dev-central.web.app
+```
+
+**📧 SendGrid Configuration**:
+- **Verified Sender**: `james@luminatelearn.com` (Lumino Learning)
+- **Domain Authentication**: `luminatelearn.com` domain verification
+- **API Key**: Full send permissions for transactional emails
+
+#### **🎯 Benefits for Educational Institutions**
+
+**👨‍🏫 For Teachers**:
+- **One-Click Setup**: Create student accounts instantly
+- **No Password Management**: Students set their own secure passwords
+- **Professional Communication**: Branded emails with clear instructions
+- **Status Tracking**: Know which students have completed setup
+
+**👩‍🎓 For Students**:
+- **Secure Authentication**: Firebase Auth-powered security
+- **Multiple Options**: Email/password OR Google Sign-In
+- **Easy Access**: Direct links to assignments and dashboard
+- **Account Recovery**: Standard password reset flow
+
+**🏫 For Institutions**:
+- **Scalable System**: Handle hundreds of students efficiently
+- **Security Compliance**: Enterprise-grade Firebase security
+- **Integration Ready**: Works with Google Workspace environments
+- **Analytics**: Track student engagement and authentication
+
+#### **🧪 Testing & Verification**
+
+**✅ Email Delivery Testing**:
+```bash
+# Test SendGrid integration
+cd functions-gen2
+./test-sendgrid.sh YOUR_API_KEY james@luminatelearn.com
+```
+
+**🔍 Student Creation Testing**:
+1. Create test student account in Teacher Dashboard
+2. Verify email delivery and Firebase Auth user creation
+3. Test password setup flow from student perspective
+4. Verify assignment email notifications
+
+#### **📞 Support & Troubleshooting**
+
+**🚨 Common Issues**:
+- **Email Not Received**: Check SendGrid domain verification
+- **Link Expired**: Students must use link within 1 hour
+- **Google Sign-In Issues**: Automatic account linking resolves conflicts
+- **Password Reset**: Students can use standard "Forgot Password" flow
+
+**📋 Monitoring**:
+- **Firebase Console**: Monitor function execution and errors
+- **SendGrid Dashboard**: Track email delivery rates and issues
+- **Student Records**: Check `passwordSetupSent` flag in Firestore
 
 ### 🔧 **CRITICAL SYSTEM FIXES & COMPLETE GAME LIBRARY** (January 2025) ✅
 

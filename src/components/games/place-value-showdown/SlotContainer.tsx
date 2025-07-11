@@ -10,14 +10,15 @@ export const SlotContainer: React.FC<SlotContainerProps> = ({
   showPlaceValueLabels,
   slotIndex,
   totalSlots,
-  hasComma
+  hasComma,
+  config
 }) => (
   <>
     <div className="slot-container">
       {children}
       {showPlaceValueLabels && (
         <div className="place-value-label">
-          {getPlaceValueLabel(slotIndex, totalSlots)}
+          {getPlaceValueLabel(slotIndex, totalSlots, config)}
         </div>
       )}
     </div>

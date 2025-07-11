@@ -60,3 +60,13 @@ functions/test-*.js
 mark-assignments-sent.js
 mark-assignments-sent.sh
 update-*-credentials.sh
+
+# Generated function files
+functions-gen2/lib/
+functions-gen1/lib/
+
+# Dev build files
+dev-dist/
+
+# Firebase cache
+.firebase/hosting.*.cache

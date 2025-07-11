@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Assignment, Attempt } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { authenticateEmailLinkUser } from '../services/authService';
+// Removed complex email link authentication in favor of simplified approach
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
 import { usePWA } from '../hooks/usePWA';
 import { useCustomToast, ToastComponent } from '../hooks/useCustomToast';
@@ -128,7 +128,7 @@ const StudentDashboard: React.FC = () => {
       if (action === 'focused_existing') {
         showToast({
           title: "Opening Existing App 🎯",
-          description: "Switching to your already open Lumino Learning app...",
+          description: "Switching to your already open LuminateLearn app...",
           status: "info",
           duration: 3000,
         });
@@ -205,8 +205,8 @@ const StudentDashboard: React.FC = () => {
       
       try {
         showToast({
-          title: "🌟 Get the best Lumino experience!",
-          description: "See an Install icon? → Tap it to add Lumino to your device\nSee \"Open in App\"? → Tap it\nSee \"Always Use\"? → Tap it",
+          title: "🌟 Get the best LuminateLearn experience!",
+          description: "See an Install icon? → Tap it to add LuminateLearn to your device\nSee \"Open in App\"? → Tap it\nSee \"Always Use\"? → Tap it",
           status: "info",
           duration: 12000, // Longer duration for universal message
         });
@@ -250,7 +250,7 @@ const StudentDashboard: React.FC = () => {
       const timer = setTimeout(() => {
         showToast({
           title: "App Already Installed! 🎉",
-          description: "Lumino Learning is already installed on your device. You can find it on your home screen or in your applications folder.",
+          description: "LuminateLearn is already installed on your device. You can find it on your home screen or in your applications folder.",
           status: "info",
           duration: 8000,
         });
@@ -264,7 +264,7 @@ const StudentDashboard: React.FC = () => {
         const timer = setTimeout(() => {
                   showToast({
           title: "App Already Installed! 🎉",
-          description: "Lumino Learning is already installed. Look for the app icon on your home screen or in your applications.",
+          description: "LuminateLearn is already installed. Look for the app icon on your home screen or in your applications.",
           status: "success",
           duration: 8000,
         });
@@ -282,7 +282,7 @@ const StudentDashboard: React.FC = () => {
         const timer = setTimeout(() => {
                   showToast({
           title: "Manual Installation Required",
-          description: "Look for an install button in your browser address bar, or check your browser menu for 'Install Lumino Learning' or 'Add to Home Screen'.",
+          description: "Look for an install button in your browser address bar, or check your browser menu for 'Install LuminateLearn' or 'Add to Home Screen'.",
           status: "info",
           duration: 10000,
         });
@@ -356,7 +356,7 @@ const StudentDashboard: React.FC = () => {
 
     // Initialize BroadcastChannel for assignment notifications
     try {
-      assignmentChannel = new BroadcastChannel('lumino-assignments');
+      assignmentChannel = new BroadcastChannel('luminatelearn-assignments');
       console.log('[StudentDashboard] 📡 BroadcastChannel initialized');
 
       const handleAssignmentMessage = (event: MessageEvent) => {
@@ -478,62 +478,43 @@ const StudentDashboard: React.FC = () => {
           // Email link access - authenticate the user properly
           const studentEmailParam = queryParams.get('studentEmail');
           if (studentEmailParam) {
-            console.log('🔐🔐🔐 [NEW CODE] Email link access detected - authenticating user:', studentEmailParam);
+            console.log('🔐 Email link access detected - using simplified approach for:', studentEmailParam);
             
+            // Use simplified approach - fetch student data directly
+            await fetchStudentSpecificData(studentEmailParam);
+            
+            // Fetch actual student name from users collection
+            let studentDisplayName = studentEmailParam.split('@')[0]; // Fallback
             try {
-              // Authenticate the email link user using their existing Firebase Auth account
-              const authenticatedUser = await authenticateEmailLinkUser(studentEmailParam);
-              console.log('[StudentDashboard] ✅ Email link authentication successful, now fetching data as authenticated user');
+              console.log('[StudentDashboard] Fetching student name from users collection for email:', studentEmailParam);
+              const usersQuery = query(
+                collection(db, 'users'),
+                where('email', '==', studentEmailParam.toLowerCase()),
+                limit(1)
+              );
+              const usersSnapshot = await getDocs(usersQuery);
               
-              // The user is now authenticated and currentUser will be updated by AuthContext
-              // Wait a moment for the auth context to update
-              setTimeout(() => {
-                // Trigger data refetch as authenticated user
-                window.location.reload();
-              }, 1000);
-              
-              return;
-              
-            } catch (error) {
-              console.error('[StudentDashboard] ❌ Email link authentication failed:', error);
-              
-              // Fallback to bypass mode if authentication fails
-              console.log('[StudentDashboard] Falling back to bypass mode for:', studentEmailParam);
-              await fetchStudentSpecificData(studentEmailParam);
-              
-              // Fetch actual student name from users collection
-              let studentDisplayName = studentEmailParam.split('@')[0]; // Fallback
-              try {
-                console.log('[StudentDashboard] Fetching student name from users collection for email:', studentEmailParam);
-                const usersQuery = query(
-                  collection(db, 'users'),
-                  where('email', '==', studentEmailParam.toLowerCase()),
-                  limit(1)
-                );
-                const usersSnapshot = await getDocs(usersQuery);
-                
-                if (!usersSnapshot.empty) {
-                  const userData = usersSnapshot.docs[0].data();
-                  if (userData.name) {
-                    studentDisplayName = userData.name;
-                    console.log('[StudentDashboard] Found student name in users collection:', userData.name);
-                  } else {
-                    console.log('[StudentDashboard] No name field in user document, using email prefix');
-                  }
+              if (!usersSnapshot.empty) {
+                const userData = usersSnapshot.docs[0].data();
+                if (userData.name) {
+                  studentDisplayName = userData.name;
+                  console.log('[StudentDashboard] Found student name in users collection:', userData.name);
                 } else {
-                  console.log('[StudentDashboard] No user found in users collection, using email prefix');
+                  console.log('[StudentDashboard] No name field in user document, using email prefix');
                 }
-              } catch (nameError) {
-                console.error('[StudentDashboard] Error fetching student name from users collection:', nameError);
+              } else {
+                console.log('[StudentDashboard] No user found in users collection, using email prefix');
               }
-              
-              // Set minimal user data for display with proper name
-              setCurrentUserData({
-                id: 'email_link_user',
-                email: studentEmailParam,
-                name: studentDisplayName
-              });
+            } catch (nameError) {
+              console.error('[StudentDashboard] Error fetching student name from users collection:', nameError);
             }
+            
+            // Set minimal user data for display with proper name
+            setCurrentUserData({
+              id: 'email_link_user',
+              email: studentEmailParam,
+              name: studentDisplayName
+            });
           } else {
             console.log('[StudentDashboard] Email link access but no studentEmail parameter');
             navigate('/login');
@@ -2252,7 +2233,7 @@ const StudentDashboard: React.FC = () => {
             }}>
               <div style={{ fontSize: '48px', marginBottom: '10px' }}>📱</div>
               <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>
-                Install Lumino Learning App
+                Install LuminateLearn App
               </h2>
             </div>
             
@@ -2270,7 +2251,7 @@ const StudentDashboard: React.FC = () => {
                 color: colors.textLight,
                 lineHeight: 1.6
               }}>
-                Install Lumino Learning as an app for faster access, 
+                Install LuminateLearn as an app for faster access, 
                 offline capabilities, and a native app experience!
               </p>
             </div>

@@ -54,6 +54,7 @@ export interface SlotContainerProps {
   slotIndex: number;
   totalSlots: number;
   hasComma?: boolean;
+  config: PlaceValueShowdownConfig;
 }
 
 export interface PlayerAreaProps {

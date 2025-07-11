@@ -66,7 +66,7 @@ const PlaceValueShowdown: React.FC<PlaceValueShowdownProps> = ({
         zIndex: 1000
       }}>
         <PWAGameHeader 
-          gameTitle="Place Value Showdown"
+          gameTitle={dynamicConfig.title}
           variant="compact"
         />
       </div>

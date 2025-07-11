@@ -4,16 +4,29 @@ import { Card } from './types';
 /**
  * Get the place value label for a given position
  */
-export const getPlaceValueLabel = (position: number, totalSlots: number): string => {
-  const placeValues = ['ones', 'tens', 'hundreds', 'thousands', 'ten thousands'];
-  const index = totalSlots - 1 - position;
-  return placeValues[index] || `10^${index}`;
+export const getPlaceValueLabel = (position: number, totalSlots: number, config: PlaceValueShowdownConfig): string => {
+  const wholeNumberSlots = config.numberOfCards;
+  const hasDecimal = config.includeDecimal;
+  const decimalPlaces = hasDecimal ? config.decimalPlaces : 0;
+  
+  // Determine if this position is in whole number section or decimal section
+  if (position < wholeNumberSlots) {
+    // Whole number places (from left to right: ten thousands, thousands, hundreds, tens, ones)
+    const wholeNumberPosition = wholeNumberSlots - 1 - position;
+    const placeValues = ['ones', 'tens', 'hundreds', 'thousands', 'ten thousands'];
+    return placeValues[wholeNumberPosition] || `10^${wholeNumberPosition}`;
+  } else {
+    // Decimal places (from left to right: tenths, hundredths, thousandths)
+    const decimalPosition = position - wholeNumberSlots;
+    const decimalPlaceValues = ['tenths', 'hundredths', 'thousandths'];
+    return decimalPlaceValues[decimalPosition] || `10^${-(decimalPosition + 1)}`;
+  }
 };
 
 /**
- * Get expanded notation for a set of cards (e.g., "50,000 + 5,000 + 800")
+ * Get expanded notation for a set of cards (e.g., "50,000 + 5,000 + 800" or "123.45 = 100 + 20 + 3 + 0.4 + 0.05")
  */
-export const getExpandedNotation = (cards: Card[]): string => {
+export const getExpandedNotation = (cards: Card[], config: PlaceValueShowdownConfig): string => {
   const slottedCards = cards
     .filter(card => card.position === 'slot')
     .sort((a, b) => (a.slotIndex || 0) - (b.slotIndex || 0));
@@ -21,11 +34,30 @@ export const getExpandedNotation = (cards: Card[]): string => {
   if (slottedCards.length === 0) return '';
   
   const parts: string[] = [];
+  const wholeNumberSlots = config.numberOfCards;
+  const hasDecimal = config.includeDecimal;
+  
   slottedCards.forEach((card, index) => {
-    const placeValue = Math.pow(10, slottedCards.length - 1 - index);
-    const value = card.digit * placeValue;
+    let value: number;
+    
+    if (index < wholeNumberSlots) {
+      // Whole number places
+      const placeValue = Math.pow(10, wholeNumberSlots - 1 - index);
+      value = card.digit * placeValue;
+    } else {
+      // Decimal places
+      const decimalPosition = index - wholeNumberSlots + 1;
+      const placeValue = Math.pow(10, -decimalPosition);
+      value = card.digit * placeValue;
+    }
+    
     if (value > 0) {
-      parts.push(value.toLocaleString());
+      if (value >= 1) {
+        parts.push(value.toLocaleString());
+      } else {
+        // For decimal values, show without scientific notation
+        parts.push(value.toString());
+      }
     }
   });
   
@@ -35,27 +67,81 @@ export const getExpandedNotation = (cards: Card[]): string => {
 /**
  * Get expanded notation in words for a set of cards
  */
-export const getExpandedNotationWords = (cards: Card[]): string => {
+export const getExpandedNotationWords = (cards: Card[], config: PlaceValueShowdownConfig): string => {
   const slottedCards = cards
     .filter(card => card.position === 'slot')
     .sort((a, b) => (a.slotIndex || 0) - (b.slotIndex || 0));
   
   if (slottedCards.length === 0) return '';
   
-  const number = parseInt(slottedCards.map(card => card.digit).join(''));
-  return convertNumberToWords(number);
+  const number = calculateNumber(cards, config);
+  return convertNumberToWords(number, config);
 };
 
 /**
- * Convert a number to words following standard check-writing format
+ * Convert a number to words following standard check-writing format, including decimals
  */
-export const convertNumberToWords = (num: number): string => {
+export const convertNumberToWords = (num: number, config: PlaceValueShowdownConfig): string => {
   if (num === 0) return 'zero';
   
   const ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
   const teens = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
   const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
   
+  // Handle decimal numbers
+  if (config.includeDecimal && num % 1 !== 0) {
+    const wholeNumber = Math.floor(num);
+    const decimalPart = num - wholeNumber;
+    
+    let result = '';
+    
+    // Convert whole number part
+    if (wholeNumber > 0) {
+      result += convertWholeNumberToWords(wholeNumber, ones, teens, tens);
+    } else {
+      result += 'zero';
+    }
+    
+    // Add decimal part
+    result += ' and ';
+    
+    // Convert decimal part based on number of decimal places
+    const decimalString = decimalPart.toFixed(config.decimalPlaces).slice(2); // Remove "0."
+    const decimalNumber = parseInt(decimalString);
+    
+    if (decimalNumber > 0) {
+      result += convertWholeNumberToWords(decimalNumber, ones, teens, tens);
+      
+      // Add appropriate decimal place name
+      if (config.decimalPlaces === 1) {
+        result += decimalNumber === 1 ? ' tenth' : ' tenths';
+      } else if (config.decimalPlaces === 2) {
+        result += decimalNumber === 1 ? ' hundredth' : ' hundredths';
+      } else if (config.decimalPlaces === 3) {
+        result += decimalNumber === 1 ? ' thousandth' : ' thousandths';
+      }
+    } else {
+      result += 'zero';
+      if (config.decimalPlaces === 1) {
+        result += ' tenths';
+      } else if (config.decimalPlaces === 2) {
+        result += ' hundredths';
+      } else if (config.decimalPlaces === 3) {
+        result += ' thousandths';
+      }
+    }
+    
+    return result;
+  }
+  
+  // Handle whole numbers (existing logic)
+  return convertWholeNumberToWords(Math.floor(num), ones, teens, tens);
+};
+
+/**
+ * Convert whole number to words (extracted from original function)
+ */
+const convertWholeNumberToWords = (num: number, ones: string[], teens: string[], tens: string[]): string => {
   const parts: string[] = [];
   let remaining = num;
   
@@ -122,9 +208,11 @@ export const convertNumberToWords = (num: number): string => {
 /**
  * Generate random cards for a new round
  */
-export const generateCards = (count: number): Card[] => {
+export const generateCards = (config: PlaceValueShowdownConfig): Card[] => {
+  const totalCards = config.numberOfCards + (config.includeDecimal ? config.decimalPlaces : 0);
   const cards: Card[] = [];
-  for (let i = 0; i < count; i++) {
+  
+  for (let i = 0; i < totalCards; i++) {
     cards.push({
       id: `card-${Math.random().toString(36).substring(7)}`,
       digit: Math.floor(Math.random() * 10),
@@ -145,7 +233,9 @@ export const makeTeacherMove = (cards: Card[], config: PlaceValueShowdownConfig)
   console.log(`🤖 TEACHER MOVE:`, {
     objective,
     aiDifficulty,
-    originalCards: cards.map(c => c.digit)
+    originalCards: cards.map(c => c.digit),
+    includeDecimal: config.includeDecimal,
+    decimalPlaces: config.decimalPlaces
   });
   
   if (aiDifficulty === 'easy') {
@@ -177,16 +267,40 @@ export const makeTeacherMove = (cards: Card[], config: PlaceValueShowdownConfig)
 };
 
 /**
- * Calculate the numeric value of cards in slots
+ * Calculate the numeric value of cards in slots, including decimal support
  */
-export const calculateNumber = (cards: Card[]): number => {
+export const calculateNumber = (cards: Card[], config: PlaceValueShowdownConfig): number => {
   const slottedCards = cards
     .filter(card => card.position === 'slot')
     .sort((a, b) => (a.slotIndex || 0) - (b.slotIndex || 0));
   
   if (slottedCards.length === 0) return 0;
   
-  return parseInt(slottedCards.map(card => card.digit).join(''));
+  const wholeNumberSlots = config.numberOfCards;
+  const hasDecimal = config.includeDecimal;
+  
+  if (!hasDecimal) {
+    // Original logic for whole numbers
+    return parseInt(slottedCards.map(card => card.digit).join(''));
+  }
+  
+  // Calculate with decimal support
+  let result = 0;
+  
+  slottedCards.forEach((card, index) => {
+    if (index < wholeNumberSlots) {
+      // Whole number places
+      const placeValue = Math.pow(10, wholeNumberSlots - 1 - index);
+      result += card.digit * placeValue;
+    } else {
+      // Decimal places
+      const decimalPosition = index - wholeNumberSlots + 1;
+      const placeValue = Math.pow(10, -decimalPosition);
+      result += card.digit * placeValue;
+    }
+  });
+  
+  return result;
 };
 
 /**
@@ -216,7 +330,8 @@ export const determineRoundWinner = (
 /**
  * Check if all cards are placed in slots
  */
-export const areAllCardsPlaced = (cards: Card[], totalSlots: number): boolean => {
+export const areAllCardsPlaced = (cards: Card[], config: PlaceValueShowdownConfig): boolean => {
+  const totalSlots = config.numberOfCards + (config.includeDecimal ? config.decimalPlaces : 0);
   const slottedCards = cards.filter(card => card.position === 'slot');
   return slottedCards.length === totalSlots;
 };

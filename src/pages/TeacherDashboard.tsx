@@ -1011,7 +1011,7 @@ const TeacherDashboard = () => {
       console.log('Creating student record for:', studentData.email);
       
       const newStudentData = {
-        name: studentData.name,  // Make sure this is 'name', not 'studentName'
+        name: studentData.name,
         email: studentData.email,
         grade: studentData.grade,
         age: studentData.age,
@@ -1020,7 +1020,19 @@ const TeacherDashboard = () => {
         teacherId: currentUser.uid,
         teacherEmail: currentUser.email,
         createdAt: serverTimestamp(),
-        passwordSetupSent: false // Will be updated by the trigger
+        updatedAt: serverTimestamp(),
+        // Authentication and account linking fields
+        displayName: studentData.name,
+        hasTemporaryPassword: true, // Enables automatic Google Sign-In linking
+        linkedToAuth: false, // Will be set to true after Firebase Auth user is created
+        authUid: '', // Will be set by Firebase Function with the Auth UID
+        emailVerified: false,
+        passwordSetupSent: false, // Will be updated by the trigger
+        passwordSetupComplete: false,
+        lastLogin: null,
+        // Additional metadata
+        createdBy: 'teacher',
+        source: 'teacher_dashboard'
       };
       
       // Add to users collection

@@ -27,6 +27,7 @@ const AdminPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+
   const toast = useToast();
   
   // Check if user is an admin
@@ -93,7 +94,11 @@ const AdminPage: React.FC = () => {
       setIsLoading(false);
     }
   }
-  
+
+
+
+
+
   if (loading) {
     return (
       <Center minHeight="80vh">
@@ -152,15 +157,18 @@ const AdminPage: React.FC = () => {
                 <Heading size="md" mb={4}>Maintenance Tasks</Heading>
                 <Text mb={4}>Perform system maintenance and optimization tasks.</Text>
                 
-                <Button
-                  colorScheme="blue"
-                  onClick={handleRegenerateAllThumbnails}
-                  isLoading={isLoading}
-                  loadingText="Regenerating..."
-                  mb={4}
-                >
-                  Regenerate All Thumbnails
-                </Button>
+                <VStack align="start" spacing={4}>
+                  <Button
+                    colorScheme="blue"
+                    onClick={handleRegenerateAllThumbnails}
+                    isLoading={isLoading}
+                    loadingText="Regenerating..."
+                  >
+                    Regenerate All Thumbnails
+                  </Button>
+                  
+
+                </VStack>
               </Box>
             </TabPanel>
           </TabPanels>

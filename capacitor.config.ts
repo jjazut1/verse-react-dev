@@ -1,8 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.lumino.learning',
-  appName: 'Lumino Learning',
+  appId: 'com.luminatelearn.app',
+  appName: 'LuminateLearn',
   webDir: 'dist',
   server: {
     androidScheme: 'https'

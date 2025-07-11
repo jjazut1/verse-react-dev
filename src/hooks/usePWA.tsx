@@ -494,7 +494,7 @@ export const usePWA = () => {
             
             modalContent.innerHTML = `
               <div style="color: #333; line-height: 1.6;">
-                <h3 style="margin: 0 0 20px 0; color: #007bff; font-size: 24px;">🚀 Open Your Lumino App</h3>
+                <h3 style="margin: 0 0 20px 0; color: #007bff; font-size: 24px;">🚀 Open Your LuminateLearn App</h3>
                 <p style="font-size: 18px; margin-bottom: 24px;">Your app is installed! Here's how to open it:</p>
                 
                 <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: left;">
@@ -502,32 +502,32 @@ export const usePWA = () => {
                     <div style="margin-bottom: 16px;">
                       <strong style="color: #007bff;">Option 1: Spotlight Search</strong><br>
                       • Press <kbd style="background: #e9ecef; padding: 2px 6px; border-radius: 4px; font-size: 14px;">⌘ + Space</kbd><br>
-                      • Type "Lumino"<br>
+                      • Type "LuminateLearn"<br>
                       • Press <kbd style="background: #e9ecef; padding: 2px 6px; border-radius: 4px; font-size: 14px;">Enter</kbd>
                     </div>
                     <div>
                       <strong style="color: #007bff;">Option 2: Dock/Applications</strong><br>
-                      • Look for the Lumino icon in your Dock<br>
+                      • Look for the LuminateLearn icon in your Dock<br>
                       • Or find it in Applications folder
                     </div>
                   ` : isWindows ? `
                     <div style="margin-bottom: 16px;">
                       <strong style="color: #007bff;">Option 1: Start Menu</strong><br>
                       • Press <kbd style="background: #e9ecef; padding: 2px 6px; border-radius: 4px; font-size: 14px;">Windows</kbd> key<br>
-                      • Type "Lumino"<br>
+                      • Type "LuminateLearn"<br>
                       • Press <kbd style="background: #e9ecef; padding: 2px 6px; border-radius: 4px; font-size: 14px;">Enter</kbd>
                     </div>
                     <div>
                       <strong style="color: #007bff;">Option 2: Desktop/Taskbar</strong><br>
-                      • Look for the Lumino icon on your desktop<br>
+                      • Look for the LuminateLearn icon on your desktop<br>
                       • Or check your taskbar
                     </div>
                   ` : `
                     <div>
                       <strong style="color: #007bff;">How to open:</strong><br>
-                      • Look for the Lumino app icon<br>
+                      • Look for the LuminateLearn app icon<br>
                       • Check your app drawer or home screen<br>
-                      • Search for "Lumino" in your device
+                      • Search for "LuminateLearn" in your device
                     </div>
                   `}
                 </div>
@@ -598,7 +598,7 @@ export const usePWA = () => {
             messageDiv.style.cssText = 'display: flex; align-items: center; gap: 8px;';
             messageDiv.innerHTML = `
               <span style="font-size: 24px;">📱</span>
-              <span>Your Lumino app is installed!</span>
+              <span>Your LuminateLearn app is installed!</span>
             `;
             
             const buttonsContainer = document.createElement('div');
@@ -666,7 +666,7 @@ export const usePWA = () => {
               linkModalContent.innerHTML = `
                 <div style="color: #333; line-height: 1.6;">
                   <h3 style="margin: 0 0 20px 0; color: #007bff; font-size: 24px;">🔗 Auto-Open Assignment Links</h3>
-                  <p style="font-size: 18px; margin-bottom: 24px;">Make assignment links open directly in your Lumino app!</p>
+                  <p style="font-size: 18px; margin-bottom: 24px;">Make assignment links open directly in your LuminateLearn app!</p>
                   
                   <div style="background: #f8f9fa; border-radius: 8px; padding: 24px; margin: 20px 0; text-align: left;">
                     <div style="margin-bottom: 20px;">
@@ -674,14 +674,14 @@ export const usePWA = () => {
                       <div style="margin: 8px 0; padding-left: 20px;">
                         • Click the <strong>address bar</strong> where it shows the URL<br>
                         • Look for a <strong>site settings icon</strong> (🔒 or ⚙️)<br>
-                        • Or go to Chrome Menu → Settings → Site Settings → [Find Lumino]
+                        • Or go to Chrome Menu → Settings → Site Settings → [Find LuminateLearn]
                       </div>
                     </div>
                     
                     <div style="margin-bottom: 20px;">
                       <strong style="color: #007bff; font-size: 16px;">📲 Step 2: Find Your App</strong><br>
                       <div style="margin: 8px 0; padding-left: 20px;">
-                        • Look for <strong>"Lumino Learning - Student"</strong><br>
+                        • Look for <strong>"LuminateLearn - Student"</strong><br>
                         • Click on it to open app settings
                       </div>
                     </div>
@@ -690,14 +690,14 @@ export const usePWA = () => {
                       <strong style="color: #007bff; font-size: 16px;">🔗 Step 3: Enable Link Handling</strong><br>
                       <div style="margin: 8px 0; padding-left: 20px;">
                         • Find <strong>"Opening supported links"</strong><br>
-                        • Select <strong>"Open in Lumino Learning - Student"</strong><br>
+                        • Select <strong>"Open in LuminateLearn - Student"</strong><br>
                         • <em>(Not "Open in Chrome browser")</em>
                       </div>
                     </div>
                     
                     <div style="background: #e3f2fd; padding: 16px; border-radius: 8px; border-left: 4px solid #007bff;">
                       <strong style="color: #0277bd;">✨ Result:</strong><br>
-                      Assignment links from emails will now open directly in your Lumino app instead of the browser!
+                      Assignment links from emails will now open directly in your LuminateLearn app instead of the browser!
                     </div>
                   </div>
                   
@@ -787,7 +787,7 @@ export const usePWA = () => {
             messageDiv.style.cssText = 'display: flex; align-items: center; gap: 8px;';
             messageDiv.innerHTML = `
               <span style="font-size: 24px;">📲</span>
-              <span>Get the Lumino app for the best experience!</span>
+                              <span>Get the LuminateLearn app for the best experience!</span>
             `;
             
             const installButton = document.createElement('button');
@@ -847,19 +847,19 @@ export const usePWA = () => {
                 
                 modalContent.innerHTML = `
                   <div style="color: #333; line-height: 1.6;">
-                    <h3 style="margin: 0 0 20px 0; color: #28a745; font-size: 24px;">📲 Install Lumino App</h3>
+                    <h3 style="margin: 0 0 20px 0; color: #28a745; font-size: 24px;">📲 Install LuminateLearn App</h3>
                     ${isChrome ? `
                       <p style="font-size: 18px; margin-bottom: 24px;">Use Chrome's install option:</p>
                       <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: left;">
                         <div style="margin-bottom: 16px;">
                           <strong style="color: #28a745;">Option 1: Address Bar</strong><br>
                           • Look for the <strong>install icon</strong> (⊞ or 🔗) in your address bar<br>
-                          • Click it to install the Lumino app
+                          • Click it to install the LuminateLearn app
                         </div>
                         <div style="margin-bottom: 16px;">
                           <strong style="color: #28a745;">Option 2: Chrome Menu</strong><br>
                           • Click the <strong>three dots</strong> (⋮) in the top right<br>
-                          • Look for <strong>"Install Lumino Learning"</strong><br>
+                                                      • Look for <strong>"Install LuminateLearn"</strong><br>
                           • Click to install
                         </div>
                         ${isMac ? `

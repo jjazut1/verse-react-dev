@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getAuth, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { isEmailSignInLink, completeSignInWithEmailLink, getAssignmentToken } from '../services/authService';
+import { safeGoogleSignIn, checkRedirectResult } from '../services/authService';
 
 // Add reCAPTCHA types
 declare global {
@@ -118,12 +118,98 @@ const Login = () => {
   const [recaptchaVerified, setRecaptchaVerified] = useState(false);
   const [recaptchaLoaded, setRecaptchaLoaded] = useState(false);
   const [emailLinkSuccess, setEmailLinkSuccess] = useState(false);
+  const [hasTemporaryPassword, setHasTemporaryPassword] = useState(false);
   const recaptchaRef = useRef<number | null>(null);
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-  const { login, signup, loginWithGoogle, isTeacher, isStudent } = useAuth();
+  const { login, signup, loginWithGoogle, isTeacher, isStudent, currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const assignmentId = searchParams.get('assignmentId');
+  const urlEmail = searchParams.get('email');
+  const isTemporaryPasswordUser = searchParams.get('temp') === 'true';
+
+  // Check if email has temporary password (to hide Google Sign-In)
+  const checkTemporaryPassword = async (email: string) => {
+    if (!email || !email.includes('@')) {
+      setHasTemporaryPassword(false);
+      return;
+    }
+    
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email.toLowerCase()));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data();
+        const hasTemp = userData.hasTemporaryPassword === true;
+        setHasTemporaryPassword(hasTemp);
+      } else {
+        setHasTemporaryPassword(false);
+      }
+    } catch (error) {
+      console.error('Error checking temporary password:', error);
+      setHasTemporaryPassword(false);
+    }
+  };
+
+  // Check temporary password when email changes
+  useEffect(() => {
+    if (email && mode === 'login') {
+      const timeoutId = setTimeout(() => {
+        checkTemporaryPassword(email);
+      }, 500); // Debounce for better performance
+      
+      return () => clearTimeout(timeoutId);
+    } else {
+      setHasTemporaryPassword(false);
+    }
+  }, [email, mode]);
+
+
+
+  // Auto-populate email from URL parameters and check for temporary password
+  useEffect(() => {
+    if (urlEmail && mode === 'login') {
+      setEmail(urlEmail);
+      
+      // If this is marked as a temporary password user, check immediately
+      if (isTemporaryPasswordUser) {
+        checkTemporaryPassword(urlEmail);
+      }
+    }
+  }, [urlEmail, isTemporaryPasswordUser, mode]);
+
+  // Check for Google Sign-In redirect result when page loads
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await checkRedirectResult();
+        
+        if (result) {
+          console.log('✅ Google Sign-In redirect success:', result.user.email);
+          
+          // Check for account mismatch if we have an expected email
+          if (email && email.trim() && result.user.email !== email.toLowerCase().trim()) {
+            setError(`Account mismatch: You signed in with ${result.user.email}, but this login is for ${email}. Please try again and select the correct account.`);
+            return;
+          }
+          
+          // Set pending redirect flag for role-based navigation
+          setPendingRedirect(true);
+        }
+      } catch (error: any) {
+        console.error('❌ Google Sign-In redirect failed:', error);
+        if (error.message) {
+          setError(error.message);
+        } else {
+          setError('Google Sign-In failed. Please try again.');
+        }
+      }
+    };
+    
+    handleRedirectResult();
+  }, [email]);
 
   // Helper function to determine redirect path based on user role
   const getRedirectPath = () => {
@@ -141,11 +227,13 @@ const Login = () => {
 
   // Effect to handle redirect once role is determined
   useEffect(() => {
-    if (pendingRedirect && (isTeacher || isStudent)) {
-      setPendingRedirect(false);
-      navigate(getRedirectPath());
+    if (pendingRedirect) {
+      if (isTeacher || isStudent) {
+        setPendingRedirect(false);
+        navigate(getRedirectPath());
+      }
     }
-  }, [pendingRedirect, isTeacher, isStudent, navigate]);
+  }, [pendingRedirect, isTeacher, isStudent, navigate, currentUser]);
 
   // Handle email link authentication
   useEffect(() => {
@@ -208,7 +296,7 @@ const Login = () => {
       // Original email link authentication flow
       const isEmailLink = hasOobCode && hasSignInMode;
       
-      if (isEmailLink || isEmailSignInLink()) {
+      if (isEmailLink || isSignInWithEmailLink(getAuth(), window.location.href)) {
         setIsLoading(true);
         console.log('Email link authentication detected');
         
@@ -244,7 +332,7 @@ const Login = () => {
         try {
           // Complete the sign-in process
           console.log('Attempting to complete email link sign-in with email:', emailForSignIn);
-          await completeSignInWithEmailLink(emailForSignIn);
+          await signInWithEmailLink(getAuth(), emailForSignIn, window.location.href);
           
           // Calculate time to complete authentication
           const timeToComplete = Date.now() - startTime;
@@ -257,8 +345,11 @@ const Login = () => {
           if (assignmentId) {
             console.log('Assignment ID found in URL:', assignmentId);
             try {
-              // Get the assignment token using the callable function
-              const assignmentToken = await getAssignmentToken(assignmentId);
+              // Get the assignment token directly from Firestore
+              const tokenAssignmentRef = doc(db, 'assignments', assignmentId);
+              const tokenAssignmentDoc = await getDoc(tokenAssignmentRef);
+              const tokenAssignmentData = tokenAssignmentDoc.data();
+              const assignmentToken = tokenAssignmentData?.linkToken;
               console.log('Retrieved assignment token successfully:', assignmentToken);
               
               // Get assignment details to check if it's a beta test
@@ -402,6 +493,10 @@ const Login = () => {
 
       if (mode === 'login') {
         await login(email, password);
+        
+        // Check if user has temporary password after successful login
+        // We'll check this after the login is complete by using the AuthContext
+        // which will be updated after successful login
       } else {
         // Get the reCAPTCHA token if we're in signup mode
         const recaptchaToken = recaptchaRef.current && window.grecaptcha 
@@ -457,19 +552,38 @@ const Login = () => {
     try {
       setIsLoading(true);
       setError('');
-      await loginWithGoogle();
-      // Set pending redirect flag - the useEffect will handle the actual redirect
-      // once the user's role is determined
-      setPendingRedirect(true);
+      
+      // Call the clean Google Sign-In with login hint if email is provided
+      const result = await safeGoogleSignIn(email || undefined);
+      
+      if (result && result.user) {
+        // Set pending redirect flag - the useEffect will handle the actual redirect
+        // once the user's role is determined
+        setPendingRedirect(true);
+      } else if (result === null) {
+        // Redirect method was used - the page will redirect to Google
+        // Don't set loading to false - keep the loading state since we're redirecting
+        return;
+      }
     } catch (err: any) {
-      setError('Failed to sign in with Google');
+      console.error('Google Sign-In failed:', err);
+      
+      // Handle specific error cases with user-friendly messages
+      if (err.code === 'auth/account-mismatch') {
+        setError(err.message);
+      } else if (err.message === 'Sign-in was cancelled. Please try again.') {
+        setError(err.message);
+      } else if (err.message === 'Popup was blocked by your browser. Please allow popups for this site and try again.') {
+        setError(err.message);
+      } else {
+        setError('Failed to sign in with Google. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const toggleMode = () => {
-    console.log(`Toggling mode from ${mode} to ${mode === 'login' ? 'signup' : 'login'}`);
     setMode(mode === 'login' ? 'signup' : 'login');
     setError('');
     setRecaptchaVerified(false);
@@ -590,35 +704,60 @@ const Login = () => {
           )}
         </form>
         
-        <div style={{ margin: '1rem 0', textAlign: 'center', position: 'relative' }}>
-          <hr style={{ border: '1px solid var(--color-gray-200)' }} />
-          <span style={{ 
-            position: 'absolute', 
-            top: '50%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)', 
-            backgroundColor: 'white',
-            padding: '0 0.5rem',
-            color: 'var(--color-gray-500)',
-            fontSize: '0.875rem'
-          }}>
-            OR
-          </span>
-        </div>
+        {/* Show Google Sign-In section only if user doesn't have temporary password OR temp=true URL parameter */}
+        {!hasTemporaryPassword && !isTemporaryPasswordUser && (
+          <>
+            <div style={{ margin: '1rem 0', textAlign: 'center', position: 'relative' }}>
+              <hr style={{ border: '1px solid var(--color-gray-200)' }} />
+              <span style={{ 
+                position: 'absolute', 
+                top: '50%', 
+                left: '50%', 
+                transform: 'translate(-50%, -50%)', 
+                backgroundColor: 'white',
+                padding: '0 0.5rem',
+                color: 'var(--color-gray-500)',
+                fontSize: '0.875rem'
+              }}>
+                OR
+              </span>
+            </div>
+            
+            <button 
+              onClick={handleGoogleSignIn} 
+              style={googleButtonStyle}
+              disabled={isLoading}
+            >
+              <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+                <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+              </svg>
+              <span>Continue with Google</span>
+            </button>
+          </>
+        )}
         
-        <button 
-          onClick={handleGoogleSignIn} 
-          style={googleButtonStyle}
-          disabled={isLoading}
-        >
-          <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-            <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
-            <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
-            <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
-            <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
-          </svg>
-          <span>Continue with Google</span>
-        </button>
+        {/* Show temporary password notice */}
+        {(hasTemporaryPassword || isTemporaryPasswordUser) && mode === 'login' && (
+          <div style={{ 
+            background: '#fff3cd', 
+            border: '1px solid #ffeaa7', 
+            borderRadius: '5px', 
+            padding: '15px', 
+            margin: '20px 0',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '14px', color: '#856404', marginBottom: '10px' }}>
+              <strong>⚠️ First Time Login</strong>
+            </div>
+            <div style={{ fontSize: '12px', color: '#856404' }}>
+              Please use your email and temporary password from the email your teacher sent you. 
+              You'll be asked to create a new password after signing in.
+            </div>
+          </div>
+        )}
         
         <div style={switchModeStyle}>
           {mode === 'login' ? (

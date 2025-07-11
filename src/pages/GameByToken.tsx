@@ -191,47 +191,29 @@ const GameByToken: React.FC<Props> = () => {
     
     // Check for existing PWA window if this is from email (separate from the above conditions)
     const fromEmail = searchParams.get('from') === 'email';
-    console.log('GameByToken: Email check debug:', {
-      fromEmail,
-      token,
-      fromParam: searchParams.get('from'),
-      allParams: Object.fromEntries(searchParams.entries())
-    });
+
     
     // Service Worker-based window management - listen for close messages
-    console.log(`GameByToken: 🎯 Service Worker window management enabled`);
-    console.log('GameByToken: Source details:', { fromEmail, token, pwaType, fromParam: searchParams.get('from') });
-    
     // Mark this as an email/JavaScript launched window (can be auto-closed)
     window.name = 'assignment-window';
     localStorage.setItem('pwa_origin', fromEmail ? 'email_link' : 'javascript');
-    console.log('GameByToken: Marked window as email/JS launched (auto-closeable)');
     
     // NOTE: PWA window management now handled by useSinglePWAWindow hook
     // This provides more sophisticated focus-first behavior with security fallbacks
-    console.log('GameByToken: 📢 PWA window management delegated to useSinglePWAWindow hook');
     
     // Listen for service worker messages
     const handleServiceWorkerMessage = (event: MessageEvent) => {
-      console.log('GameByToken: 🎵 Received service worker message:', event.data);
-      
       if (event.data?.type === 'FORCE_CLOSE_LAUNCHER') {
-        console.log('GameByToken: 🔄 Service worker requesting window close');
-        
         const wasUserLaunched = localStorage.getItem('pwa_origin') === 'device_icon';
-        console.log('GameByToken: Was user launched (device icon):', wasUserLaunched);
         
         if (wasUserLaunched) {
-          console.log('GameByToken: 🚨 Cannot auto-close device icon window, showing user message');
           alert('Please close this tab manually. A newer game window has been launched.');
         } else {
-          console.log('GameByToken: 🔄 Auto-closing email/JS-opened window');
           window.close();
         }
       }
       
       if (event.data?.type === 'NAVIGATE_TO_ASSIGNMENT') {
-        console.log('GameByToken: 🔄 Service worker requesting navigation');
         // Handle navigation if needed
       }
     };
@@ -250,7 +232,6 @@ const GameByToken: React.FC<Props> = () => {
     const modeParam = urlParams.get('mode');
     
     if (oobCode || (emailParam && token) || (modeParam === 'signIn')) {
-      console.log('GameByToken: Email link parameters detected in URL, skipping authentication requirement');
       setIsEmailLinkAccess(true);
       
       // Store email for potential use later
@@ -261,7 +242,6 @@ const GameByToken: React.FC<Props> = () => {
 
     // Handle force browser mode
     if (forceBrowser) {
-      console.log('GameByToken: 🖥️ Force browser mode detected - disabling PWA features');
       // Store browser preference
       sessionStorage.setItem('force_browser_mode', 'true');
     }
@@ -275,9 +255,9 @@ const GameByToken: React.FC<Props> = () => {
       // New approach: Service worker only manages launchers, not game windows
       // Game windows manage themselves through BroadcastChannel
       
-      // Log service worker messages for debugging
+      // Handle service worker messages
       if (event.data && event.data.type) {
-        console.log('GameByToken: Received service worker message:', event.data.type, event.data);
+        // Process service worker messages
       }
     };
 
@@ -293,12 +273,10 @@ const GameByToken: React.FC<Props> = () => {
   useEffect(() => {
     // Validate token parameter
     if (!token) {
-      console.error("GameByToken: Missing token parameter");
       setError("Invalid game link. Please check the URL and try again.");
       setLoading(false);
       return;
     }
-    console.log("GameByToken: Processing token", token);
     
     // Check if the URL is a sign-in link
     if (isSignInWithEmailLink(auth, window.location.href)) {
@@ -320,7 +298,6 @@ const GameByToken: React.FC<Props> = () => {
             // Continue loading the game
             setIsAuthenticated(true);
             setCurrentUser(result.user);
-            console.log('Successfully authenticated via email link:', { email: result.user?.email });
             loadGameAndAssignment(token);
             setIsAuthenticating(false);
           })
@@ -343,19 +320,16 @@ const GameByToken: React.FC<Props> = () => {
     if (!loading && gameConfig && assignment && !isAuthenticated && !currentUser) {
       // If this is a direct email link access, don't require authentication
       if (isEmailLinkAccess) {
-        console.log('Skipping authentication requirement for email link access');
         return;
       }
       
       // Show the authentication form right away
       if (assignment.studentEmail) {
         setAuthEmail(assignment.studentEmail);
-        console.log('Pre-filling auth email for immediate authentication:', assignment.studentEmail);
       }
       
       // Only show the form if we're not already in the process of authenticating
       if (!isAuthenticating && !showAuthForm) {
-        console.log('Showing authentication form immediately');
         setShowAuthForm(true);
       }
     }
@@ -373,7 +347,6 @@ const GameByToken: React.FC<Props> = () => {
     const directAccess = searchParams.get('directAccess') === 'true' || 
                           sessionStorage.getItem('direct_token_access') === 'true';
     if (directAccess) {
-      console.log('GameByToken: Loading assignment with direct access mode');
       setIsEmailLinkAccess(true);
     }
     
@@ -381,7 +354,6 @@ const GameByToken: React.FC<Props> = () => {
     setError(null);
     
     try {
-      console.log(`GameByToken: Loading assignment for token: ${tokenValue}`);
       const assignment = await getAssignmentByToken(tokenValue);
       
       if (!assignment) {
@@ -615,22 +587,19 @@ const GameByToken: React.FC<Props> = () => {
               if (userData.name) {
                 nameToUse = userData.name;
                 setStudentName(userData.name);
-                console.log('GameByToken: Found student name in users collection for auto-start:', userData.name);
               }
             }
           } catch (error) {
-            console.error('GameByToken: Error fetching student name for auto-start:', error);
+            console.error('Error fetching student name for auto-start:', error);
           }
           
           // If still no name, use fallbacks
           if (!nameToUse && assignment.studentName) {
             nameToUse = assignment.studentName;
             setStudentName(assignment.studentName);
-            console.log('GameByToken: Using assignment student name:', assignment.studentName);
           } else if (!nameToUse) {
             nameToUse = assignment.studentEmail.split('@')[0];
             setStudentName(assignment.studentEmail.split('@')[0]);
-            console.log('GameByToken: Using email prefix as name:', nameToUse);
           }
         }
         
@@ -639,7 +608,6 @@ const GameByToken: React.FC<Props> = () => {
         
         // Ensure authentication state is properly set for email access
         if (!isAuthenticated) {
-          console.log('GameByToken: Setting authentication state for email link access');
           setIsAuthenticated(true);
         }
         
@@ -650,32 +618,16 @@ const GameByToken: React.FC<Props> = () => {
             displayName: assignment.studentName || assignment.studentEmail.split('@')[0]
           };
           setCurrentUser(syntheticUser);
-          console.log('GameByToken: Created synthetic user for auto-start:', syntheticUser);
         }
         
-        // Enhanced auto-start with better delay and comprehensive debugging
+        // Enhanced auto-start with better delay
         setTimeout(() => {
-          console.log('GameByToken: 🚀 Executing enhanced auto-start sequence...');
-          console.log('GameByToken: Final student name for auto-start:', nameToUse);
-          console.log('GameByToken: Game config type:', gameConfig.type);
-          
           setIsPlaying(true);
           setStartTime(new Date());
           setHasAutoStarted(true);
-          
-          console.log('GameByToken: ✅ Enhanced auto-start completed successfully!');
-          console.log('GameByToken: State after auto-start - isPlaying: true, hasAutoStarted: true');
         }, 200); // Optimized delay for state consistency
       } else if (isEmailLinkAccess && !hasAutoStarted) {
-        console.log('GameByToken: ❌ Auto-start conditions not satisfied:', {
-          'loading': loading,
-          'isPlaying': isPlaying,
-          'hasAssignment': !!assignment,
-          'hasGameConfig': !!gameConfig,
-          'hasStudentEmail': assignment?.studentEmail,
-          'assignmentType': assignment?.gameType,
-          'gameConfigType': gameConfig?.type
-        });
+        // Auto-start conditions not satisfied
       }
     };
     
@@ -686,7 +638,6 @@ const GameByToken: React.FC<Props> = () => {
   useEffect(() => {
     const setupStudentName = async () => {
       if (isEmailLinkAccess && assignment && !loading && !hasAutoStarted) {
-        console.log('Forcing immediate setup for email link user');
         
         // Immediately set up the student name from users collection first
         try {
@@ -701,7 +652,6 @@ const GameByToken: React.FC<Props> = () => {
             const userData = usersSnapshot.docs[0].data();
             if (userData.name) {
               setStudentName(userData.name);
-              console.log('GameByToken: Found student name for immediate setup:', userData.name);
             } else {
               // Fallback logic if no name field
               if (assignment.studentName) {
@@ -719,7 +669,7 @@ const GameByToken: React.FC<Props> = () => {
             }
           }
         } catch (error) {
-          console.error('GameByToken: Error fetching student name for immediate setup:', error);
+          console.error('Error fetching student name for immediate setup:', error);
           // Fallback logic on error
           if (assignment.studentName) {
             setStudentName(assignment.studentName);
@@ -755,32 +705,16 @@ const GameByToken: React.FC<Props> = () => {
     
     // If there's a directAccess parameter OR a token parameter, treat it as email link access
     if (directAccess || hasToken) {
-      console.log('GameByToken: Direct access or token access detected in URL');
       setIsEmailLinkAccess(true);
       
       // Force authenticated state for direct access mode
       setIsAuthenticated(true);
-      console.log('GameByToken: Setting authenticated state to true for email link access');
       
       sessionStorage.setItem('direct_token_access', 'true');
     }
   }, []);
   
-  // Debug effect to track render state
-  useEffect(() => {
-    if (assignment && gameConfig) {
-      console.log('GameByToken: Rendering state update:', {
-        hasAssignment: !!assignment,
-        hasGameConfig: !!gameConfig,
-        gameType: gameConfig?.type,
-        isPlaying: isPlaying,
-        isEmailLinkAccess: isEmailLinkAccess,
-        isAuthenticated: isAuthenticated,
-        hasAutoStarted: hasAutoStarted,
-        loading: loading
-      });
-    }
-  }, [assignment, gameConfig, isPlaying, isEmailLinkAccess, isAuthenticated, hasAutoStarted, loading]);
+
   
   // Update handleGameComplete to NOT reload immediately after attempt save
   const handleGameComplete = async (score: number) => {
@@ -788,7 +722,7 @@ const GameByToken: React.FC<Props> = () => {
     setSaveError(null);
     
     if (!assignment || !startTime || !gameConfig) {
-      console.error("GameByToken: Cannot save attempt - missing required data", { 
+      console.error("Cannot save attempt - missing required data", { 
         hasAssignment: !!assignment, 
         hasStartTime: !!startTime, 
         hasGameConfig: !!gameConfig 
@@ -799,7 +733,6 @@ const GameByToken: React.FC<Props> = () => {
     
     // Check if user is authenticated
     if (!isAuthenticated || !currentUser) {
-      console.warn("GameByToken: User is not authenticated. Prompting for authentication");
       // Save the score temporarily to reuse after authentication
       sessionStorage.setItem('pending_game_score', score.toString());
       sessionStorage.setItem('pending_start_time', startTime.toISOString());

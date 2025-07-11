@@ -53,7 +53,7 @@ const PlaceValueShowdownConfig = () => {
   const toast = useToast();
   
   const [title, setTitle] = useState('Place Value Showdown');
-  const [numberOfCards, setNumberOfCards] = useState<2 | 3 | 4 | 5>(3);
+  const [numberOfCards, setNumberOfCards] = useState<1 | 2 | 3 | 4 | 5>(3);
   const [objective, setObjective] = useState<'largest' | 'smallest'>('largest');
   const [winningScore, setWinningScore] = useState(5);
   const [enableHints, setEnableHints] = useState(true);
@@ -62,6 +62,8 @@ const PlaceValueShowdownConfig = () => {
   const [saveAttempted, setSaveAttempted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [teacherName, setTeacherName] = useState('Teacher');
+  const [includeDecimal, setIncludeDecimal] = useState(false);
+  const [decimalPlaces, setDecimalPlaces] = useState<1 | 2 | 3>(3);
 
   const hasUnsavedChanges = true; // Always assume changes for simplicity
   const { safeNavigate } = useUnsavedChanges(hasUnsavedChanges);
@@ -155,10 +157,11 @@ const PlaceValueShowdownConfig = () => {
 
     setIsLoading(true);
     try {
+      const totalCards = includeDecimal ? numberOfCards + decimalPlaces : numberOfCards;
       const gameConfig = {
         title,
         type: 'place-value-showdown' as const,
-        description: `Place value game with ${numberOfCards} cards, aiming for ${objective} number. First to ${winningScore} points wins!`,
+        description: `Place value game with ${numberOfCards} cards${includeDecimal ? ` + ${decimalPlaces} decimal places` : ''}, aiming for ${objective} number. First to ${winningScore} points wins!`,
         difficulty: 'medium' as const,
         timeLimit: 300,
         targetScore: winningScore,
@@ -170,6 +173,8 @@ const PlaceValueShowdownConfig = () => {
         teacherName,
         enableHints,
         gameMode,
+        includeDecimal,
+        decimalPlaces,
         share: shareConfig,
         email: currentUser?.email,
         userId: currentUser?.uid,
@@ -257,16 +262,17 @@ const PlaceValueShowdownConfig = () => {
                   <FormLabel>Number of Cards</FormLabel>
                   <Select
                     value={numberOfCards}
-                    onChange={(e) => setNumberOfCards(parseInt(e.target.value) as 2 | 3 | 4 | 5)}
+                    onChange={(e) => setNumberOfCards(parseInt(e.target.value) as 1 | 2 | 3 | 4 | 5)}
                     className="apple-input"
                   >
+                    <option value={1}>1 Card (1-digit numbers)</option>
                     <option value={2}>2 Cards (2-digit numbers)</option>
                     <option value={3}>3 Cards (3-digit numbers)</option>
                     <option value={4}>4 Cards (4-digit numbers)</option>
                     <option value={5}>5 Cards (5-digit numbers)</option>
                   </Select>
                   <Text fontSize="sm" color="gray.600" mt={1}>
-                    More cards = bigger numbers and more complex place value concepts
+                    Choose 1-5 cards for whole number places. Max format: ##,###.### with decimals
                   </Text>
                 </FormControl>
 
@@ -320,6 +326,44 @@ const PlaceValueShowdownConfig = () => {
                   </Text>
                 </FormControl>
               </HStack>
+
+              {/* Decimal Settings */}
+              <Card bg="gray.50" p={4}>
+                <VStack spacing={4}>
+                  <FormControl display="flex" alignItems="center">
+                    <FormLabel mb="0" flex="1">
+                      Include Decimal Places
+                      <Text fontSize="sm" color="gray.600" mt={1}>
+                        Add decimal places to practice decimal place values. Max format: ##,###.###
+                      </Text>
+                    </FormLabel>
+                    <Switch
+                      isChecked={includeDecimal}
+                      onChange={(e) => setIncludeDecimal(e.target.checked)}
+                      colorScheme="blue"
+                    />
+                  </FormControl>
+
+                  {includeDecimal && (
+                    <FormControl>
+                      <FormLabel>Number of Decimal Places</FormLabel>
+                      <Select
+                        value={decimalPlaces}
+                        onChange={(e) => setDecimalPlaces(parseInt(e.target.value) as 1 | 2 | 3)}
+                        className="apple-input"
+                        w="200px"
+                      >
+                        <option value={1}>1 place (tenths)</option>
+                        <option value={2}>2 places (hundredths)</option>
+                        <option value={3}>3 places (thousandths)</option>
+                      </Select>
+                      <Text fontSize="sm" color="gray.600" mt={1}>
+                        Combined with 1-5 whole number cards for flexible difficulty
+                      </Text>
+                    </FormControl>
+                  )}
+                </VStack>
+              </Card>
             </VStack>
           </CardBody>
         </Card>
@@ -384,12 +428,42 @@ const PlaceValueShowdownConfig = () => {
           <CardBody>
             <VStack spacing={3} align="flex-start">
               <Text><strong>Game:</strong> {title}</Text>
-              <Text><strong>Cards per round:</strong> {numberOfCards} cards</Text>
+              <Text><strong>Cards per round:</strong> {numberOfCards} cards{includeDecimal ? ` + ${decimalPlaces} decimal places` : ''}</Text>
               <Text><strong>Objective:</strong> Create the {objective} number possible</Text>
               <Text><strong>Winning condition:</strong> First to {winningScore} points</Text>
               <Text><strong>AI Difficulty:</strong> Medium - Teacher plays strategically most of the time</Text>
               <Text><strong>Players:</strong> Student vs {teacherName}</Text>
               <Text><strong>Hints:</strong> {enableHints ? 'Enabled' : 'Disabled'}</Text>
+              {includeDecimal && (
+                <>
+                  <Text><strong>Decimal Places:</strong> {decimalPlaces} places</Text>
+                  <Text><strong>Example Number:</strong> {(() => {
+                    // Create example based on numberOfCards and decimalPlaces
+                    let wholeExample = '';
+                    for (let i = 0; i < numberOfCards; i++) {
+                      wholeExample += String(numberOfCards - i);
+                    }
+                    
+                    let decimalExample = '';
+                    for (let i = 0; i < decimalPlaces; i++) {
+                      decimalExample += String(i + 1);
+                    }
+                    
+                    // Format with commas if 4+ digits
+                    const formattedWhole = numberOfCards >= 4 ? parseInt(wholeExample).toLocaleString() : wholeExample;
+                    return `${formattedWhole}.${decimalExample}`;
+                  })()}</Text>
+                </>
+              )}
+              {!includeDecimal && numberOfCards >= 4 && (
+                <Text><strong>Example Number:</strong> {(() => {
+                  let example = '';
+                  for (let i = 0; i < numberOfCards; i++) {
+                    example += String(numberOfCards - i);
+                  }
+                  return parseInt(example).toLocaleString();
+                })()}</Text>
+              )}
             </VStack>
           </CardBody>
         </Card>

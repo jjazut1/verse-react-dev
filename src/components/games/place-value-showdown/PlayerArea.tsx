@@ -26,37 +26,48 @@ export const PlayerArea: React.FC<PlayerAreaProps> = ({
   const slotClass = isTeacher ? 'teacher-slot' : 'student-slot';
   const cardClass = isTeacher ? 'teacher-card' : 'student-card';
 
+  const totalSlots = config.numberOfCards + (config.includeDecimal ? config.decimalPlaces : 0);
+
   return (
     <div className={`player-area ${areaClass}`}>
       <h3>{playerName}'s Turn</h3>
       
       <div className="number-slots">
-        {Array.from({ length: config.numberOfCards }, (_, i) => {
+        {Array.from({ length: totalSlots }, (_, i) => {
           const cardInSlot = cards.find(card => card.slotIndex === i);
-          const hasComma = config.numberOfCards > 3 && i === config.numberOfCards - 4;
+          const hasComma = config.numberOfCards >= 4 && i === config.numberOfCards - 4;
+          const isDecimalPoint = config.includeDecimal && i === config.numberOfCards;
           
           return (
-            <SlotContainer
-              key={i}
-              showPlaceValueLabels={showPlaceValueLabels}
-              slotIndex={i}
-              totalSlots={config.numberOfCards}
-              hasComma={hasComma}
-            >
-              <div 
-                className={`number-slot ${slotClass} ${!isTeacher && selectionState?.isCardSelected ? 'can-drop' : ''}`}
-                onClick={() => !isTeacher && onSlotClick?.(i)}
+            <React.Fragment key={i}>
+              {isDecimalPoint && (
+                <div className="decimal-point">
+                  <div className="decimal-dot">.</div>
+                </div>
+              )}
+              
+              <SlotContainer
+                showPlaceValueLabels={showPlaceValueLabels}
+                slotIndex={i}
+                totalSlots={totalSlots}
+                hasComma={hasComma}
+                config={config}
               >
-                {cardInSlot && (
-                  <div 
-                    className={`card ${cardClass} ${isTeacher && gameState.phase === 'revealing' ? 'revealed' : ''}`}
-                    onClick={() => !isTeacher && onReturnToDeck?.(cardInSlot)}
-                  >
-                    {isTeacher && gameState.phase !== 'revealing' ? '?' : cardInSlot.digit}
-                  </div>
-                )}
-              </div>
-            </SlotContainer>
+                <div 
+                  className={`number-slot ${slotClass} ${!isTeacher && selectionState?.isCardSelected ? 'can-drop' : ''}`}
+                  onClick={() => !isTeacher && onSlotClick?.(i)}
+                >
+                  {cardInSlot && (
+                    <div 
+                      className={`card ${cardClass} ${isTeacher && gameState.phase === 'revealing' ? 'revealed' : ''}`}
+                      onClick={() => !isTeacher && onReturnToDeck?.(cardInSlot)}
+                    >
+                      {isTeacher && gameState.phase !== 'revealing' ? '?' : cardInSlot.digit}
+                    </div>
+                  )}
+                </div>
+              </SlotContainer>
+            </React.Fragment>
           );
         })}
       </div>
@@ -98,12 +109,12 @@ export const PlayerArea: React.FC<PlayerAreaProps> = ({
         <div className="inline-notation">
           {showExpandedNumbers && (
             <div className="notation-line">
-              <strong>{number.toLocaleString()} =</strong> {getExpandedNotation(cards)}
+              <strong>{config.includeDecimal ? number.toFixed(config.decimalPlaces) : number.toLocaleString()} =</strong> {getExpandedNotation(cards, config)}
             </div>
           )}
           {showExpandedWords && (
             <div className="notation-line">
-              <strong>In Words:</strong> {getExpandedNotationWords(cards)}
+              <strong>In Words:</strong> {getExpandedNotationWords(cards, config)}
             </div>
           )}
         </div>

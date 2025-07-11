@@ -13,6 +13,7 @@ import {
   buildAssignmentFolderTree,
   canCreateAssignmentSubfolder
 } from '../services/assignmentFolderService';
+import { getTeacherAssignmentsWithFolders } from '../services/assignmentService';
 import { AssignmentWithFolder, ToastOptions } from '../pages/teacher-dashboard/types';
 import { useModal } from '../contexts/ModalContext';
 
@@ -216,8 +217,7 @@ export const useAssignmentFolderManager = ({
       console.log('📋 Assigning assignment to folder:', { assignmentId, folderId, userId });
       await assignAssignmentToFolder(assignmentId, folderId, userId);
       
-      // Import and use the enhanced assignment function
-      const { getTeacherAssignmentsWithFolders } = await import('../services/assignmentService');
+      // Use the enhanced assignment function
       const updatedAssignments = await getTeacherAssignmentsWithFolders(userId);
       onAssignmentsUpdate(updatedAssignments);
       
@@ -240,8 +240,7 @@ export const useAssignmentFolderManager = ({
       console.log('📋 Removing assignment from folder:', { assignmentId, userId });
       await removeAssignmentFromFolder(assignmentId, userId);
       
-      // Import and use the enhanced assignment function
-      const { getTeacherAssignmentsWithFolders } = await import('../services/assignmentService');
+      // Use the enhanced assignment function
       const updatedAssignments = await getTeacherAssignmentsWithFolders(userId);
       onAssignmentsUpdate(updatedAssignments);
       

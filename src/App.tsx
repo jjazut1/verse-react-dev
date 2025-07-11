@@ -27,6 +27,8 @@ import WordVolleyConfig from './pages/configurations/WordVolleyConfig'
 import LinkInterceptor from './components/LinkInterceptor'
 import SmartRouter from './pages/SmartRouter'
 import EmailLinkRouter from './pages/EmailLinkRouter'
+import PasswordSetup from './pages/PasswordSetup'
+import PasswordChange from './pages/PasswordChange'
 import { useEffect } from 'react'
 import { usePWANavigation } from './hooks/usePWANavigation'
 
@@ -413,6 +415,16 @@ const router = createBrowserRouter([
   {
     path: "/forgot-password",
     element: <Layout><ForgotPassword /></Layout>,
+    errorElement: <ErrorBoundary />,
+  },
+  {
+    path: "/password-setup",
+    element: <Layout><PasswordSetup /></Layout>,
+    errorElement: <ErrorBoundary />,
+  },
+  {
+    path: "/password-change",
+    element: <Layout><PasswordChange /></Layout>,
     errorElement: <ErrorBoundary />,
   },
   {

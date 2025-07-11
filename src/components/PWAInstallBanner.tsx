@@ -59,7 +59,7 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = ({ className = 
     } else if (isAndroid && isChrome) {
       return `📱 Install on Android:\n\n1. Look for the install icon (⬇️) in the address bar\n2. Tap "Install" or "Add to Home Screen"\n3. Follow the prompts\n\nOr:\n1. Tap the menu (⋮) in Chrome\n2. Select "Add to Home Screen"\n3. Tap "Install"`;
     } else if (isChrome) {
-      return `💻 Install on Desktop:\n\n1. Look for the install icon (⬇️) in the address bar\n2. Click "Install Lumino Learning"\n3. Follow the prompts\n\nOr:\n1. Click the menu (⋮) in Chrome\n2. Select "Install Lumino Learning..."\n3. Click "Install"`;
+      return `💻 Install on Desktop:\n\n1. Look for the install icon (⬇️) in the address bar\n2. Click "Install LuminateLearn"\n3. Follow the prompts\n\nOr:\n1. Click the menu (⋮) in Chrome\n2. Select "Install LuminateLearn..."\n3. Click "Install"`;
     } else {
       return `📱 Install Instructions:\n\nFor the best experience, please use:\n• Chrome on Android/Desktop\n• Safari on iOS\n\nThen look for install options in your browser menu or address bar.`;
     }
@@ -74,7 +74,7 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = ({ className = 
     let instructions = '';
     
     if (isChrome) {
-      instructions = 'Chrome: Look for the install icon (⊕) in the address bar, or go to Menu → Install Lumino Learning';
+              instructions = 'Chrome: Look for the install icon (⊕) in the address bar, or go to Menu → Install LuminateLearn';
     } else if (isSafari) {
       instructions = 'Safari: Tap the Share button (□↑) and select "Add to Home Screen"';
     } else if (isFirefox) {
@@ -116,10 +116,10 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = ({ className = 
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 600 }}>
-            Install Lumino Learning
+            Install LuminateLearn
           </h3>
           <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9, lineHeight: 1.4 }}>
-            Get the app experience! Install Lumino Learning for faster access to your assignments.
+                          Get the app experience! Install LuminateLearn for faster access to your assignments.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>

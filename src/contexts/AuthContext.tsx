@@ -28,7 +28,7 @@ interface AuthContextType {
   currentUser: User | null;
   isTeacher: boolean;
   isStudent: boolean;
-  loginWithGoogle: () => Promise<UserCredential | void>;
+  loginWithGoogle: (useRedirect?: boolean, loginHint?: string) => Promise<UserCredential | null>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -42,7 +42,7 @@ export const AuthContext = createContext<AuthContextType>({
   currentUser: null,
   isTeacher: false,
   isStudent: false,
-  loginWithGoogle: async () => {},
+  loginWithGoogle: async () => null,
   login: async () => {},
   logout: async () => {},
   resetPassword: async () => {},
@@ -69,12 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsStudent(false);
       return;
     }
-
-    // 🔍 ENHANCED DEBUG LOGGING for Google Workspace Migration Issue
-    console.log('🔍 DEBUG: Starting user role check');
-    console.log('📧 User Email:', user.email);
-    console.log('🆔 User UID:', user.uid);
-    console.log('👤 Display Name:', user.displayName);
     
     try {
       // First check if email is in our demo teacher list
@@ -86,13 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Check if they have a role in their user document
       try {
-        console.log('🔍 DEBUG: Checking for direct UID match in users collection');
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
         
         if (userDoc.exists()) {
-          console.log('✅ DEBUG: Found user document by direct UID lookup');
-          console.log('   👑 Role:', userDoc.data().role);
           const userData = userDoc.data();
           
           // Update lastLogin timestamp - preserve existing createdAt
@@ -128,10 +119,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } else if (userData.role === 'student') {
             setIsTeacher(false);
             setIsStudent(true);
+            
+            // Check if student has temporary password and redirect (only if not already on password change page)
+            if (userData.hasTemporaryPassword && window.location.pathname !== '/password-change') {
+              console.log('🔑 Student has temporary password - redirecting to password change');
+              // Use a small delay to ensure auth state is fully updated
+              setTimeout(() => {
+                window.location.href = '/password-change';
+              }, 100);
+              return;
+            }
             return;
           }
         } else {
-          console.log('❌ DEBUG: No user document found by direct UID lookup');
         }
       } catch (error) {
         console.error('Error checking user document by UID:', error);
@@ -139,23 +139,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Fallback: try to find user by email (for legacy documents)
       try {
-        console.log('🔍 DEBUG: Searching for user document by email (fallback for legacy documents)');
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where('email', '==', user.email));
         const querySnapshot = await getDocs(q);
         
         if (!querySnapshot.empty) {
-          console.log(`🔍 DEBUG: Found ${querySnapshot.docs.length} document(s) for email ${user.email}`);
-          
           const existingUserDoc = querySnapshot.docs[0];
           const existingUserData = existingUserDoc.data();
-          
-          console.log('🔍 DEBUG: Document details:');
-          console.log('   📄 Document UID:', existingUserDoc.id);
-          console.log('   📧 Document Email:', existingUserData.email);
-          console.log('   👑 Document Role:', existingUserData.role);
-          console.log('   🆔 Current Auth UID:', user.uid);
-          console.log('   🔗 UIDs Match:', existingUserDoc.id === user.uid);
           
           // 🛡️ IMPORTANT: Check if this document is already using the correct UID
           // If the document ID matches the user's UID, then it's NOT a legacy document
@@ -191,6 +181,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               } else if (existingUserData.role === 'student') {
                 setIsTeacher(false);
                 setIsStudent(true);
+                
+                // Check if student has temporary password and redirect (only if not already on password change page)
+                if (existingUserData.hasTemporaryPassword && window.location.pathname !== '/password-change') {
+                  console.log('🔑 Student has temporary password - redirecting to password change');
+                  // Use a small delay to ensure auth state is fully updated
+                  setTimeout(() => {
+                    window.location.href = '/password-change';
+                  }, 100);
+                  return;
+                }
               }
               return;
             } catch (error) {
@@ -200,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('🔄 Found legacy user document with different UID - performing migration');
             console.log(`   Legacy UID: ${existingUserDoc.id}`);
             console.log(`   Current UID: ${user.uid}`);
+
             
             // This is a real legacy document - perform migration
           try {
@@ -236,6 +237,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else if (existingUserData.role === 'student') {
               setIsTeacher(false);
               setIsStudent(true);
+              
+              // Check if student has temporary password and redirect (only if not already on password change page)
+              if (existingUserData.hasTemporaryPassword && window.location.pathname !== '/password-change') {
+                console.log('🔑 Migrated student has temporary password - redirecting to password change');
+                // Use a small delay to ensure auth state is fully updated
+                setTimeout(() => {
+                  window.location.href = '/password-change';
+                }, 100);
+                return;
+              }
             }
             return;
           } catch (error) {
@@ -260,6 +271,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Check for redirect result first
+    getRedirectResult(auth).then((result) => {
+      if (result) {
+        // Redirect sign-in successful
+      }
+    }).catch((error) => {
+      console.error('Redirect sign-in error:', error);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       checkUserRole(user);
@@ -305,7 +325,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (useRedirect = false, loginHint?: string) => {
     // Create the provider instance
     const provider = new GoogleAuthProvider();
     
@@ -313,17 +333,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     provider.addScope('profile');
     provider.addScope('email');
     
-    // Set custom parameters for the auth provider
-    provider.setCustomParameters({
+    // Set custom parameters for the auth provider - force account selection for login modal
+    const customParams: any = {
       prompt: 'select_account'
-    });
+    };
+    
+    // If we have a login hint (expected email), add it to help Google pre-select the right account
+    if (loginHint && loginHint.trim()) {
+      customParams.login_hint = loginHint.toLowerCase().trim();
+    }
+    
+    provider.setCustomParameters(customParams);
+    
+    if (useRedirect) {
+      try {
+        await signInWithRedirect(auth, provider);
+        // Note: signInWithRedirect doesn't return a result directly
+        // The user will be redirected away and back
+        return null;
+      } catch (error: any) {
+        console.error('Redirect sign-in failed:', error);
+        throw error;
+      }
+    }
     
     try {
-      // Use signInWithPopup for direct feedback
-      const result = await signInWithPopup(auth, provider);
+      // Test popup blocker first
+      const testPopup = window.open('', '_blank', 'width=1,height=1');
+             if (!testPopup || testPopup.closed) {
+         testPopup?.close();
+         return await loginWithGoogle(true);
+       }
+      testPopup.close();
+      
+      // Use signInWithPopup for direct feedback with timeout
+      const signInPromise = signInWithPopup(auth, provider);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Google Sign-In popup timed out after 30 seconds')), 30000);
+      });
+      
+      const result = await Promise.race([signInPromise, timeoutPromise]) as UserCredential;
       return result;
-    } catch (error) {
-      console.error('Error signing in with Google:', error);
+          } catch (error: any) {
+        console.error('Google Sign-In error occurred:', error);
+      
+      // Handle specific error cases
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Sign-in was cancelled. Please try again.');
+      }
+      
+      if (error.code === 'auth/popup-blocked') {
+        throw new Error('Popup was blocked by your browser. Please allow popups for this site and try again.');
+      }
+      
+      // Handle timeout - fallback to redirect
+      if (error.message && error.message.includes('timed out')) {
+        try {
+          return await loginWithGoogle(true);
+        } catch (redirectError) {
+          console.error('Redirect fallback also failed:', redirectError);
+          throw new Error('Both popup and redirect sign-in methods failed. Please try again or contact support.');
+        }
+      }
+      
+      // Handle IndexedDB/storage errors
+      if (error.message && error.message.includes('IndexedDB')) {
+        throw new Error('Browser storage issue detected. Please clear your browser data (F12 → Application → Storage → Clear site data) and try again.');
+      }
+      
+      // Handle other storage-related errors
+      if (error.message && (error.message.includes('storage') || error.message.includes('quota'))) {
+        throw new Error('Browser storage is full or corrupted. Please clear your browser data and try again.');
+      }
+      
+      // Handle account linking when user already has email/password account
+      if (error.code === 'auth/account-exists-with-different-credential') {
+        const email = error.customData?.email;
+        if (email) {
+          throw new Error(`You already have an account with ${email}. Please sign in with your email and password to link your Google account.`);
+        }
+      }
+      
       throw error;
     }
   };

@@ -101,7 +101,7 @@
 }
 
 .score .player-name {
-  color: #666;
+  color: #e0e0e0;
   font-size: 0.85rem;
 }
 
@@ -323,6 +323,22 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
+}
+
+.decimal-point {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 65px;
+  margin: 0 5px;
+}
+
+.decimal-dot {
+  font-size: 3rem;
+  font-weight: bold;
+  color: #333;
+  line-height: 1;
+  user-select: none;
 }
 
 .number-slot {
@@ -623,6 +639,15 @@
     min-width: 100%; /* Ensure it takes full width available */
   }
 
+  .decimal-point {
+    height: 50px;
+    margin: 0 3px;
+  }
+
+  .decimal-dot {
+    font-size: 2.5rem;
+  }
+
   .number-slot {
     width: 50px; /* Slightly smaller for tablets */
     height: 50px;
@@ -693,6 +718,15 @@
     min-width: 100%; /* Ensure it takes full width available */
   }
 
+  .decimal-point {
+    height: 45px;
+    margin: 0 2px;
+  }
+
+  .decimal-dot {
+    font-size: 2rem;
+  }
+
   .number-slot {
     width: 45px; /* Smaller slots for mobile to fit more digits */
     height: 45px;
@@ -755,6 +789,15 @@
     gap: 4px; /* Even smaller gap for very small screens */
     padding: 6px;
     justify-content: flex-start; /* Align to start to allow scrolling */
+  }
+
+  .decimal-point {
+    height: 40px;
+    margin: 0 1px;
+  }
+
+  .decimal-dot {
+    font-size: 1.5rem;
   }
 
   .number-slot {

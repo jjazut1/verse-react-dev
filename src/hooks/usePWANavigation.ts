@@ -52,7 +52,7 @@ export const usePWANavigation = () => {
 
             // Send acknowledgment back to launcher via BroadcastChannel (fallback)
             console.log('[PWA] Sending BroadcastChannel ACK');
-            const channel = new BroadcastChannel('lumino-pwa-navigation');
+            const channel = new BroadcastChannel('luminatelearn-pwa-navigation');
             channel.postMessage({
                 type: 'PWA_NAVIGATION_ACK',
                 timestamp: Date.now(),
@@ -82,7 +82,7 @@ export const usePWANavigation = () => {
         };
 
         // Listen for navigation messages via BroadcastChannel (fallback method)
-        const channel = new BroadcastChannel('lumino-pwa-navigation');
+        const channel = new BroadcastChannel('luminatelearn-pwa-navigation');
         channel.onmessage = handleNavigationMessage;
 
         if ('serviceWorker' in navigator) {

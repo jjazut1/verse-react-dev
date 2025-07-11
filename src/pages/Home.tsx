@@ -31,6 +31,7 @@ import {
 import { generateAndUploadThumbnail } from '../utils/thumbnailGenerator';
 import GameItemDisplay from '../components/GameItemDisplay';
 
+
 const SearchBar = ({ onSearch }: { onSearch: (query: string) => void }) => (
   <div style={{
     marginBottom: 'var(--spacing-4)',
@@ -818,37 +819,16 @@ const Home = () => {
 
   return (
     <div style={{ width: '100vw', overflow: 'hidden' }}>
-      {/* Debug PWA Status - Temporary for testing */}
-      {currentUser && (
-        <div style={{
-          position: 'fixed',
-          top: '10px',
-          right: '10px',
-          background: 'rgba(0,0,0,0.8)',
-          color: 'white',
-          padding: '10px',
-          borderRadius: '8px',
-          fontSize: '12px',
-          zIndex: 1000
-        }}>
-          <div>🔍 PWA Debug:</div>
-          <div>User: {currentUser.email}</div>
-          <div>Page: Home (/)</div>
-          <div>PWA Banner: Only on /student</div>
-          <div>
-            <a href="/student" style={{ color: '#4299E1' }}>
-              → Go to Student Dashboard
-            </a>
-          </div>
-        </div>
-      )}
+
+      
+
 
       {/* Hero Section */}
       <div style={{ backgroundColor: 'var(--color-primary-500)', color: 'white', padding: 'var(--spacing-20) 0', width: '100%' }}>
         <div style={{ width: '100%', margin: '0 auto', padding: '0 var(--spacing-4)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-6)', alignItems: 'center', width: '100%' }}>
             <h1 style={{ fontSize: 'var(--font-size-5xl)', fontWeight: 'bold' }}>
-              Lumino Learning
+              LuminateLearn
             </h1>
             <p style={{ fontSize: 'var(--font-size-xl)' }}>
               Create Efficiently. Spark Curiosity. Shape Minds.
@@ -934,7 +914,7 @@ const Home = () => {
                 marginBottom: 'var(--spacing-4)',
                 opacity: 0.9
               }}>
-                Access your assignments and install the Lumino Learning app from your dashboard!
+                Access your assignments and install the LuminateLearn app from your dashboard!
               </p>
               <a 
                 href="/student"
@@ -1120,6 +1100,8 @@ const Home = () => {
 
       {/* Render the confirmation dialog */}
       <DeleteConfirmationDialog />
+      
+
     </div>
   );
 };

@@ -101,14 +101,14 @@ const LinkInterceptor: React.FC = () => {
         </div>
         
         <h2 style={{ marginBottom: '15px' }}>
-          {status === 'detecting' && 'Opening Lumino Learning...'}
+          {status === 'detecting' && 'Opening LuminateLearn...'}
           {status === 'redirecting' && 'Launching App...'}
           {status === 'fallback' && 'Redirecting...'}
         </h2>
         
         <p style={{ opacity: 0.9, lineHeight: 1.5 }}>
           {status === 'detecting' && 'Detecting the best way to open your assignment...'}
-          {status === 'redirecting' && 'Attempting to open in the Lumino Learning app...'}
+          {status === 'redirecting' && 'Attempting to open in the LuminateLearn app...'}
           {status === 'fallback' && 'Opening in your browser...'}
         </p>
 

@@ -149,7 +149,7 @@ export interface SentenceSenseConfig extends BaseGameConfig {
 
 export interface PlaceValueShowdownConfig extends BaseGameConfig {
   type: 'place-value-showdown';
-  numberOfCards: 2 | 3 | 4 | 5; // Number of digit cards per round
+  numberOfCards: 1 | 2 | 3 | 4 | 5; // Number of digit cards per round (1-5 for max ##,###.###)
   objective: 'largest' | 'smallest'; // What number to create
   winningScore: number; // Points needed to win (default 5)
   aiDifficulty: 'easy' | 'medium' | 'hard'; // How smart the teacher AI is
@@ -157,6 +157,8 @@ export interface PlaceValueShowdownConfig extends BaseGameConfig {
   teacherName: string; // Teacher's name (for display)
   enableHints: boolean; // Show place value hints
   gameMode: 'student-vs-teacher' | 'practice'; // Competition vs practice mode
+  includeDecimal: boolean; // Whether to include decimal places (default: false)
+  decimalPlaces: 1 | 2 | 3; // Number of decimal places when enabled (default: 3)
 }
 
 export interface WordVolleyConfig extends BaseGameConfig {

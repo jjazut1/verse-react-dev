@@ -186,12 +186,18 @@ service cloud.firestore {
       request.resource.data.title is string &&
       request.resource.data.title.size() > 0 &&
       request.resource.data.numberOfCards is number &&
-      request.resource.data.numberOfCards >= 2 &&
+      request.resource.data.numberOfCards >= 1 &&
       request.resource.data.numberOfCards <= 5 &&
       request.resource.data.objective is string &&
       request.resource.data.objective in ['largest', 'smallest'] &&
       request.resource.data.winningScore is number &&
-      request.resource.data.winningScore > 0) ||
+      request.resource.data.winningScore > 0 &&
+      request.resource.data.includeDecimal is bool &&
+      (!request.resource.data.includeDecimal || (
+        request.resource.data.decimalPlaces is number &&
+        request.resource.data.decimalPlaces >= 1 &&
+        request.resource.data.decimalPlaces <= 3
+      ))) ||
       
       // Word Volley game validation
       (request.resource.data.type == 'word-volley' &&
@@ -211,12 +217,10 @@ service cloud.firestore {
     }
     
     match /assignments/{assignmentId} {
-      // Read allowed for everyone - explicitly set to true for clarity
-      allow read: if isAuthenticated() && (
-        isTeacherOrAdmin() || 
-        resource.data.studentEmail == request.auth.token.email ||
-        isAdmin()
-      );
+      // Allow all authenticated users to read assignments
+      // This enables token-based queries to work for authenticated students
+      // Application logic ensures students only access appropriate assignments
+      allow read: if isAuthenticated();
 
       // Allow service accounts full access
       allow read, write: if isServiceAccount();
@@ -265,11 +269,21 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       // Allow users to read their own document + teachers/admins can read others
+      // Also allow reading documents where email matches the authenticated user's email (for migration)
       allow read: if isAuthenticated() && (
         request.auth.uid == userId ||  // Users can read their own document
         isTeacherOrAdmin() || 
-        isAdmin()
+        isAdmin() ||
+        (request.auth.token.email != null && resource.data.email == request.auth.token.email)  // Allow reading by matching email
       );
+      
+      // Allow users to query by their own email (for migration/linking purposes)
+      allow list: if isAuthenticated() && 
+        request.auth.token.email != null;
+      
+      // Allow unauthenticated users to query for temporary password checking
+      // This is needed for the login page to check if a user has a temporary password
+      allow list: if request.auth == null;
       
       // New permission model:
       // 1. Allow admins to perform any operations on any user document
@@ -289,9 +303,18 @@ service cloud.firestore {
          request.resource.data.role == 'student' &&
          request.resource.data.teacherId == request.auth.uid &&
          request.resource.data.email is string &&
-         request.resource.data.name is string);
+         request.resource.data.name is string) ||
+        // Allow authenticated users to create documents for migration (when email matches)
+        (isAuthenticated() &&
+         request.auth.token.email != null &&
+         request.resource.data.email == request.auth.token.email &&
+         request.auth.uid == userId);
          
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() ||
+        // Allow users to delete legacy documents during migration (when email matches)
+        (isAuthenticated() &&
+         request.auth.token.email != null &&
+         resource.data.email == request.auth.token.email);
       
       allow update: if isAdmin() || 
         (request.auth.uid == userId && 
@@ -457,6 +480,8 @@ service cloud.firestore {
       // Allow cleanup - service accounts can delete processed requests
       allow delete: if isServiceAccount();
     }
+
+
 
     // System configuration (admin only)
     match /config/{configId} {

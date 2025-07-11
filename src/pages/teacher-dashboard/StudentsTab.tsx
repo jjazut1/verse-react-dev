@@ -97,7 +97,19 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
         teacherId: currentUser.uid,
         teacherEmail: currentUser.email,
         createdAt: serverTimestamp(),
-        passwordSetupSent: false // Will be updated by the trigger
+        updatedAt: serverTimestamp(),
+        // Authentication and account linking fields
+        displayName: studentData.name,
+        hasTemporaryPassword: true, // Enables automatic Google Sign-In linking
+        linkedToAuth: false, // Will be set to true after Firebase Auth user is created
+        authUid: '', // Will be set by Firebase Function with the Auth UID
+        emailVerified: false,
+        passwordSetupSent: false, // Will be updated by the trigger
+        passwordSetupComplete: false,
+        lastLogin: null,
+        // Additional metadata
+        createdBy: 'teacher',
+        source: 'teacher_dashboard'
       };
       
       // Add to users collection

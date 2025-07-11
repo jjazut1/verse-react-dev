@@ -167,7 +167,7 @@ const SmartRouter: React.FC = () => {
         fontFamily: 'system-ui, sans-serif'
       }}>
         <LoadingSpinner />
-        <h2 style={{ marginTop: '20px', color: '#374151' }}>Lumino Learning</h2>
+        <h2 style={{ marginTop: '20px', color: '#374151' }}>LuminateLearn</h2>
         <p style={{ color: '#6b7280', textAlign: 'center', maxWidth: '400px' }}>
           Detecting your device capabilities and choosing the best way to open your content...
         </p>
@@ -186,7 +186,7 @@ const SmartRouter: React.FC = () => {
         }}>
           <strong>What's happening:</strong>
           <ul style={{ margin: '10px 0', paddingLeft: '20px' }}>
-            <li>🔍 Checking if Lumino Learning app is installed</li>
+                          <li>🔍 Checking if LuminateLearn app is installed</li>
             <li>🎯 Selecting the best way to open your content</li>
             <li>🚀 Redirecting to your assignment or dashboard</li>
           </ul>

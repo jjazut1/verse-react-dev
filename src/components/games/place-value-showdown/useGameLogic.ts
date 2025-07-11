@@ -26,7 +26,7 @@ export const useGameLogic = (
     studentNumber: null,
     teacherNumber: null,
     roundWinner: null,
-    message: `🟢 In this game, each of you will be dealt ${config.numberOfCards} digit cards. Your mission is to drag and drop them into the slots to create the ${config.objective} number possible! The winner of each round earns 1 point! First to ${config.winningScore} points wins!`,
+    message: `🟢 In this game, each of you will be dealt ${config.numberOfCards}${config.includeDecimal ? ` + ${config.decimalPlaces} decimal` : ''} digit cards. Your mission is to drag and drop them into the slots to create the ${config.objective} number possible! The winner of each round earns 1 point! First to ${config.winningScore} points wins!`,
     isStudentReady: false,
     isTeacherReady: false,
   });
@@ -41,8 +41,8 @@ export const useGameLogic = (
 
   // Start a new round
   const startNewRound = useCallback(() => {
-    const studentCards = generateCards(config.numberOfCards);
-    const teacherCards = generateCards(config.numberOfCards);
+    const studentCards = generateCards(config);
+    const teacherCards = generateCards(config);
     
     setGameState(prev => ({
       ...prev,
@@ -84,9 +84,10 @@ export const useGameLogic = (
     if (!gameStartedRef.current) {
       gameStartedRef.current = true;
       setTimeout(() => {
+        const totalCards = config.numberOfCards + (config.includeDecimal ? config.decimalPlaces : 0);
         setGameState(prev => ({
           ...prev,
-          message: "📣 Let's get started!"
+          message: `📣 Let's get started! ${config.includeDecimal ? `We'll be working with ${config.numberOfCards} whole number cards and ${config.decimalPlaces} decimal place cards.` : `We'll be working with ${config.numberOfCards} digit cards.`}`
         }));
         
         setTimeout(() => {
@@ -94,13 +95,13 @@ export const useGameLogic = (
         }, 1500);
       }, 3000);
     }
-  }, [startNewRound]);
+  }, [startNewRound, config]);
 
   // Check if round is complete and reveal results
   useEffect(() => {
     if (gameState.isStudentReady && gameState.isTeacherReady && gameState.phase === 'arranging') {
-      const studentNum = calculateNumber(gameState.studentCards);
-      const teacherNum = calculateNumber(gameState.teacherCards);
+      const studentNum = calculateNumber(gameState.studentCards, config);
+      const teacherNum = calculateNumber(gameState.teacherCards, config);
       const winner = determineRoundWinner(studentNum, teacherNum, config.objective);
 
       // Update scores immediately when round is complete
@@ -130,15 +131,15 @@ export const useGameLogic = (
         }, 2000); // Give time to see the round results before showing game complete message
       }
     }
-  }, [gameState.isStudentReady, gameState.isTeacherReady, gameState.phase, gameState.studentScore, gameState.teacherScore, config.objective, config.winningScore, config.playerName, config.teacherName]);
+  }, [gameState.isStudentReady, gameState.isTeacherReady, gameState.phase, gameState.studentScore, gameState.teacherScore, config]);
 
   // Check if student is ready when all cards are placed
   useEffect(() => {
-    const isReady = areAllCardsPlaced(gameState.studentCards, config.numberOfCards);
+    const isReady = areAllCardsPlaced(gameState.studentCards, config);
     if (isReady && !gameState.isStudentReady) {
       setGameState(prev => ({ ...prev, isStudentReady: true }));
     }
-  }, [gameState.studentCards, config.numberOfCards, gameState.isStudentReady]);
+  }, [gameState.studentCards, config, gameState.isStudentReady]);
 
   // Handle game completion
   useEffect(() => {

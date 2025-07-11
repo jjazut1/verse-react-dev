@@ -42,7 +42,7 @@ export class EmailLinkHandler {
 
   private initializeBroadcastChannel() {
     try {
-      this.assignmentChannel = new BroadcastChannel('lumino-assignments');
+      this.assignmentChannel = new BroadcastChannel('luminatelearn-assignments');
       console.log('[EmailLink] 📡 BroadcastChannel initialized');
     } catch (error) {
       console.warn('[EmailLink] ⚠️ BroadcastChannel not supported:', error);
