@@ -40,7 +40,7 @@ const colorThemes = {
   ocean: ['#006994', '#0081A7', '#00AFB9', '#FDFCDC', '#FED9B7', '#F07167', '#E29578', '#83C5BE'],
   sunset: ['#F72585', '#B5179E', '#7209B7', '#480CA8', '#3A0CA3', '#3F37C9', '#4361EE', '#4895EF'],
   forest: ['#2D5016', '#3F6C23', '#4F7C2F', '#5F8A3A', '#6F9946', '#7FA752', '#8FB65E', '#9FC46A'],
-  rainbow: ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3', '#FF1493']
+  patriotic: ['#DC143C', '#FFFFFF', '#000080', '#B22222', '#F8F8FF', '#4169E1', '#FF4500', '#1E90FF']
 };
 
 // Define a type for WheelItem
@@ -424,7 +424,7 @@ const AppearanceManager: React.FC<{
           <option value="ocean">Ocean</option>
           <option value="sunset">Sunset</option>
           <option value="forest">Forest</option>
-          <option value="rainbow">Rainbow</option>
+          <option value="patriotic">Patriotic</option>
           <option value="custom">Custom Colors</option>
         </Select>
       </FormControl>

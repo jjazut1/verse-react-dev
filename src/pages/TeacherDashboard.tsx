@@ -421,7 +421,22 @@ const TeacherDashboard = () => {
         };
       }) as GameTemplate[];
       
-      setBlankTemplates(blankTemplatesList);
+      // Sort blankTemplates by game type (alphabetically), then by title (alphanumerically)
+      const sortedBlankTemplates = blankTemplatesList.sort((a, b) => {
+        // First sort by game type alphabetically
+        const typeComparison = (a.type || '').localeCompare(b.type || '');
+        if (typeComparison !== 0) {
+          return typeComparison;
+        }
+        
+        // If types are the same, sort by title alphanumerically
+        return (a.title || '').localeCompare(b.title || '', undefined, { 
+          numeric: true, 
+          sensitivity: 'base' 
+        });
+      });
+      
+      setBlankTemplates(sortedBlankTemplates);
       setCategoryTemplates(categoryTemplatesList);
     } catch (error) {
       console.error('Error fetching game templates:', error);
@@ -642,6 +657,18 @@ const TeacherDashboard = () => {
       }
       
       return matchesSearch && matchesType && matchesFolder;
+    }).sort((a, b) => {
+      // First sort by game type alphabetically
+      const typeComparison = (a.gameType || '').localeCompare(b.gameType || '');
+      if (typeComparison !== 0) {
+        return typeComparison;
+      }
+      
+      // If types are the same, sort by title alphanumerically
+      return (a.title || '').localeCompare(b.title || '', undefined, { 
+        numeric: true, 
+        sensitivity: 'base' 
+      });
     });
   }, [myGames, gameSearchQuery, gameTypeFilter, gameFolderFilter, folderManager.selectedFolderId, folderManager]);
 
@@ -659,6 +686,18 @@ const TeacherDashboard = () => {
         (game.gameType || '').toLowerCase().includes(publicGameTypeFilter.toLowerCase());
       
       return matchesSearch && matchesType;
+    }).sort((a, b) => {
+      // First sort by game type alphabetically
+      const typeComparison = (a.gameType || '').localeCompare(b.gameType || '');
+      if (typeComparison !== 0) {
+        return typeComparison;
+      }
+      
+      // If types are the same, sort by title alphanumerically
+      return (a.title || '').localeCompare(b.title || '', undefined, { 
+        numeric: true, 
+        sensitivity: 'base' 
+      });
     });
   }, [publicGames, publicGameSearchQuery, publicGameTypeFilter]);
 
@@ -1784,13 +1823,13 @@ const TeacherDashboard = () => {
                           }}
                         >
                           <option value="all">✅ All Types</option>
-                          <option value="whack">🔨 Whack-a-Mole</option>
-                          <option value="spinner">🎡 Spinner Wheel</option>
-                          <option value="sort">🥚 Sort Categories</option>
                           <option value="anagram">🧩 Anagram</option>
-                          <option value="sentence">📝 Sentence Sense</option>
-                          <option value="place">🎯 Place Value Showdown</option>
-                          <option value="word">🏓 Pong</option>
+                          <option value="place-value-showdown">🎯 Place Value Showdown</option>
+                          <option value="word-volley">🏓 Pong</option>
+                          <option value="sentence-sense">📝 Sentence Sense</option>
+                          <option value="sort-categories-egg">🥚 Sort Categories</option>
+                          <option value="spinner-wheel">🎡 Spinner Wheel</option>
+                          <option value="whack-a-mole">🔨 Whack-a-Mole</option>
                         </select>
                       </div>
                       
