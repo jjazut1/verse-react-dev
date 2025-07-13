@@ -4,6 +4,7 @@ import { useGameLogic } from './useGameLogic';
 import { GameHeader } from './GameHeader';
 import { PlayerArea } from './PlayerArea';
 import PWAGameHeader from '../PWAGameHeader';
+import { useAuth } from '../../../contexts/AuthContext';
 import './PlaceValueShowdown.css';
 
 /**
@@ -25,16 +26,24 @@ const PlaceValueShowdown: React.FC<PlaceValueShowdownProps> = ({
   onHighScoreProcessStart,
   onHighScoreProcessComplete,
 }) => {
+  const { currentUser } = useAuth();
+  
   // Educational feature toggles
   const [showPlaceValueLabels, setShowPlaceValueLabels] = useState(false);
   const [showExpandedNumbers, setShowExpandedNumbers] = useState(false);
   const [showExpandedWords, setShowExpandedWords] = useState(false);
 
-  // Create a modified config that uses the dynamic playerName
-  const dynamicConfig = React.useMemo(() => ({
-    ...config,
-    playerName: playerName || config.playerName // Use dynamic playerName if available, fallback to original
-  }), [config, playerName]);
+  // Create a modified config with privacy protection for public games
+  const dynamicConfig = React.useMemo(() => {
+    // Check if this is a public game access (current user is different from game creator)
+    const isPublicGameAccess = currentUser && config.userId && currentUser.uid !== config.userId;
+    
+    return {
+      ...config,
+      playerName: playerName || config.playerName, // Use dynamic playerName if available, fallback to original
+      teacherName: isPublicGameAccess ? 'Teacher' : config.teacherName // Use generic "Teacher" for public games
+    };
+  }, [config, playerName, currentUser]);
 
   // Use custom hook for game logic and state management
   const { gameState, selectionState, handlers } = useGameLogic(dynamicConfig, onGameComplete);

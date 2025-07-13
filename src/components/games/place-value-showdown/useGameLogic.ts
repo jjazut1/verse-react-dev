@@ -16,6 +16,15 @@ export const useGameLogic = (
   config: PlaceValueShowdownConfig,
   onGameComplete: (score: number) => void
 ) => {
+  // DEBUG: Log the actual config values being used
+  console.log('🔧 [PlaceValueShowdown] Config values received:', {
+    numberOfCards: config.numberOfCards,
+    includeDecimal: config.includeDecimal,
+    decimalPlaces: config.decimalPlaces,
+    totalSlots: config.numberOfCards + (config.includeDecimal ? config.decimalPlaces : 0),
+    fullConfig: config
+  });
+
   const [gameState, setGameState] = useState<GameState>({
     phase: 'dealing',
     round: 0,

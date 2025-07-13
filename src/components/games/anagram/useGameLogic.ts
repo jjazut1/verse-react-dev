@@ -4,17 +4,15 @@ import { GameState, AnagramItem, GameStats } from './types';
 import { 
   initializeAnagrams, 
   checkAnswerCorrectness, 
-  calculateScore,
+  calculateScore, 
   formatTime 
 } from './utils';
-import { useHighScore } from '../../../hooks/useHighScore';
+import { speakWord, isTTSAvailable } from '../../../utils/soundUtils';
 
 export const useGameLogic = (
   config: AnagramConfig,
   playerName: string,
-  onGameComplete: (score: number) => void,
-  onHighScoreProcessStart?: () => void,
-  onHighScoreProcessComplete?: () => void
+  onGameComplete: (score: number) => void
 ) => {
   const [gameState, setGameState] = useState<GameState>({
     gameStarted: false,
@@ -31,7 +29,7 @@ export const useGameLogic = (
     },
     showHint: false,
     showDefinition: false,
-    highScores: [], // This will be managed by the new hook
+    highScores: [],
     showHighScoreModal: false,
     isNewHighScore: false,
     feedback: '',
@@ -43,16 +41,6 @@ export const useGameLogic = (
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const incorrectFeedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Use the new unified high score system
-  const highScoreSystem = useHighScore({
-    gameType: 'anagram',
-    configId: config.id || 'demo',
-    scoringSystem: 'miss-based', // Lower misses = better score
-    enableRateLimit: true,
-    onHighScoreProcessStart,
-    onHighScoreProcessComplete,
-  });
-
   // Initialize game on mount
   useEffect(() => {
     initializeGame();
@@ -63,6 +51,26 @@ export const useGameLogic = (
       if (incorrectFeedbackTimeoutRef.current) clearTimeout(incorrectFeedbackTimeoutRef.current);
     };
   }, [config]);
+
+  // Auto-speak word when anagram changes (if TTS is enabled)
+  useEffect(() => {
+    if (config.enableTextToSpeech && 
+        isTTSAvailable() && 
+        gameState.gameStarted && 
+        !gameState.gameCompleted && 
+        gameState.anagrams.length > 0) {
+      
+      const currentAnagram = gameState.anagrams[gameState.currentAnagramIndex];
+      if (currentAnagram) {
+        // Delay speaking to avoid conflicts with feedback
+        const speakTimeout = setTimeout(() => {
+          speakWord(currentAnagram.original);
+        }, 500);
+        
+        return () => clearTimeout(speakTimeout);
+      }
+    }
+  }, [gameState.currentAnagramIndex, gameState.gameStarted, gameState.gameCompleted, config.enableTextToSpeech]);
 
   // Game timer
   useEffect(() => {
@@ -253,18 +261,11 @@ export const useGameLogic = (
       gameStats: {
         ...prev.gameStats,
         timeElapsed: prev.timeElapsed
-      },
-      // Update with the unified high score data
-      highScores: highScoreSystem.highScores,
-      isNewHighScore: highScoreSystem.isNewHighScore,
-      showHighScoreModal: true // We'll handle this differently now
+      }
     }));
 
-    // Use the new unified high score system
-    await highScoreSystem.saveHighScore(totalMisses, playerName);
-
     onGameComplete(totalMisses);
-  }, [gameState.gameStats.totalMisses, gameState.timeElapsed, highScoreSystem, playerName, onGameComplete]);
+  }, [gameState.gameStats.totalMisses, gameState.timeElapsed, playerName, onGameComplete]);
 
   const startGame = useCallback(() => {
     setGameState(prev => ({
@@ -290,7 +291,7 @@ export const useGameLogic = (
       },
       showHint: false,
       showDefinition: false,
-      highScores: highScoreSystem.highScores, // Keep current high scores
+      highScores: [],
       showHighScoreModal: false,
       isNewHighScore: false,
       feedback: '',
@@ -298,23 +299,14 @@ export const useGameLogic = (
       showIncorrectFeedback: false
     });
     initializeGame();
-  }, [highScoreSystem.highScores, initializeGame]);
+  }, [initializeGame]);
 
   const closeHighScoreModal = useCallback(() => {
     setGameState(prev => ({ ...prev, showHighScoreModal: false }));
-    highScoreSystem.setShowHighScoreModal(false);
-  }, [highScoreSystem]);
+  }, []);
 
   return {
-    gameState: {
-      ...gameState,
-      // Merge in the high score system state
-      highScores: highScoreSystem.highScores,
-      showHighScoreModal: highScoreSystem.showHighScoreModal,
-      isNewHighScore: highScoreSystem.isNewHighScore,
-    },
-    // High score system functions and state
-    highScoreSystem,
+    gameState,
     // Game functions
     handleLetterClick,
     checkAnswer,

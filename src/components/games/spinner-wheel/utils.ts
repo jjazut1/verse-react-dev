@@ -13,6 +13,44 @@ export const colorThemes: ColorTheme = {
   custom: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']
 };
 
+/**
+ * Calculate the relative luminance of a color
+ * Based on WCAG 2.1 guidelines for color contrast
+ * @param color - Hex color string (e.g., '#FF6B6B')
+ * @returns Luminance value between 0 (darkest) and 1 (lightest)
+ */
+export const calculateLuminance = (color: string): number => {
+  // Remove # if present
+  const hex = color.replace('#', '');
+  
+  // Convert hex to RGB
+  const r = parseInt(hex.substr(0, 2), 16) / 255;
+  const g = parseInt(hex.substr(2, 2), 16) / 255;
+  const b = parseInt(hex.substr(4, 2), 16) / 255;
+  
+  // Apply gamma correction (sRGB to linear RGB)
+  const rsRGB = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+  const gsRGB = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+  const bsRGB = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+  
+  // Calculate relative luminance
+  return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
+};
+
+/**
+ * Determine the best contrasting text color for a given background
+ * @param backgroundColor - Hex color string (e.g., '#FF6B6B')
+ * @returns '#FFFFFF' for white text or '#000000' for black text
+ */
+export const getContrastingTextColor = (backgroundColor: string): string => {
+  const luminance = calculateLuminance(backgroundColor);
+  
+  // Use white text for dark backgrounds (luminance < 0.5)
+  // Use black text for light backgrounds (luminance >= 0.5)
+  // This threshold can be adjusted for preference - 0.5 is a good middle ground
+  return luminance < 0.5 ? '#FFFFFF' : '#000000';
+};
+
 // Helper function to calculate segment center angle - ensures consistency
 export const getSegmentCenterAngle = (segmentIndex: number, totalSegments: number): number => {
   const degreesPerSlice = 360 / totalSegments;

@@ -32,8 +32,10 @@
   margin: 0 auto;
 }
 
-/* Side-by-side layout for desktop */
-@media (min-width: 900px) {
+/* Force stacked layout for all screens - better for games with many slots */
+/* Side-by-side layout disabled for better slot accommodation */
+/*
+@media (min-width: 1400px) {
   .game-area {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -41,6 +43,7 @@
     align-items: stretch;
   }
 }
+*/
 
 /* ============================================
    GAME HEADER & SCOREBOARD
@@ -72,6 +75,30 @@
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
+}
+
+/* Objective Indicator */
+.objective-indicator {
+  margin-left: 12px;
+  font-size: 0.75em;
+  background: #90EE90;
+  color: black;
+  padding: 6px 16px;
+  border-radius: 25px;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  border: 2px solid white;
+  white-space: nowrap;
+  font-family: 'Comic Neue', 'Comic Sans MS', 'Trebuchet MS', cursive, sans-serif !important;
+  display: inline-block;
+  text-shadow: none;
+  -webkit-text-fill-color: black;
+  background-clip: initial;
+  -webkit-background-clip: initial;
+}
+
+.objective-indicator.smallest {
+  background: #90EE90;
 }
 
 /* Header Content Layout */
@@ -314,8 +341,9 @@
   background: rgba(78, 205, 196, 0.05);
   width: fit-content;
   margin: 0 auto 15px auto;
-  max-width: 100%;
+  max-width: calc(100vw - 40px); /* Ensure it doesn't exceed viewport width */
   overflow-x: auto; /* Add horizontal scrolling if needed on very small screens */
+  box-sizing: border-box;
 }
 
 .slot-container {
@@ -631,33 +659,36 @@
 
   .player-area {
     padding: 10px;
+    max-width: calc(100vw - 20px); /* Ensure player area fits in viewport */
+    box-sizing: border-box;
   }
 
   .number-slots {
-    gap: 8px; /* Reduced gap for better fit */
-    padding: 10px;
-    min-width: 100%; /* Ensure it takes full width available */
+    gap: clamp(6px, 2vw, 10px); /* Good gaps for tablets with full width */
+    padding: clamp(10px, 2.5vw, 15px);
+    max-width: calc(100vw - 20px); /* Ensure it fits in viewport */
+    min-width: unset; /* Remove min-width constraint */
   }
 
   .decimal-point {
-    height: 50px;
-    margin: 0 3px;
+    height: clamp(50px, 10vw, 60px);
+    margin: 0 clamp(3px, 1vw, 5px);
   }
 
   .decimal-dot {
-    font-size: 2.5rem;
+    font-size: clamp(2.2rem, 4vw, 2.8rem);
   }
 
   .number-slot {
-    width: 50px; /* Slightly smaller for tablets */
-    height: 50px;
+    width: clamp(50px, 9vw, 60px); /* Good size for tablets with full width */
+    height: clamp(50px, 9vw, 60px);
     flex-shrink: 0; /* Prevent slots from shrinking further */
   }
 
   .card {
-    width: 50px; /* Match slot size */
-    height: 50px;
-    font-size: 1.3rem;
+    width: clamp(50px, 9vw, 60px); /* Match slot size */
+    height: clamp(50px, 9vw, 60px);
+    font-size: clamp(1.3rem, 3vw, 1.6rem);
   }
 
   .game-message p {
@@ -665,7 +696,8 @@
   }
 
   .comma-separator {
-    font-size: 2rem;
+    font-size: clamp(2rem, 4vw, 2.5rem);
+    margin: 0 clamp(3px, 1vw, 5px);
   }
 
   .student-deck {
@@ -713,30 +745,31 @@
   }
 
   .number-slots {
-    gap: 6px; /* Reduced gap to fit more digits */
-    padding: 8px;
-    min-width: 100%; /* Ensure it takes full width available */
+    gap: clamp(4px, 1.5vw, 8px); /* Reasonable gaps for mobile with full width */
+    padding: clamp(8px, 2vw, 12px);
+    max-width: calc(100vw - 20px); /* Ensure it fits in viewport */
+    min-width: unset; /* Remove min-width constraint */
   }
 
   .decimal-point {
-    height: 45px;
-    margin: 0 2px;
+    height: clamp(45px, 10vw, 55px);
+    margin: 0 clamp(2px, 1vw, 4px);
   }
 
   .decimal-dot {
-    font-size: 2rem;
+    font-size: clamp(2rem, 4vw, 2.5rem);
   }
 
   .number-slot {
-    width: 45px; /* Smaller slots for mobile to fit more digits */
-    height: 45px;
+    width: clamp(45px, 8vw, 55px); /* Reasonable size for mobile with full width */
+    height: clamp(45px, 8vw, 55px);
     flex-shrink: 0; /* Prevent slots from shrinking further */
   }
 
   .card {
-    width: 45px; /* Match smaller slot size */
-    height: 45px;
-    font-size: 1.2rem; /* Slightly smaller font to fit in smaller cards */
+    width: clamp(45px, 8vw, 55px); /* Match slot size */
+    height: clamp(45px, 8vw, 55px);
+    font-size: clamp(1.2rem, 3vw, 1.5rem); /* Readable font size */
   }
 
   .student-deck {
@@ -745,8 +778,8 @@
   }
 
   .comma-separator {
-    font-size: 1.8rem;
-    margin: 0 3px;
+    font-size: clamp(1.8rem, 3.5vw, 2.2rem);
+    margin: 0 clamp(2px, 1vw, 4px);
   }
 
   .header-controls {
@@ -780,39 +813,42 @@
   }
 }
 
+/* Removed 390px breakpoint - 480px breakpoint now handles this range well with full width layout */
+
 /* ============================================
    RESPONSIVE DESIGN - EXTRA SMALL MOBILE (320px and below)
    ============================================ */
 
 @media (max-width: 320px) {
   .number-slots {
-    gap: 4px; /* Even smaller gap for very small screens */
-    padding: 6px;
-    justify-content: flex-start; /* Align to start to allow scrolling */
+    gap: clamp(2px, 1vw, 4px); /* Small but reasonable gaps */
+    padding: clamp(4px, 1.5vw, 8px);
+    justify-content: flex-start; /* Align to start to allow scrolling if needed */
+    max-width: calc(100vw - 16px); /* Ensure it fits in viewport */
   }
 
   .decimal-point {
-    height: 40px;
-    margin: 0 1px;
+    height: clamp(35px, 8vw, 45px);
+    margin: 0 clamp(1px, 0.5vw, 2px);
   }
 
   .decimal-dot {
-    font-size: 1.5rem;
+    font-size: clamp(1.5rem, 3.5vw, 2rem);
   }
 
   .number-slot {
-    width: 40px; /* Even smaller slots for very small screens */
-    height: 40px;
+    width: clamp(35px, 7vw, 45px); /* Reasonable slots for very small screens with full width */
+    height: clamp(35px, 7vw, 45px);
   }
 
   .card {
-    width: 40px; /* Match slot size */
-    height: 40px;
-    font-size: 1.1rem; /* Smaller font for tiny cards */
+    width: clamp(35px, 7vw, 45px); /* Match slot size */
+    height: clamp(35px, 7vw, 45px);
+    font-size: clamp(1rem, 2.5vw, 1.3rem); /* Readable font */
   }
 
   .comma-separator {
-    font-size: 1.5rem; /* Smaller comma for tiny screens */
-    margin: 0 2px;
+    font-size: clamp(1.3rem, 3vw, 1.7rem); /* Readable comma size */
+    margin: 0 clamp(1px, 0.5vw, 2px);
   }
 } 

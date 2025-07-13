@@ -25,10 +25,17 @@ export const useGameLogic = (onGameComplete: (score: number) => void, config: Ga
   useEffect(() => {
     if (config && (config as any).items) {
       const configItems = (config as any).items as SpinnerWheelItem[];
+      console.log('🎮 [useGameLogic] Raw config items received:', configItems);
+      console.log('🎮 [useGameLogic] First item details:', configItems[0]);
+      console.log('🎮 [useGameLogic] First item has content field:', !!configItems[0]?.content);
+      
       const theme = (config as any).wheelTheme || 'primaryColors';
       const customColors = (config as any).customColors;
       
       const itemsWithColors = getItemColors(configItems, theme, customColors);
+      console.log('🎮 [useGameLogic] Items after color processing:', itemsWithColors);
+      console.log('🎮 [useGameLogic] First processed item:', itemsWithColors[0]);
+      
       setGameState(prev => ({ ...prev, items: itemsWithColors }));
     }
   }, [config]);

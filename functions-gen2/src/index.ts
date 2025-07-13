@@ -296,9 +296,9 @@ export const sendPasswordSetupEmail = onDocumentCreated(
           <tr>
             <td>
               <h1 style="color: #2D3748; text-align: center; margin: 0 0 20px 0;">Welcome to LuminateLearn!</h1>
-              
+          
               <p style="margin: 0 0 15px 0; font-size: 16px; color: #4A5568;">Hi ${studentName},</p>
-              
+          
               <p style="margin: 0 0 20px 0; font-size: 16px; color: #4A5568;">Your teacher has created an account for you on our educational gaming platform. Here are your login credentials:</p>
               
               <table width="100%" cellpadding="20" cellspacing="0" style="background: #f8f9fa; border: 2px solid #4299E1; border-radius: 8px; margin: 20px 0;">
@@ -327,7 +327,7 @@ export const sendPasswordSetupEmail = onDocumentCreated(
                     <a href="${getBaseUrl()}/login?email=${encodeURIComponent(studentEmail)}&temp=true" 
                        style="background-color: #4299E1; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
                       Sign In Now
-                    </a>
+            </a>
                   </td>
                 </tr>
               </table>
@@ -339,19 +339,19 @@ export const sendPasswordSetupEmail = onDocumentCreated(
                 <li>You'll be asked to create a new password of your choice</li>
                 <li>After that, you can use either email/password or Google Sign-In</li>
               </ol>
-              
+          
               <p style="margin: 20px 0 10px 0; font-size: 16px; color: #4A5568;">Once you've signed in, you can:</p>
               <ul style="margin: 0 0 20px 0; padding-left: 20px; color: #4A5568;">
-                <li>Access assignments sent by your teacher</li>
-                <li>Play educational games</li>
-              </ul>
-              
+            <li>Access assignments sent by your teacher</li>
+            <li>Play educational games</li>
+          </ul>
+          
               <p style="margin: 20px 0; font-size: 16px; color: #4A5568;">If you have any questions, please contact your teacher.</p>
-              
-              <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 30px 0;">
+          
+          <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 30px 0;">
               <p style="font-size: 12px; color: #718096; text-align: center; margin: 0;">
                 This email was sent from LuminateLearn Platform
-              </p>
+          </p>
             </td>
           </tr>
         </table>

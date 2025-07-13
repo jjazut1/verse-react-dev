@@ -27,6 +27,41 @@ import { useModal } from '../contexts/ModalContext';
 import { GlobalModals } from '../components/GlobalModals';
 import { StudentsTab, AssignmentsTab } from './teacher-dashboard';
 
+// Utility function to manage game type filter memory
+const GAME_TYPE_FILTER_KEY = 'teacher-dashboard-game-type-filter';
+const MEMORY_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+const saveGameTypeFilter = (filterValue: string) => {
+  const data = {
+    value: filterValue,
+    timestamp: Date.now()
+  };
+  localStorage.setItem(GAME_TYPE_FILTER_KEY, JSON.stringify(data));
+};
+
+const loadGameTypeFilter = (): string => {
+  try {
+    const saved = localStorage.getItem(GAME_TYPE_FILTER_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      const now = Date.now();
+      const elapsed = now - data.timestamp;
+      
+      // If within 15 minutes, return the saved value
+      if (elapsed < MEMORY_DURATION) {
+        return data.value;
+      } else {
+        // Remove expired data
+        localStorage.removeItem(GAME_TYPE_FILTER_KEY);
+      }
+    }
+  } catch (error) {
+    console.error('Error loading game type filter:', error);
+    localStorage.removeItem(GAME_TYPE_FILTER_KEY);
+  }
+  return 'all'; // Default value
+};
+
 interface Game extends GameWithFolder {
   id: string;
   title: string;
@@ -95,7 +130,7 @@ const TeacherDashboard = () => {
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [gameSearchQuery, setGameSearchQuery] = useState<string>('');
-  const [gameTypeFilter, setGameTypeFilter] = useState<string>('all');
+  const [gameTypeFilter, setGameTypeFilter] = useState<string>(loadGameTypeFilter());
   const [gameFolderFilter, setGameFolderFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(false);
   
@@ -125,8 +160,8 @@ const TeacherDashboard = () => {
   
   // Function to get student display name from email
   const getStudentDisplayName = (studentEmail: string): string => {
-    const student = students.find(s => s.email === studentEmail);
-    return student?.name || studentEmail.split('@')[0]; // Fallback to email prefix if name not found
+    return students.find(student => student.email === studentEmail)?.name || 
+           studentEmail.split('@')[0] || 'Unknown Student';
   };
   
   // Refs for edit handlers
@@ -150,7 +185,11 @@ const TeacherDashboard = () => {
   );
 
   // Drag state for visual feedback
-  const [activeItem, setActiveItem] = useState<any>(null);
+  const [activeItem, setActiveItem] = useState<{
+    type: 'game' | 'folder';
+    id: string;
+    data?: any;
+  } | null>(null);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
@@ -606,27 +645,22 @@ const TeacherDashboard = () => {
     });
   }, [myGames, gameSearchQuery, gameTypeFilter, gameFolderFilter, folderManager.selectedFolderId, folderManager]);
 
-  // Filter public games based on search query, type, and creator
+  // Filter public games based on search query and type
   const getFilteredPublicGames = useCallback(() => {
     return publicGames.filter(game => {
       // Text search filter
       const matchesSearch = !publicGameSearchQuery || 
         game.title.toLowerCase().includes(publicGameSearchQuery.toLowerCase()) ||
         (game.description || '').toLowerCase().includes(publicGameSearchQuery.toLowerCase()) ||
-        (game.gameType || '').toLowerCase().includes(publicGameSearchQuery.toLowerCase()) ||
-        (game.createdBy || '').toLowerCase().includes(publicGameSearchQuery.toLowerCase());
+        (game.gameType || '').toLowerCase().includes(publicGameSearchQuery.toLowerCase());
       
       // Game type filter
       const matchesType = publicGameTypeFilter === 'all' || 
         (game.gameType || '').toLowerCase().includes(publicGameTypeFilter.toLowerCase());
       
-      // Creator filter
-      const matchesCreator = publicGameCreatorFilter === 'all' || 
-        (game.createdBy || '').toLowerCase().includes(publicGameCreatorFilter.toLowerCase());
-      
-      return matchesSearch && matchesType && matchesCreator;
+      return matchesSearch && matchesType;
     });
-  }, [publicGames, publicGameSearchQuery, publicGameTypeFilter, publicGameCreatorFilter]);
+  }, [publicGames, publicGameSearchQuery, publicGameTypeFilter]);
 
   const handleCreateAssignment = (game: Game) => {
     // Use global modal for assignment creation
@@ -1365,6 +1399,12 @@ const TeacherDashboard = () => {
     }
   };
 
+  // Handler for game type filter that saves to localStorage
+  const handleGameTypeFilterChange = (value: string) => {
+    setGameTypeFilter(value);
+    saveGameTypeFilter(value);
+  };
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
       <ToastComponent toastMessage={toastMessage} />
@@ -1733,7 +1773,7 @@ const TeacherDashboard = () => {
                         </label>
                         <select
                           value={gameTypeFilter}
-                          onChange={(e) => setGameTypeFilter(e.target.value)}
+                          onChange={(e) => handleGameTypeFilterChange(e.target.value)}
                           style={{
                             padding: '6px 8px',
                             border: '1px solid #CBD5E0',
@@ -1743,13 +1783,14 @@ const TeacherDashboard = () => {
                             cursor: 'pointer'
                           }}
                         >
-                          <option value="all">All Types</option>
+                          <option value="all">✅ All Types</option>
                           <option value="whack">🔨 Whack-a-Mole</option>
                           <option value="spinner">🎡 Spinner Wheel</option>
                           <option value="sort">🥚 Sort Categories</option>
                           <option value="anagram">🧩 Anagram</option>
                           <option value="sentence">📝 Sentence Sense</option>
                           <option value="place">🎯 Place Value Showdown</option>
+                          <option value="word">🏓 Pong</option>
                         </select>
                       </div>
                       
@@ -1955,34 +1996,38 @@ const TeacherDashboard = () => {
                         </div>
                       </div>
                     ) : (
-                      /* Temporary fallback: show flat folder list if tree is empty */
+                      /* No folders yet - show getting started message */
                       <div style={{ marginBottom: '12px' }}>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#FFF3CD', borderRadius: '6px', border: '1px solid #FFC107' }}>
-                          <strong>Debug:</strong> FolderTree is empty (length: {folderManager.folderTree.length}), showing fallback. 
-                          Folders array has {folderManager.folders.length} items.
-                        </div>
-                        
-                        {folderManager.folders.length > 0 && (
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                            {folderManager.folders.map(folder => (
+                        <div style={{ 
+                          marginBottom: '12px', 
+                          padding: '16px', 
+                          backgroundColor: '#E6F3FF', 
+                          borderRadius: '8px', 
+                          border: '1px solid #4299E1',
+                          textAlign: 'center' as const
+                        }}>
+                          <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#2B6CB0', marginBottom: '8px' }}>
+                            🚀 Get Started with Game Folders
+                          </h4>
+                          <p style={{ color: '#4A5568', marginBottom: '12px' }}>
+                            Organize your games into folders to keep track of different subjects, game types, or teaching units.
+                          </p>
                               <button
-                                key={folder.id}
-                                onClick={() => folderManager.setSelectedFolderId(folder.id)}
+                            onClick={() => folderManager.openCreateFolderModal()}
                                 style={{
-                                  padding: '6px 12px',
-                                  backgroundColor: 'white',
-                                  color: '#4A5568',
-                                  border: `2px solid ${folder.color || '#4299E1'}`,
+                              padding: '8px 16px',
+                              backgroundColor: '#4299E1',
+                              color: 'white',
+                              border: 'none',
                                   borderRadius: '6px',
                                   cursor: 'pointer',
-                                  fontSize: '14px'
+                              fontSize: '14px',
+                              fontWeight: '600'
                                 }}
                               >
-                                📁 {folder.name} (level: {folder.depth || 0})
+                            📁 Create Your First Game Folder
                               </button>
-                            ))}
                                 </div>
-                              )}
                       </div>
                     )}
                     
@@ -2168,7 +2213,7 @@ const TeacherDashboard = () => {
                                 }}>
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: '1fr auto auto auto', 
+                  gridTemplateColumns: '1fr auto auto', 
                   gap: '12px', 
                   alignItems: 'center' 
                               }}>
@@ -2200,33 +2245,14 @@ const TeacherDashboard = () => {
                       minWidth: '150px'
                     }}
                   >
-                    <option value="all">All Types</option>
-                    <option value="whack-a-mole">Whack-a-Mole</option>
-                    <option value="spinner-wheel">Spinner Wheel</option>
-                    <option value="sort-categories-egg">Sort Categories</option>
-                    <option value="anagram">Anagram</option>
-                    <option value="sentence-sense">Sentence Sense</option>
-                    <option value="place-value-showdown">Place Value Showdown</option>
-                    <option value="word-volley">Word Volley</option>
-                  </select>
-                  
-                  {/* Creator Filter */}
-                  <select
-                    value={publicGameCreatorFilter}
-                    onChange={(e) => setPublicGameCreatorFilter(e.target.value)}
-                                  style={{
-                      padding: '8px 12px',
-                      border: '1px solid #D1D5DB',
-                                    borderRadius: '6px',
-                      fontSize: '14px',
-                      backgroundColor: 'white',
-                      minWidth: '150px'
-                                  }}
-                  >
-                    <option value="all">All Creators</option>
-                    {Array.from(new Set(publicGames.map(game => game.createdBy).filter(Boolean))).map(creator => (
-                      <option key={creator} value={creator}>{creator}</option>
-                    ))}
+                    <option value="all">✅ All Types</option>
+                    <option value="whack-a-mole">🔨 Whack-a-Mole</option>
+                    <option value="spinner-wheel">🎡 Spinner Wheel</option>
+                    <option value="sort-categories-egg">🥚 Sort Categories</option>
+                    <option value="anagram">🧩 Anagram</option>
+                    <option value="sentence-sense">📝 Sentence Sense</option>
+                    <option value="place-value-showdown">🎯 Place Value Showdown</option>
+                    <option value="word-volley">🏓 Pong</option>
                   </select>
                   
                   {/* Clear Filters Button */}
@@ -2234,7 +2260,6 @@ const TeacherDashboard = () => {
                     onClick={() => {
                       setPublicGameSearchQuery('');
                       setPublicGameTypeFilter('all');
-                      setPublicGameCreatorFilter('all');
                                   }}
                                   style={{
                       padding: '8px 16px',
@@ -2346,17 +2371,10 @@ const TeacherDashboard = () => {
                           <p style={{ 
                             color: '#718096', 
                             fontSize: '14px',
-                            marginBottom: '4px',
+                            marginBottom: '16px',
                             textTransform: 'capitalize'
                           }}>
                             {(game.gameType || 'Unknown').replace('-', ' ')}
-                          </p>
-                          <p style={{ 
-                            color: '#A0AEC0', 
-                            fontSize: '12px',
-                            marginBottom: '16px'
-                          }}>
-                            Created by: {game.createdBy || 'Unknown'}
                           </p>
                           
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
@@ -2500,7 +2518,6 @@ const TeacherDashboard = () => {
                       onClick={() => {
                         setPublicGameSearchQuery('');
                         setPublicGameTypeFilter('all');
-                        setPublicGameCreatorFilter('all');
                       }}
                       style={{
                         padding: '8px 16px',

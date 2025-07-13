@@ -44,13 +44,13 @@ export async function safeGoogleSignIn(loginHint?: string) {
         
         const error = new Error(`Account mismatch: You signed in with ${result.user.email}, but this login is for ${loginHint}. Please try again and select the correct account.`);
         (error as any).code = 'auth/account-mismatch';
-        throw error;
-      }
+            throw error;
+          }
       
       return result;
     } catch (popupError: any) {
       console.log('[Google Sign-In] Popup failed or timed out, trying redirect...', popupError.message || popupError.code);
-      
+          
       // If popup fails or times out, use redirect as fallback
       if (popupError.code === 'auth/popup-blocked' || 
           popupError.code === 'auth/popup-closed-by-user' || 

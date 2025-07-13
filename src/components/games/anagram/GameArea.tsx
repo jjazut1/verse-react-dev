@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   VStack,
@@ -17,6 +17,7 @@ import {
 import { ChevronDownIcon, ChevronRightIcon } from '@chakra-ui/icons';
 import { GameState } from './types';
 import { AnagramConfig } from '../../../types/game';
+import { speakWord, speakDefinition, stopSpeech, isTTSAvailable } from '../../../utils/soundUtils';
 
 interface GameAreaProps {
   gameState: GameState;
@@ -25,6 +26,23 @@ interface GameAreaProps {
   onUseHint: () => void;
   onToggleDefinition: () => void;
 }
+
+// Simple HTML renderer component for rich text definitions
+const RichTextRenderer: React.FC<{ html: string }> = ({ html }) => {
+  return (
+    <Box
+      dangerouslySetInnerHTML={{ __html: html }}
+      sx={{
+        '& strong': { fontWeight: 'bold' },
+        '& em': { fontStyle: 'italic' },
+        '& u': { textDecoration: 'underline' },
+        '& sub': { fontSize: '0.8em', verticalAlign: 'sub' },
+        '& sup': { fontSize: '0.8em', verticalAlign: 'super' },
+        fontFamily: "'Comic Neue', sans-serif"
+      }}
+    />
+  );
+};
 
 const GameArea: React.FC<GameAreaProps> = ({
   gameState,
@@ -40,6 +58,18 @@ const GameArea: React.FC<GameAreaProps> = ({
   const answerBorder = useColorModeValue('green.200', 'green.600');
 
   const currentAnagram = gameState.anagrams[gameState.currentAnagramIndex];
+
+  const handleSpeakWord = () => {
+    if (currentAnagram) {
+      speakWord(currentAnagram.original);
+    }
+  };
+
+  const handleSpeakDefinition = () => {
+    if (currentAnagram?.definition) {
+      speakDefinition(currentAnagram.definition);
+    }
+  };
 
   if (!currentAnagram) {
     return null;
@@ -69,6 +99,7 @@ const GameArea: React.FC<GameAreaProps> = ({
               justifyContent="center"
               fontSize="3xl"
               fontWeight="bold"
+              fontFamily="'Comic Neue', sans-serif"
               boxShadow="lg"
               animation="pulse 0.25s ease-in-out"
             >
@@ -80,6 +111,7 @@ const GameArea: React.FC<GameAreaProps> = ({
               borderRadius="md" 
               w="auto"
               boxShadow="lg"
+              fontFamily="'Comic Neue', sans-serif"
             >
               <AlertIcon />
               {gameState.feedback}
@@ -95,7 +127,7 @@ const GameArea: React.FC<GameAreaProps> = ({
           <VStack spacing={8}>
             {/* Scrambled Letters */}
             <VStack spacing={3} w="full">
-              <Heading size="sm" color="gray.600">Scrambled Letters</Heading>
+              <Heading size="sm" color="gray.600" fontFamily="'Comic Neue', sans-serif">Scrambled Letters</Heading>
               <Flex 
                 wrap="wrap" 
                 gap={2} 
@@ -125,6 +157,7 @@ const GameArea: React.FC<GameAreaProps> = ({
                     transition="all 0.2s"
                     fontSize="xl"
                     fontWeight="bold"
+                    fontFamily="'Comic Neue', sans-serif"
                     color={letter ? "blue.600" : "gray.400"}
                   >
                     {letter}
@@ -135,7 +168,7 @@ const GameArea: React.FC<GameAreaProps> = ({
 
             {/* Answer Slots */}
             <VStack spacing={3} w="full">
-              <Heading size="sm" color="gray.600">Your Answer</Heading>
+              <Heading size="sm" color="gray.600" fontFamily="'Comic Neue', sans-serif">Your Answer</Heading>
               <Flex 
                 wrap="wrap" 
                 gap={2} 
@@ -165,6 +198,7 @@ const GameArea: React.FC<GameAreaProps> = ({
                     transition="all 0.2s"
                     fontSize="xl"
                     fontWeight="bold"
+                    fontFamily="'Comic Neue', sans-serif"
                     color={letter ? "green.600" : "gray.400"}
                   >
                     {letter}
@@ -175,13 +209,14 @@ const GameArea: React.FC<GameAreaProps> = ({
 
             {/* Hint and Definition Section */}
             <VStack spacing={3} w="full">
-              <HStack spacing={4}>
+              <HStack spacing={4} wrap="wrap" justify="center">
                 {config.enableHints && (
                   <Button
                     onClick={onUseHint}
                     colorScheme="cyan"
                     variant="outline"
                     size="sm"
+                    fontFamily="'Comic Neue', sans-serif"
                     isDisabled={gameState.showHint}
                   >
                     {gameState.showHint ? '🔍 Hint Shown' : '🔍 Show Hint'}
@@ -194,17 +229,45 @@ const GameArea: React.FC<GameAreaProps> = ({
                     colorScheme="blue"
                     variant="outline"
                     size="sm"
+                    fontFamily="'Comic Neue', sans-serif"
                     leftIcon={gameState.showDefinition ? <ChevronDownIcon /> : <ChevronRightIcon />}
                   >
                     Definition
                   </Button>
+                )}
+
+                {/* Text-to-Speech Controls */}
+                {config.enableTextToSpeech && isTTSAvailable() && (
+                  <>
+                    <Button
+                      onClick={handleSpeakWord}
+                      colorScheme="purple"
+                      variant="outline"
+                      size="sm"
+                      fontFamily="'Comic Neue', sans-serif"
+                    >
+                      🗣️ Speak Word
+                    </Button>
+                    
+                    {config.showDefinitions && currentAnagram.definition && (
+                      <Button
+                        onClick={handleSpeakDefinition}
+                        colorScheme="orange"
+                        variant="outline"
+                        size="sm"
+                        fontFamily="'Comic Neue', sans-serif"
+                      >
+                        📚 Speak Definition
+                      </Button>
+                    )}
+                  </>
                 )}
               </HStack>
 
               {/* Hint Display */}
               {config.enableHints && (
                 <Collapse in={gameState.showHint}>
-                  <Alert status="info" borderRadius="md">
+                  <Alert status="info" borderRadius="md" fontFamily="'Comic Neue', sans-serif">
                     <AlertIcon />
                     <Text fontSize="sm">
                       💡 First letter: <strong>{currentAnagram.original[0]}</strong>
@@ -213,14 +276,15 @@ const GameArea: React.FC<GameAreaProps> = ({
                 </Collapse>
               )}
 
-              {/* Definition Display */}
+              {/* Definition Display with Rich Text Support */}
               {config.showDefinitions && currentAnagram.definition && (
                 <Collapse in={gameState.showDefinition}>
-                  <Alert status="info" borderRadius="md">
+                  <Alert status="info" borderRadius="md" fontFamily="'Comic Neue', sans-serif">
                     <AlertIcon />
-                    <Text fontSize="sm">
-                      📚 <strong>Definition:</strong> {currentAnagram.definition}
-                    </Text>
+                    <Box fontSize="sm">
+                      <Text as="span" fontWeight="bold">📚 Definition:</Text>{' '}
+                      <RichTextRenderer html={currentAnagram.definition} />
+                    </Box>
                   </Alert>
                 </Collapse>
               )}

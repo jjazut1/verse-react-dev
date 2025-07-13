@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box } from '@chakra-ui/react';
 import { SpinnerWheelItem, ZoomTarget, ParsedTextNode } from './types';
-import { parseHTML } from './utils';
+import { parseHTML, getContrastingTextColor } from './utils';
 
 interface WheelRendererProps {
   items: SpinnerWheelItem[];
@@ -22,7 +22,7 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
   const center = 240; // Match original
   const angle = 360 / items.length;
 
-  const renderRichTextSVG = (htmlContent: string, x: number, y: number, transform: string, fontSize: number = 18) => {
+  const renderRichTextSVG = (htmlContent: string, x: number, y: number, transform: string, textColor: string, fontSize: number = 18) => {
     const parsedNodes = parseHTML(htmlContent);
     
     return (
@@ -34,7 +34,7 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
         fontSize={fontSize}
         fontWeight="normal"
         fontFamily="'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-        fill="#333"
+        fill={textColor}
         transform={transform}
       >
         {parsedNodes.map((segment, index) => {
@@ -87,6 +87,11 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
 
   const renderWheel = () => {
     if (items.length === 0) return null;
+
+    console.log('🎨 [WheelRenderer] Rendering items:', items);
+    console.log('🎨 [WheelRenderer] First item:', items[0]);
+    console.log('🎨 [WheelRenderer] First item has content:', !!items[0]?.content);
+    console.log('🎨 [WheelRenderer] First item content value:', items[0]?.content);
 
     // Calculate zoom transform - match original scaling
     const zoomScale = isZoomed ? 2.4 : 1;
@@ -141,6 +146,9 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
               // Check if this is the winning segment for special highlighting
               const isWinningSegment = isZoomed && i === zoomTarget.segmentIndex;
               
+              // Calculate contrasting text color based on background color
+              const textColor = getContrastingTextColor(item.color);
+              
               return (
                 <g key={item.id}>
                   <path
@@ -151,7 +159,7 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
                     filter={isWinningSegment ? "drop-shadow(0 0 10px rgba(255, 215, 0, 0.8))" : "none"}
                   />
                   {item.content ? (
-                    renderRichTextSVG(item.content, textX, textY, transformText, 18)
+                    renderRichTextSVG(item.content, textX, textY, transformText, textColor, 18)
                   ) : (
                     <text
                       x={textX}
@@ -161,7 +169,7 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
                       fontSize="18"
                       fontWeight="normal"
                       fontFamily="'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-                      fill="#333"
+                      fill={textColor}
                       transform={transformText}
                     >
                       {item.text.length > 10 ? item.text.substring(0, 10) + '...' : item.text}

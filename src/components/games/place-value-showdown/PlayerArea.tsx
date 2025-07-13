@@ -28,6 +28,17 @@ export const PlayerArea: React.FC<PlayerAreaProps> = ({
 
   const totalSlots = config.numberOfCards + (config.includeDecimal ? config.decimalPlaces : 0);
 
+  // DEBUG: Log slot calculation values
+  console.log('🎯 [PlayerArea] Slot calculation:', {
+    isTeacher,
+    playerName,
+    numberOfCards: config.numberOfCards,
+    includeDecimal: config.includeDecimal,
+    decimalPlaces: config.decimalPlaces,
+    totalSlots,
+    configType: config.type
+  });
+
   return (
     <div className={`player-area ${areaClass}`}>
       <h3>{playerName}'s Turn</h3>

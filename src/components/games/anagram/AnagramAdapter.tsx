@@ -6,16 +6,12 @@ interface AnagramAdapterProps {
   config: GameConfig;
   playerName: string;
   onGameComplete: (score: number) => void;
-  onHighScoreProcessStart?: () => void;
-  onHighScoreProcessComplete?: () => void;
 }
 
 const AnagramAdapter: React.FC<AnagramAdapterProps> = ({
   config,
   playerName,
   onGameComplete,
-  onHighScoreProcessStart,
-  onHighScoreProcessComplete,
 }) => {
   // Type guard to ensure we have an anagram config
   if (config.type !== 'anagram') {
@@ -27,8 +23,6 @@ const AnagramAdapter: React.FC<AnagramAdapterProps> = ({
       config={config}
       playerName={playerName}
       onGameComplete={onGameComplete}
-      onHighScoreProcessStart={onHighScoreProcessStart}
-      onHighScoreProcessComplete={onHighScoreProcessComplete}
     />
   );
 };

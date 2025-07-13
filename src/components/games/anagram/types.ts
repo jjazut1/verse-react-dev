@@ -5,8 +5,6 @@ export interface AnagramProps {
   playerName: string;
   onGameComplete: (score: number) => void;
   config: AnagramConfig;
-  onHighScoreProcessStart?: () => void;
-  onHighScoreProcessComplete?: () => void;
 }
 
 export interface HighScore {

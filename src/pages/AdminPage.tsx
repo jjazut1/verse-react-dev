@@ -98,7 +98,7 @@ const AdminPage: React.FC = () => {
 
 
 
-
+  
   if (loading) {
     return (
       <Center minHeight="80vh">
@@ -158,14 +158,14 @@ const AdminPage: React.FC = () => {
                 <Text mb={4}>Perform system maintenance and optimization tasks.</Text>
                 
                 <VStack align="start" spacing={4}>
-                  <Button
-                    colorScheme="blue"
-                    onClick={handleRegenerateAllThumbnails}
-                    isLoading={isLoading}
-                    loadingText="Regenerating..."
-                  >
-                    Regenerate All Thumbnails
-                  </Button>
+                <Button
+                  colorScheme="blue"
+                  onClick={handleRegenerateAllThumbnails}
+                  isLoading={isLoading}
+                  loadingText="Regenerating..."
+                >
+                  Regenerate All Thumbnails
+                </Button>
                   
 
                 </VStack>

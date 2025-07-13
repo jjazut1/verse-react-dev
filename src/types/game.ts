@@ -124,6 +124,7 @@ export interface AnagramConfig extends BaseGameConfig {
   type: 'anagram';
   showDefinitions: boolean;
   enableHints: boolean;
+  enableTextToSpeech: boolean;
   maxAttempts: number;
   shuffleIntensity: 'low' | 'medium' | 'high';
   anagrams: Array<{
@@ -136,9 +137,9 @@ export interface AnagramConfig extends BaseGameConfig {
 
 export interface SentenceSenseConfig extends BaseGameConfig {
   type: 'sentence-sense';
-  enableHints: boolean;
+  showHints: boolean;
+  enableTextToSpeech: boolean;
   maxAttempts: number;
-  correctFeedbackDuration: 'always' | 'momentary';
   sentences: Array<{
     id: string;
     original: string; // The correct sentence

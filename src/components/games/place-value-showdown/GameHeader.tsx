@@ -16,7 +16,12 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
   onAdvanceToNextRound
 }) => (
   <div className="game-header">
-    <h2>🏆 {config.title}</h2>
+    <h2>
+      🏆 {config.title}
+      <span className={`objective-indicator ${config.objective === 'smallest' ? 'smallest' : ''}`}>
+        {config.objective === 'largest' ? '🔺 LARGEST' : '🔻 SMALLEST'}
+      </span>
+    </h2>
     <div className="header-content">
       <div className="scoreboard">
         <div className="score">

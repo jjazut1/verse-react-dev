@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { speakText, isTTSAvailable } from '../../../utils/soundUtils';
 import './WordSentenceMode.css';
 
 interface WordSentenceModeProps {
@@ -11,6 +12,7 @@ interface WordSentenceModeProps {
   onHintUsed: () => void;
   showDefinition: boolean;
   enableHints: boolean;
+  enableTextToSpeech?: boolean;
   correctFeedbackDuration?: 'always' | 'momentary';
 }
 
@@ -28,6 +30,7 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
   onHintUsed,
   showDefinition,
   enableHints,
+  enableTextToSpeech = false,
   correctFeedbackDuration = 'momentary'
 }) => {
   const [words, setWords] = useState<Word[]>([]);
@@ -375,6 +378,17 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
     initializeGame();
   };
 
+  const handleTTS = () => {
+    if (!enableTextToSpeech || !isTTSAvailable()) return;
+    
+    // Speak the correct sentence
+    speakText(anagram.original, {
+      rate: 0.8,
+      pitch: 1.0,
+      volume: 0.8
+    });
+  };
+
   const getWordClassName = (word: Word, index: number) => {
     let className = 'draggable-word';
     
@@ -493,6 +507,16 @@ const WordSentenceMode: React.FC<WordSentenceModeProps> = ({
 
       {/* Game Controls */}
       <div className="game-controls">
+        {enableTextToSpeech && isTTSAvailable() && (
+          <button 
+            className="tts-button"
+            onClick={handleTTS}
+            title="Listen to the correct sentence"
+          >
+            🔊 Listen
+          </button>
+        )}
+        
         {enableHints && !isComplete && !showHint && (
           <button 
             className="hint-button"

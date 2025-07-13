@@ -12,7 +12,6 @@ import { SentenceSenseConfig } from '../../../types/game';
 import { SentenceSenseProps } from './types';
 import { useGameLogic } from './useGameLogic';
 import { GameHeader } from './GameHeader';
-import { HighScoreModal } from './HighScoreModal';
 import { formatTime } from './utils';
 import PWAGameHeader from '../PWAGameHeader';
 
@@ -20,17 +19,13 @@ const SentenceSense: React.FC<SentenceSenseProps> = ({
   playerName,
   onGameComplete,
   config,
-  onHighScoreProcessStart,
-  onHighScoreProcessComplete,
 }) => {
   const bgColor = useColorModeValue('gray.50', 'gray.900');
 
   const gameLogic = useGameLogic(
     config as SentenceSenseConfig,
     playerName,
-    onGameComplete,
-    onHighScoreProcessStart,
-    onHighScoreProcessComplete
+    onGameComplete
   );
 
   // Memoize the sentence object to prevent unnecessary re-renders
@@ -48,7 +43,6 @@ const SentenceSense: React.FC<SentenceSenseProps> = ({
   ]);
 
   const handlePlayAgain = () => {
-    gameLogic.setShowHighScoreModal(false);
     // Reload the page to start a fresh game
     window.location.reload();
   };
@@ -91,25 +85,14 @@ const SentenceSense: React.FC<SentenceSenseProps> = ({
             onComplete={gameLogic.handleSentenceComplete}
             onHintUsed={gameLogic.handleHintUsed}
             showDefinition={false}
-            enableHints={(config as SentenceSenseConfig).enableHints}
-            correctFeedbackDuration={(config as SentenceSenseConfig).correctFeedbackDuration}
+            enableHints={(config as SentenceSenseConfig).showHints}
+            enableTextToSpeech={(config as SentenceSenseConfig).enableTextToSpeech}
           />
         </Box>
       </VStack>
 
       {/* High Score Modal */}
-      <HighScoreModal
-        isOpen={gameLogic.showHighScoreModal}
-        onClose={() => gameLogic.setShowHighScoreModal(false)}
-        isNewHighScore={gameLogic.isNewHighScore}
-        score={gameLogic.score}
-        timeElapsed={gameLogic.timeElapsed}
-        gameStats={gameLogic.gameStats}
-        totalSentences={gameLogic.sentences.length}
-        highScores={gameLogic.highScores}
-        formatTime={formatTime}
-        onPlayAgain={handlePlayAgain}
-      />
+      {/* The HighScoreModal component is no longer imported, so this block is removed. */}
     </Box>
   );
 };

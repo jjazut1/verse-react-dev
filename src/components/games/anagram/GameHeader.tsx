@@ -27,21 +27,21 @@ const GameHeader: React.FC<GameHeaderProps> = ({ gameState, formatTime }) => {
     <Card bg={cardBg} borderColor={borderColor} borderWidth="1px" mb={6}>
       <CardBody>
         <HStack justify="space-between" mb={4}>
-          <Text fontSize="lg" fontWeight="bold">
+          <Text fontSize="lg" fontWeight="bold" fontFamily="'Comic Neue', sans-serif">
             Anagram {gameState.currentAnagramIndex + 1} of {gameState.anagrams.length}
           </Text>
           <HStack spacing={4}>
-            <Badge colorScheme="blue" fontSize="sm">
+            <Badge colorScheme="blue" fontSize="sm" fontFamily="'Comic Neue', sans-serif">
               Time: {formatTime(gameState.timeElapsed)}
             </Badge>
-            <Badge colorScheme="red" fontSize="sm">
+            <Badge colorScheme="red" fontSize="sm" fontFamily="'Comic Neue', sans-serif">
               Misses: {gameState.gameStats.totalMisses}
             </Badge>
-            <Badge colorScheme="green" fontSize="sm">
+            <Badge colorScheme="green" fontSize="sm" fontFamily="'Comic Neue', sans-serif">
               Correct: {gameState.gameStats.correctAnswers}
             </Badge>
             {gameState.gameStats.hintsUsed > 0 && (
-              <Badge colorScheme="orange" fontSize="sm">
+              <Badge colorScheme="orange" fontSize="sm" fontFamily="'Comic Neue', sans-serif">
                 Hints: {gameState.gameStats.hintsUsed}
               </Badge>
             )}

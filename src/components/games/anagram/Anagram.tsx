@@ -6,25 +6,20 @@ import StartScreen from './StartScreen';
 import GameArea from './GameArea';
 import GameComplete from './GameComplete';
 import PWAGameHeader from '../PWAGameHeader';
-import { HighScoreModal } from '../../common/HighScoreModal';
 import './WordSentenceMode.css';
 
 const Anagram: React.FC<AnagramProps> = ({
   playerName,
   onGameComplete,
   config,
-  onHighScoreProcessStart,
-  onHighScoreProcessComplete,
 }) => {
   const gameLogic = useGameLogic(
     config,
     playerName,
-    onGameComplete,
-    onHighScoreProcessStart,
-    onHighScoreProcessComplete
+    onGameComplete
   );
 
-  const { gameState, highScoreSystem } = gameLogic;
+  const { gameState } = gameLogic;
 
   if (!gameState.gameStarted) {
     return (
@@ -39,31 +34,10 @@ const Anagram: React.FC<AnagramProps> = ({
     return (
       <Box w="100vw" h="100vh" overflow="hidden">
         <PWAGameHeader gameTitle="Anagram" variant="compact" />
-        <GameComplete 
+        <GameComplete
           gameState={gameState} 
           onResetGame={gameLogic.resetGame}
           formatTime={gameLogic.formatTime}
-        />
-        
-        {/* Use the new unified HighScoreModal */}
-        <HighScoreModal
-          isOpen={highScoreSystem.showHighScoreModal}
-          onClose={gameLogic.closeHighScoreModal}
-          score={gameState.score}
-          isNewHighScore={highScoreSystem.isNewHighScore}
-          highScores={highScoreSystem.highScores}
-          scoringSystem="miss-based"
-          gameTitle="Anagram"
-          timeElapsed={gameState.timeElapsed}
-          additionalStats={[
-            { label: 'Correct Answers', value: gameState.gameStats.correctAnswers, colorScheme: 'green' },
-            { label: 'Hints Used', value: gameState.gameStats.hintsUsed, colorScheme: 'yellow' },
-          ]}
-          isLoading={highScoreSystem.isLoading}
-          isSubmittingScore={highScoreSystem.isSubmittingScore}
-          error={highScoreSystem.error}
-          onClearError={highScoreSystem.clearError}
-          onPlayAgain={gameLogic.resetGame}
         />
       </Box>
     );
@@ -72,12 +46,12 @@ const Anagram: React.FC<AnagramProps> = ({
   return (
     <Box w="100vw" h="100vh" overflow="hidden">
       <PWAGameHeader gameTitle="Anagram" variant="compact" />
-      <GameArea 
+        <GameArea
         gameState={gameState}
-        config={config}
-        onLetterClick={gameLogic.handleLetterClick}
-        onUseHint={gameLogic.useHint}
-        onToggleDefinition={gameLogic.toggleDefinition}
+          config={config}
+          onLetterClick={gameLogic.handleLetterClick}
+          onUseHint={gameLogic.useHint}
+          onToggleDefinition={gameLogic.toggleDefinition}
       />
     </Box>
   );

@@ -481,40 +481,40 @@ const StudentDashboard: React.FC = () => {
             console.log('🔐 Email link access detected - using simplified approach for:', studentEmailParam);
             
             // Use simplified approach - fetch student data directly
-            await fetchStudentSpecificData(studentEmailParam);
-            
-            // Fetch actual student name from users collection
-            let studentDisplayName = studentEmailParam.split('@')[0]; // Fallback
-            try {
-              console.log('[StudentDashboard] Fetching student name from users collection for email:', studentEmailParam);
-              const usersQuery = query(
-                collection(db, 'users'),
-                where('email', '==', studentEmailParam.toLowerCase()),
-                limit(1)
-              );
-              const usersSnapshot = await getDocs(usersQuery);
+              await fetchStudentSpecificData(studentEmailParam);
               
-              if (!usersSnapshot.empty) {
-                const userData = usersSnapshot.docs[0].data();
-                if (userData.name) {
-                  studentDisplayName = userData.name;
-                  console.log('[StudentDashboard] Found student name in users collection:', userData.name);
+              // Fetch actual student name from users collection
+              let studentDisplayName = studentEmailParam.split('@')[0]; // Fallback
+              try {
+                console.log('[StudentDashboard] Fetching student name from users collection for email:', studentEmailParam);
+                const usersQuery = query(
+                  collection(db, 'users'),
+                  where('email', '==', studentEmailParam.toLowerCase()),
+                  limit(1)
+                );
+                const usersSnapshot = await getDocs(usersQuery);
+                
+                if (!usersSnapshot.empty) {
+                  const userData = usersSnapshot.docs[0].data();
+                  if (userData.name) {
+                    studentDisplayName = userData.name;
+                    console.log('[StudentDashboard] Found student name in users collection:', userData.name);
+                  } else {
+                    console.log('[StudentDashboard] No name field in user document, using email prefix');
+                  }
                 } else {
-                  console.log('[StudentDashboard] No name field in user document, using email prefix');
+                  console.log('[StudentDashboard] No user found in users collection, using email prefix');
                 }
-              } else {
-                console.log('[StudentDashboard] No user found in users collection, using email prefix');
+              } catch (nameError) {
+                console.error('[StudentDashboard] Error fetching student name from users collection:', nameError);
               }
-            } catch (nameError) {
-              console.error('[StudentDashboard] Error fetching student name from users collection:', nameError);
-            }
-            
-            // Set minimal user data for display with proper name
-            setCurrentUserData({
-              id: 'email_link_user',
-              email: studentEmailParam,
-              name: studentDisplayName
-            });
+              
+              // Set minimal user data for display with proper name
+              setCurrentUserData({
+                id: 'email_link_user',
+                email: studentEmailParam,
+                name: studentDisplayName
+              });
           } else {
             console.log('[StudentDashboard] Email link access but no studentEmail parameter');
             navigate('/login');

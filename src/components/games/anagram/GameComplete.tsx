@@ -39,7 +39,7 @@ const GameComplete: React.FC<GameCompleteProps> = ({
       <Center>
         <Card maxW="lg" w="full" bg={cardBg}>
           <CardHeader textAlign="center">
-            <Heading size="xl" color="green.500" mb={2}>
+            <Heading size="xl" color="green.500" mb={2} fontFamily="'Comic Neue', sans-serif">
               🎉 Game Complete!
             </Heading>
           </CardHeader>
@@ -47,37 +47,37 @@ const GameComplete: React.FC<GameCompleteProps> = ({
             <VStack spacing={6}>
               <Grid templateColumns="1fr 1fr" gap={6} w="full">
                 <Stat textAlign="center">
-                  <StatLabel>Total Misses</StatLabel>
-                  <StatNumber color="purple.500" fontSize="3xl">
+                  <StatLabel fontFamily="'Comic Neue', sans-serif">Total Misses</StatLabel>
+                  <StatNumber color="purple.500" fontSize="3xl" fontFamily="'Comic Neue', sans-serif">
                     {gameState.score}
                   </StatNumber>
-                  <StatHelpText>Fewer misses = better score!</StatHelpText>
+                  <StatHelpText fontFamily="'Comic Neue', sans-serif">Fewer misses = better score!</StatHelpText>
                 </Stat>
                 <Stat textAlign="center">
-                  <StatLabel>Time</StatLabel>
-                  <StatNumber color="orange.500" fontSize="3xl">
+                  <StatLabel fontFamily="'Comic Neue', sans-serif">Time</StatLabel>
+                  <StatNumber color="orange.500" fontSize="3xl" fontFamily="'Comic Neue', sans-serif">
                     {formatTime(gameState.timeElapsed)}
                   </StatNumber>
-                  <StatHelpText>Total time</StatHelpText>
+                  <StatHelpText fontFamily="'Comic Neue', sans-serif">Total time</StatHelpText>
                 </Stat>
               </Grid>
 
               <Grid templateColumns="1fr 1fr" gap={6} w="full">
                 <Stat textAlign="center">
-                  <StatLabel>Correct</StatLabel>
-                  <StatNumber color="green.500" fontSize="2xl">
+                  <StatLabel fontFamily="'Comic Neue', sans-serif">Correct</StatLabel>
+                  <StatNumber color="green.500" fontSize="2xl" fontFamily="'Comic Neue', sans-serif">
                     {gameState.gameStats.correctAnswers} / {gameState.anagrams.length}
                   </StatNumber>
-                  <StatHelpText>Words solved</StatHelpText>
+                  <StatHelpText fontFamily="'Comic Neue', sans-serif">Words solved</StatHelpText>
                 </Stat>
                 <Stat textAlign="center">
-                  <StatLabel>Accuracy</StatLabel>
-                  <StatNumber color="blue.500" fontSize="2xl">
+                  <StatLabel fontFamily="'Comic Neue', sans-serif">Accuracy</StatLabel>
+                  <StatNumber color="blue.500" fontSize="2xl" fontFamily="'Comic Neue', sans-serif">
                     {gameState.gameStats.totalMisses + gameState.gameStats.correctAnswers > 0 
                       ? Math.round((gameState.gameStats.correctAnswers / (gameState.gameStats.totalMisses + gameState.gameStats.correctAnswers)) * 100) 
                       : 100}%
                   </StatNumber>
-                  <StatHelpText>Success rate</StatHelpText>
+                  <StatHelpText fontFamily="'Comic Neue', sans-serif">Success rate</StatHelpText>
                 </Stat>
               </Grid>
 
@@ -87,6 +87,7 @@ const GameComplete: React.FC<GameCompleteProps> = ({
                   colorScheme="purple"
                   size="lg"
                   leftIcon={<RepeatIcon />}
+                  fontFamily="'Comic Neue', sans-serif"
                 >
                   Play Again
                 </Button>
