@@ -21,7 +21,10 @@ const SpinnerWheelConfig: React.FC = () => {
   // Load existing configuration if templateId is provided
   useEffect(() => {
     const loadConfiguration = async () => {
-      if (!templateId) return;
+      // Skip loading if templateId is empty, null, undefined, or "new"
+      if (!templateId || templateId === 'new' || templateId.trim() === '') {
+        return;
+      }
       
       // Check if this is a copy operation
       const urlParams = new URLSearchParams(window.location.search);
@@ -30,10 +33,29 @@ const SpinnerWheelConfig: React.FC = () => {
       
       setIsLoading(true);
       try {
-        const docRef = doc(db, 'userGameConfigs', templateId);
-        const docSnap = await getDoc(docRef);
+        let isAdminConfig = false;
         
-        if (docSnap.exists()) {
+        // Try multiple collections to find the template
+        const collections = [
+          { name: 'userGameConfigs', ref: doc(db, 'userGameConfigs', templateId) },
+          { name: 'gameConfigs', ref: doc(db, 'gameConfigs', templateId) },
+          { name: 'blankGameTemplates', ref: doc(db, 'blankGameTemplates', templateId) },
+          { name: 'categoryTemplates', ref: doc(db, 'categoryTemplates', templateId) }
+        ];
+        
+        let foundCollection = '';
+        let docSnap = null;
+        for (const collection of collections) {
+          const tempDocSnap = await getDoc(collection.ref);
+          if (tempDocSnap.exists()) {
+            docSnap = tempDocSnap;
+            foundCollection = collection.name;
+            isAdminConfig = collection.name === 'gameConfigs' || collection.name === 'blankGameTemplates' || collection.name === 'categoryTemplates';
+            break;
+          }
+        }
+        
+        if (docSnap && docSnap.exists()) {
           const data = docSnap.data();
           
           // Check if this is a copy operation or user doesn't have permission
@@ -45,12 +67,14 @@ const SpinnerWheelConfig: React.FC = () => {
               status: "info",
               duration: 5000,
             });
-          } else if (data.userId !== currentUser?.uid) {
+          } else if (isAdminConfig || data.userId !== currentUser?.uid) {
             setIsEditing(false);
-            setIsCopyOperation(true); // Treat as copy if user doesn't own it
+            setIsCopyOperation(true); // Treat as copy if user doesn't own it or it's an admin config
             toast({
               title: "Creating a copy",
-              description: "You're not the owner of this configuration, so you'll create a copy instead.",
+              description: isAdminConfig ? 
+                "This is an official template. You'll create a copy that you can customize." :
+                "You're not the owner of this configuration, so you'll create a copy instead.",
               status: "info",
               duration: 5000,
             });
@@ -61,14 +85,17 @@ const SpinnerWheelConfig: React.FC = () => {
           // Populate initial data - if copy, append "Copy of " to title
           const loadedData = {
             ...data,
-            title: (isCopy || data.userId !== currentUser?.uid) ? `Copy of ${data.title || 'Untitled Spinner Wheel'}` : (data.title || ''),
+            title: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? 
+              `Copy of ${data.title || 'Untitled Spinner Wheel'}` : 
+              (data.title || ''),
+            share: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? false : data.share, // Reset share to false for copies
           };
           
           setInitialData(loadedData);
         } else {
           toast({
             title: "Configuration not found",
-            description: "The requested configuration could not be found.",
+            description: "The requested configuration could not be found in any collection.",
             status: "error",
             duration: 5000,
           });

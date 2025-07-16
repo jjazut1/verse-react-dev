@@ -32,46 +32,98 @@ export const generateEggs = (config: SortCategoriesConfig): EggType[] => {
     }
   });
   
-  // Calculate grid-like positions for eggs
+  // Generate container positions with random placement and collision detection
   const newEggs: EggType[] = [];
   const numEggs = Math.min(config.eggQty, allWords.length);
-  const gridCols = Math.ceil(Math.sqrt(numEggs));
   
-  // Calculate cell dimensions with padding to prevent overlap
-  const titleHeight = 20; // Reserve top 20% for title
-  const bottomReserve = 30; // Reserve bottom 30% for baskets
-  const usableHeight = 100 - titleHeight - bottomReserve; // Remaining space for eggs
+  // Define safe zones for container placement
+  const titleHeight = 8; // Reserve top 8% for title
+  const bottomReserve = 45; // Reserve bottom 45% for baskets and labels
+  const usableHeight = 100 - titleHeight - bottomReserve; // Remaining space for containers
   
-  const horizontalPadding = 15; // 15% padding from sides
+  const horizontalPadding = 8; // 8% padding from sides
   const usableWidth = 100 - (2 * horizontalPadding);
   
-  const cellWidth = usableWidth / gridCols;
-  const cellHeight = usableHeight / Math.ceil(numEggs / gridCols);
+  // Container size estimates for collision detection (in percentage units)
+  const containerWidth = 6; // Approximate container width
+  const containerHeight = 8; // Approximate container height
+  const minDistance = 9; // Minimum distance between container centers
   
   // Shuffle allWords array before creating eggs
   const shuffledWords = [...allWords].sort(() => Math.random() - 0.5);
   
+  // Store all generated positions for collision detection
+  const usedPositions: { x: number; y: number }[] = [];
+  
+  // Function to check if a position collides with existing positions
+  const checkCollision = (x: number, y: number): boolean => {
+    return usedPositions.some(pos => {
+      const distance = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
+      return distance < minDistance;
+    });
+  };
+  
+  // Function to generate a random position within safe bounds
+  const generateRandomPosition = (): { x: number; y: number } => {
+    const x = horizontalPadding + (Math.random() * usableWidth);
+    const y = titleHeight + (Math.random() * usableHeight);
+    return { x, y };
+  };
+  
+  // Generate positions for each container
   for (let i = 0; i < numEggs; i++) {
     const randomWord = shuffledWords[i];
-    const row = Math.floor(i / gridCols);
-    const col = i % gridCols;
+    let position: { x: number; y: number };
+    let attempts = 0;
+    const maxAttempts = 100; // Prevent infinite loops
     
-    // Calculate base position
-    const baseX = horizontalPadding + (col * cellWidth) + (cellWidth / 2);
-    const baseY = titleHeight + (row * cellHeight) + (cellHeight / 2);
+    // Try to find a non-colliding position
+    do {
+      position = generateRandomPosition();
+      attempts++;
+    } while (checkCollision(position.x, position.y) && attempts < maxAttempts);
     
-    // Add small random offset (max 10% of cell size)
-    const maxOffset = Math.min(cellWidth, cellHeight) * 0.1;
-    const offsetX = (Math.random() - 0.5) * maxOffset;
-    const offsetY = (Math.random() - 0.5) * maxOffset;
+    // If we couldn't find a good position after many attempts, use fallback grid
+    if (attempts >= maxAttempts) {
+      const gridCols = Math.ceil(Math.sqrt(numEggs));
+      const row = Math.floor(i / gridCols);
+      const col = i % gridCols;
+      const cellWidth = usableWidth / gridCols;
+      const cellHeight = usableHeight / Math.ceil(numEggs / gridCols);
+      
+      position = {
+        x: horizontalPadding + (col * cellWidth) + (cellWidth / 2),
+        y: titleHeight + (row * cellHeight) + (cellHeight / 2)
+      };
+    }
+    
+    // Add small random variation to make it look more natural
+    const variation = 2; // 2% variation
+    const finalX = Math.max(
+      horizontalPadding + containerWidth/2, 
+      Math.min(
+        100 - horizontalPadding - containerWidth/2, 
+        position.x + (Math.random() - 0.5) * variation
+      )
+    );
+    const finalY = Math.max(
+      titleHeight + containerHeight/2, 
+      Math.min(
+        titleHeight + usableHeight - containerHeight/2, 
+        position.y + (Math.random() - 0.5) * variation
+      )
+    );
+    
+    // Store the position for collision detection
+    usedPositions.push({ x: finalX, y: finalY });
     
     newEggs.push({
       id: `egg-${Date.now()}-${i}`,
       word: randomWord,
       cracked: false,
       position: {
-        x: baseX + offsetX,
-        y: baseY + offsetY,
+        x: finalX,
+        y: finalY,
       },
     });
   }

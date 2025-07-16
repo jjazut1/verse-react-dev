@@ -9,14 +9,14 @@ interface AudioFiles {
   backgroundMusic?: string;
 }
 
-// Default audio files - these would be stored in public/sounds/
+// Default audio files - using existing sounds from public/sounds/
 const DEFAULT_AUDIO_FILES: AudioFiles = {
-  correct: '/sounds/word-volley/correct.wav',
-  wrong: '/sounds/word-volley/wrong.wav',
-  bounce: '/sounds/word-volley/bounce.wav',
-  levelUp: '/sounds/word-volley/level-up.wav',
-  gameOver: '/sounds/word-volley/game-over.wav',
-  backgroundMusic: '/sounds/word-volley/background.mp3',
+  correct: '/sounds/pop.mp3',        // Use pop sound for correct answers
+  wrong: '/sounds/crack.mp3',        // Use crack sound for wrong answers  
+  bounce: '/sounds/cardboard.mp3',   // Use cardboard sound for bounces
+  levelUp: '/sounds/unwrap.mp3',     // Use unwrap sound for level up
+  gameOver: '/sounds/crack.mp3',     // Use crack sound for game over
+  backgroundMusic: undefined,        // No background music for now
 };
 
 export const useAudio = (customAudioFiles?: Partial<AudioFiles>) => {
@@ -32,20 +32,38 @@ export const useAudio = (customAudioFiles?: Partial<AudioFiles>) => {
   useEffect(() => {
     // Preload sound effects
     Object.entries(audioFiles).forEach(([key, src]) => {
-      if (key !== 'backgroundMusic') {
+      if (key !== 'backgroundMusic' && src) {
         const audio = new Audio(src);
         audio.volume = volume;
         audio.preload = 'auto';
+        
+        // Add error handling for failed audio loads
+        audio.onerror = () => {
+          console.warn(`Failed to load audio file for ${key}: ${src}`);
+          // Remove from cache if it fails to load
+          audioCache.current.delete(key);
+        };
+        
+        audio.oncanplaythrough = () => {
+          console.log(`Successfully loaded audio for ${key}`);
+        };
+        
         audioCache.current.set(key, audio);
       }
     });
 
-    // Initialize background music
+    // Initialize background music if provided
     if (audioFiles.backgroundMusic) {
       const bgMusic = new Audio(audioFiles.backgroundMusic);
       bgMusic.volume = volume * 0.3; // Background music should be quieter
       bgMusic.loop = true;
       bgMusic.preload = 'auto';
+      
+      bgMusic.onerror = () => {
+        console.warn(`Failed to load background music: ${audioFiles.backgroundMusic}`);
+        backgroundMusicRef.current = null;
+      };
+      
       backgroundMusicRef.current = bgMusic;
     }
 
@@ -75,6 +93,82 @@ export const useAudio = (customAudioFiles?: Partial<AudioFiles>) => {
     }
   }, [volume, isMuted]);
 
+  // Web Audio API fallback sound generation
+  const playFallbackSound = useCallback((soundKey: string, volumeMultiplier: number = 1) => {
+    if (isMuted) return;
+
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      const baseVolume = volume * volumeMultiplier * 0.1; // Keep generated sounds quieter
+      
+      switch (soundKey) {
+        case 'correct':
+          // High pitched positive sound
+          oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(1000, audioContext.currentTime + 0.1);
+          gainNode.gain.setValueAtTime(baseVolume, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+          oscillator.type = 'sine';
+          break;
+          
+        case 'wrong':
+          // Low pitched negative sound
+          oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(150, audioContext.currentTime + 0.2);
+          gainNode.gain.setValueAtTime(baseVolume, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+          oscillator.type = 'sawtooth';
+          break;
+          
+        case 'bounce':
+          // Quick percussive bounce sound
+          oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.05);
+          gainNode.gain.setValueAtTime(baseVolume, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+          oscillator.type = 'square';
+          break;
+          
+        case 'levelUp':
+          // Ascending celebratory sound
+          oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.3);
+          gainNode.gain.setValueAtTime(baseVolume, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+          oscillator.type = 'triangle';
+          break;
+          
+        case 'gameOver':
+          // Descending dramatic sound
+          oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.5);
+          gainNode.gain.setValueAtTime(baseVolume, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.6);
+          oscillator.type = 'sawtooth';
+          break;
+          
+        default:
+          // Generic beep
+          oscillator.frequency.setValueAtTime(500, audioContext.currentTime);
+          gainNode.gain.setValueAtTime(baseVolume, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+          oscillator.type = 'sine';
+      }
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 1); // Stop after 1 second max
+      
+    } catch (error) {
+      console.warn(`Failed to generate fallback sound for ${soundKey}:`, error);
+    }
+  }, [isMuted, volume]);
+
   // Generic play sound function
   const playSound = useCallback((soundKey: string, volumeMultiplier: number = 1) => {
     if (isMuted) return;
@@ -88,9 +182,14 @@ export const useAudio = (customAudioFiles?: Partial<AudioFiles>) => {
       // Play the sound
       audioClone.play().catch(error => {
         console.warn(`Failed to play sound ${soundKey}:`, error);
+        // Fallback to Web Audio API generated sound
+        playFallbackSound(soundKey, volumeMultiplier);
       });
+    } else {
+      // If audio file isn't loaded, use Web Audio API fallback
+      playFallbackSound(soundKey, volumeMultiplier);
     }
-  }, [isMuted, volume]);
+  }, [isMuted, volume, playFallbackSound]);
 
   // Specific sound effects
   const playCorrectSound = useCallback(() => {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
+exports.processTTSRequest = exports.fixStudentPasswordFlag = exports.checkStudentPasswordStatus = exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
@@ -9,10 +9,16 @@ const admin = require("firebase-admin");
 const sendgridHelper_1 = require("./sendgridHelper");
 // Import the new PWA-aware email templates
 const emailTemplates_1 = require("./emailTemplates");
+const functions = require("firebase-functions");
+// AWS Polly imports
+const client_polly_1 = require("@aws-sdk/client-polly");
 // Define the secrets
 exports.SENDGRID_API_KEY = (0, params_1.defineSecret)("SENDGRID_API_KEY");
 exports.SENDER_EMAIL = (0, params_1.defineSecret)("SENDER_EMAIL");
 exports.APP_URL = (0, params_1.defineSecret)("APP_URL");
+// AWS secrets for Polly TTS
+exports.AWS_ACCESS_KEY_ID = (0, params_1.defineSecret)("AWS_ACCESS_KEY_ID");
+exports.AWS_SECRET_ACCESS_KEY = (0, params_1.defineSecret)("AWS_SECRET_ACCESS_KEY");
 // Get environment
 const isProduction = process.env.NODE_ENV === 'production';
 // Configuration flag to use untrackable email templates
@@ -107,7 +113,7 @@ exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
         to: studentEmail,
         from: {
             email: exports.SENDER_EMAIL.value().trim(),
-            name: "Lumino Learning"
+            name: "LuminateLearn"
         },
         subject: `📱 New Assignment: ${assignment.gameTitle || assignment.gameName}`,
         html: emailHtml,
@@ -140,11 +146,11 @@ exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
 // Send password setup email when a new student is created
 exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
     document: "users/{userId}",
-    secrets: [exports.SENDGRID_API_KEY, exports.SENDER_EMAIL],
+    secrets: [exports.SENDGRID_API_KEY, exports.SENDER_EMAIL, exports.APP_URL],
 }, async (event) => {
     const snapshot = event.data;
     const userData = snapshot === null || snapshot === void 0 ? void 0 : snapshot.data();
-    const userId = event.params.userId;
+    let userId = event.params.userId;
     // Only process if this is a new student and no password setup email has been sent
     if (!userData || userData.role !== 'student' || userData.passwordSetupSent === true) {
         console.log("Skipping password setup email: not a new student or already sent", { userId });
@@ -158,62 +164,150 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
     }
     try {
         // First, create or get the Firebase Auth user
+        let authUser;
+        let actualAuthUid;
         try {
-            // Try to get existing user
-            await admin.auth().getUserByEmail(studentEmail);
+            // Try to get existing user by email
+            authUser = await admin.auth().getUserByEmail(studentEmail);
+            actualAuthUid = authUser.uid;
             firebase_functions_1.logger.info('Found existing Firebase Auth user for:', studentEmail);
+            firebase_functions_1.logger.info('Existing Auth UID:', actualAuthUid);
+            // Update Firestore document to link to existing Auth user
+            await admin.firestore().collection('users').doc(userId).update({
+                authUid: actualAuthUid,
+                linkedToAuth: true,
+                emailVerified: authUser.emailVerified,
+                hasTemporaryPassword: true,
+                temporaryPasswordSet: true,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            firebase_functions_1.logger.info('✅ Updated Firestore document to link with existing Auth user');
         }
         catch (error) {
             if (error.code === 'auth/user-not-found') {
                 // Create new Firebase Auth user with the same UID as the Firestore document
-                await admin.auth().createUser({
-                    uid: userId,
+                authUser = await admin.auth().createUser({
+                    uid: userId, // Use the same UID as the Firestore document
                     email: studentEmail,
                     displayName: studentName,
                     emailVerified: false
                 });
-                firebase_functions_1.logger.info('✅ Created Firebase Auth user for:', studentEmail);
+                actualAuthUid = userId; // New user gets the Firestore document ID as their UID
+                firebase_functions_1.logger.info('✅ Created Firebase Auth user with UID:', actualAuthUid);
+                // Update the Firestore document with authentication linking fields
+                await admin.firestore().collection('users').doc(userId).update({
+                    authUid: actualAuthUid,
+                    linkedToAuth: true,
+                    emailVerified: false,
+                    hasTemporaryPassword: true,
+                    temporaryPasswordSet: true,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                firebase_functions_1.logger.info('✅ Updated Firestore document with auth linking fields');
             }
             else {
                 throw error;
             }
         }
-        // Generate a password reset link using Firebase Auth
-        const passwordResetLink = await admin.auth().generatePasswordResetLink(studentEmail);
-        firebase_functions_1.logger.info('Generated password reset link for:', studentEmail);
+        // Generate random password for the student
+        const generateRandomPassword = () => {
+            const adjectives = ['Bright', 'Happy', 'Swift', 'Calm', 'Bold', 'Smart', 'Kind', 'Cool', 'Warm', 'Quick'];
+            const nouns = ['Tiger', 'Ocean', 'Mountain', 'Star', 'River', 'Eagle', 'Lion', 'Phoenix', 'Wolf', 'Bear'];
+            const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+            const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+            const randomNumber = Math.floor(Math.random() * 9000) + 1000; // 4-digit number
+            return `${randomAdjective}-${randomNoun}-${randomNumber}`;
+        };
+        const temporaryPassword = generateRandomPassword();
+        // Set the temporary password on the Firebase Auth user using the ACTUAL Auth UID
+        await admin.auth().updateUser(actualAuthUid, {
+            password: temporaryPassword
+        });
+        firebase_functions_1.logger.info('Generated temporary password for:', studentEmail);
+        firebase_functions_1.logger.info('Temporary password set successfully for Auth UID:', actualAuthUid);
         // Create email content
-        const subject = `Set Your Password for Verse Educational Games`;
+        const subject = `Your LuminateLearn Account - Sign In Information`;
         const htmlContent = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #2D3748; text-align: center;">Welcome to Verse Educational Games!</h1>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to LuminateLearn!</title>
+</head>
+<body>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; padding: 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: white; border-radius: 8px; padding: 30px; font-family: Arial, sans-serif;">
           
-          <p>Hi ${studentName},</p>
+          <tr>
+            <td>
+              <h1 style="color: #2D3748; text-align: center; margin: 0 0 20px 0;">Welcome to LuminateLearn!</h1>
           
-          <p>Your teacher has created an account for you on our educational gaming platform. To get started, you'll need to set up your password.</p>
+              <p style="margin: 0 0 15px 0; font-size: 16px; color: #4A5568;">Hi ${studentName},</p>
           
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${passwordResetLink}" 
-               style="background-color: #4299E1; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-              Set Your Password
+              <p style="margin: 0 0 20px 0; font-size: 16px; color: #4A5568;">Your teacher has created an account for you on our educational gaming platform. Here are your login credentials:</p>
+              
+              <table width="100%" cellpadding="20" cellspacing="0" style="background: #f8f9fa; border: 2px solid #4299E1; border-radius: 8px; margin: 20px 0;">
+                <tr>
+                  <td align="center">
+                    <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Your Login Details:</p>
+                    <p style="margin: 5px 0; font-size: 16px;"><strong>Email:</strong> <a href="mailto:${studentEmail}" style="color: #4299E1; text-decoration: underline;">${studentEmail}</a></p>
+                    <p style="margin: 5px 0; font-size: 16px;"><strong>Temporary Password:</strong> <span style="background: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 18px; color: #2d3748;">${temporaryPassword}</span></p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table width="100%" cellpadding="15" cellspacing="0" style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; margin: 20px 0;">
+                <tr>
+                  <td>
+                    <p style="margin: 0; font-size: 14px; color: #856404;">
+                      <strong>⚠️ Important:</strong> Please use EMAIL and PASSWORD login (not Google Sign-In) for your first login.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="${getBaseUrl()}/login?email=${encodeURIComponent(studentEmail)}&temp=true" 
+                       style="background-color: #4299E1; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                      Sign In Now
             </a>
-          </div>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 20px 0 10px 0; font-size: 16px; color: #4A5568;"><strong>What happens next:</strong></p>
+              <ol style="margin: 0 0 20px 0; padding-left: 20px; color: #4A5568;">
+                <li>Click the "Sign In Now" button above</li>
+                <li>Use your email and the temporary password provided</li>
+                <li>You'll be asked to create a new password of your choice</li>
+                <li>After that, you can use either email/password or Google Sign-In</li>
+              </ol>
           
-          <p><strong>Important:</strong> This link will expire in 1 hour for security reasons. If it expires, please contact your teacher for a new setup link.</p>
-          
-          <p>Once you've set your password, you can:</p>
-          <ul>
+              <p style="margin: 20px 0 10px 0; font-size: 16px; color: #4A5568;">Once you've signed in, you can:</p>
+              <ul style="margin: 0 0 20px 0; padding-left: 20px; color: #4A5568;">
             <li>Access assignments sent by your teacher</li>
             <li>Play educational games</li>
-            <li>Track your progress</li>
           </ul>
           
-          <p>If you have any questions, please contact your teacher.</p>
+              <p style="margin: 20px 0; font-size: 16px; color: #4A5568;">If you have any questions, please contact your teacher.</p>
           
           <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 30px 0;">
-          <p style="font-size: 12px; color: #718096; text-align: center;">
-            This email was sent from Verse Educational Games Platform
+              <p style="font-size: 12px; color: #718096; text-align: center; margin: 0;">
+                This email was sent from LuminateLearn Platform
           </p>
-        </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
       `;
         // Use the helper function to set up SendGrid
         const isSetupSuccessful = (0, sendgridHelper_1.setupSendGrid)(exports.SENDGRID_API_KEY.value());
@@ -226,7 +320,7 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
             to: studentEmail,
             from: {
                 email: exports.SENDER_EMAIL.value().trim(),
-                name: "Verse Learning"
+                name: "LuminateLearn"
             },
             subject: subject,
             html: htmlContent,
@@ -262,9 +356,11 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
         firebase_functions_1.logger.error('❌ Error sending password setup email:', error);
     }
 });
+// Note: setUserPassword function removed - using Firebase Auth's built-in password reset instead
 // New function to authenticate email link users
 exports.authenticateEmailLinkUser = (0, https_1.onCall)({
     cors: true,
+    region: 'us-central1'
 }, async (request) => {
     const { studentEmail } = request.data;
     if (!studentEmail) {
@@ -366,6 +462,165 @@ exports.processEmailLinkAuth = (0, firestore_1.onDocumentCreated)({
             status: 'error',
             error: errorMessage,
             processedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+    }
+});
+exports.checkStudentPasswordStatus = functions.https.onCall(async (request) => {
+    try {
+        const { email } = request.data;
+        if (!email) {
+            throw new Error('Email is required');
+        }
+        // Query for user by email
+        const usersRef = admin.firestore().collection('users');
+        const querySnapshot = await usersRef.where('email', '==', email.toLowerCase()).get();
+        if (querySnapshot.empty) {
+            return {
+                found: false,
+                message: `No user found with email: ${email}`
+            };
+        }
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        return {
+            found: true,
+            email: userData.email,
+            hasTemporaryPassword: userData.hasTemporaryPassword,
+            passwordSetupComplete: userData.passwordSetupComplete,
+            role: userData.role,
+            userId: userDoc.id,
+            authUid: userData.authUid || userData.userId,
+            linkedToAuth: userData.linkedToAuth
+        };
+    }
+    catch (error) {
+        console.error('Error checking student password status:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to check student password status');
+    }
+});
+exports.fixStudentPasswordFlag = functions.https.onCall(async (request) => {
+    try {
+        const { email } = request.data;
+        if (!email) {
+            throw new Error('Email is required');
+        }
+        // Query for user by email
+        const usersRef = admin.firestore().collection('users');
+        const querySnapshot = await usersRef.where('email', '==', email.toLowerCase()).get();
+        if (querySnapshot.empty) {
+            return {
+                success: false,
+                message: `No user found with email: ${email}`
+            };
+        }
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        // Update the user document to clear temporary password flag
+        await userDoc.ref.update({
+            hasTemporaryPassword: false,
+            passwordSetupComplete: true,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        return {
+            success: true,
+            message: `Fixed password flag for ${email}`,
+            previousState: {
+                hasTemporaryPassword: userData.hasTemporaryPassword,
+                passwordSetupComplete: userData.passwordSetupComplete
+            },
+            newState: {
+                hasTemporaryPassword: false,
+                passwordSetupComplete: true
+            }
+        };
+    }
+    catch (error) {
+        console.error('Error fixing student password flag:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to fix student password flag');
+    }
+});
+// Text-to-Speech function using Amazon Polly - Firestore Trigger (No CORS issues)
+exports.processTTSRequest = (0, firestore_1.onDocumentCreated)({
+    document: 'ttsRequests/{requestId}',
+    secrets: [exports.AWS_ACCESS_KEY_ID, exports.AWS_SECRET_ACCESS_KEY]
+}, async (event) => {
+    var _a;
+    try {
+        const requestId = event.params.requestId;
+        const requestData = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
+        if (!requestData) {
+            console.error('No request data found');
+            return;
+        }
+        const { text, voiceId = 'Joanna', engine = 'neural', ssmlText, userId } = requestData;
+        if (!text && !ssmlText) {
+            console.error('No text or SSML text provided');
+            return;
+        }
+        console.log('Processing TTS request:', { requestId, text: text || 'SSML', voiceId, engine });
+        // Initialize Polly client
+        const pollyClient = new client_polly_1.PollyClient({
+            region: 'us-east-1',
+            credentials: {
+                accessKeyId: exports.AWS_ACCESS_KEY_ID.value(),
+                secretAccessKey: exports.AWS_SECRET_ACCESS_KEY.value()
+            }
+        });
+        // Prepare the synthesis command
+        const command = new client_polly_1.SynthesizeSpeechCommand({
+            Text: ssmlText || text,
+            TextType: ssmlText ? 'ssml' : 'text',
+            VoiceId: voiceId,
+            Engine: engine,
+            OutputFormat: 'mp3',
+            SampleRate: '22050'
+        });
+        // Call Polly to synthesize speech
+        const response = await pollyClient.send(command);
+        if (!response.AudioStream) {
+            throw new Error('No audio stream received from Polly');
+        }
+        // Convert stream to buffer
+        const audioBuffer = await new Promise((resolve, reject) => {
+            const chunks = [];
+            if (response.AudioStream) {
+                const stream = response.AudioStream;
+                stream.on('data', (chunk) => {
+                    chunks.push(chunk);
+                });
+                stream.on('end', () => {
+                    resolve(Buffer.concat(chunks));
+                });
+                stream.on('error', (error) => {
+                    reject(error);
+                });
+            }
+            else {
+                reject(new Error('No audio stream available'));
+            }
+        });
+        // Convert to base64
+        const base64Audio = audioBuffer.toString('base64');
+        // Write result back to Firestore
+        await admin.firestore().doc(`ttsResults/${requestId}`).set({
+            success: true,
+            audioData: base64Audio,
+            mimeType: 'audio/mp3',
+            requestId: requestId,
+            userId: userId,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('TTS request processed successfully:', requestId);
+    }
+    catch (error) {
+        console.error('Error processing TTS request:', error);
+        // Write error result back to Firestore
+        const requestId = event.params.requestId;
+        await admin.firestore().doc(`ttsResults/${requestId}`).set({
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+            requestId: requestId,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
     }
 });

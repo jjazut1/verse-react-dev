@@ -694,14 +694,12 @@ export const spinnerWheelSchema: ConfigSchema = {
   ],
   
   customValidation: (formData) => {
-    if (!formData) {
-      return 'Configuration data is not available';
-    }
-    
+    // Basic validation (like working schemas)
     if (!formData.title || !formData.title.trim()) {
       return 'Please enter a title for your wheel';
     }
     
+    // Validate items (now that they're properly initialized)
     if (!formData.items || formData.items.length === 0) {
       return 'Please add at least one item to the wheel';
     }

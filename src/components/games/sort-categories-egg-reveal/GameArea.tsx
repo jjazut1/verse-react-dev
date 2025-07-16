@@ -5,8 +5,8 @@ import {
   useBreakpointValue,
   ResponsiveValue
 } from '@chakra-ui/react';
-import { GameState, Word } from './types';
-import Egg from './Egg';
+import { GameState, EggType, Word } from './types';
+import Container from './Egg';
 import Basket from './Basket';
 import RichText from './RichText';
 
@@ -15,8 +15,13 @@ interface GameAreaProps {
   gameAreaRef: React.RefObject<HTMLDivElement>;
   onMouseMove: (event: React.MouseEvent) => void;
   onGameAreaClick: (event: React.MouseEvent) => void;
-  onEggClick: (egg: any) => void;
+  onEggClick: (egg: EggType) => void;
   onWordClick: (word: Word, e: React.MouseEvent) => void;
+  enableTextToSpeech?: boolean;
+  usePhonicsMode?: boolean;
+  useAmazonPolly?: boolean;
+  textToSpeechMode?: string;
+  containerType?: string;
 }
 
 const GameArea: React.FC<GameAreaProps> = ({
@@ -25,7 +30,12 @@ const GameArea: React.FC<GameAreaProps> = ({
   onMouseMove,
   onGameAreaClick,
   onEggClick,
-  onWordClick
+  onWordClick,
+  enableTextToSpeech = false,
+  usePhonicsMode = false,
+  useAmazonPolly = false,
+  textToSpeechMode,
+  containerType = 'eggs'
 }) => {
   // Responsive values
   const containerPadding = useBreakpointValue({ base: 2, md: 3, lg: 4 });
@@ -88,12 +98,17 @@ const GameArea: React.FC<GameAreaProps> = ({
               height={eggSize}
               zIndex={egg.cracked ? 2 : 1}
             >
-              <Egg
+              <Container
                 onClick={() => onEggClick(egg)}
                 item={egg.word.text}
                 category={egg.word.category}
                 cracked={egg.cracked}
-                onWordClick={(item, category, e) => onWordClick({ text: item, category }, e as React.MouseEvent)}
+                onWordClick={(item: string, category: string, e: React.MouseEvent) => onWordClick({ text: item, category }, e as React.MouseEvent)}
+                enableTextToSpeech={enableTextToSpeech}
+                usePhonicsMode={usePhonicsMode}
+                useAmazonPolly={useAmazonPolly}
+                textToSpeechMode={textToSpeechMode}
+                containerType={containerType}
               />
             </Box>
           ))}

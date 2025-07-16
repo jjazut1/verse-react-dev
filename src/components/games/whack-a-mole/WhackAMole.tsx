@@ -8,24 +8,13 @@ import {
   Button,
   useToast,
   Heading,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  FormControl,
-  FormLabel,
-  Input,
-  FormHelperText,
   Center
 } from '@chakra-ui/react';
-import { collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp, Timestamp, doc, getDoc } from 'firebase/firestore';
-import { db } from '../../../config/firebase';
 import Scene from './Scene';
 import { WhackAMoleConfig } from '../../../types/game';
-import { sanitizeName, isValidPlayerName } from '../../../utils/profanityFilter';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useHighScore } from '../../../hooks/useHighScore';
+import { HighScoreModal } from '../../common/HighScoreModal';
 import PWAGameHeader from '../PWAGameHeader';
 
 interface WhackAMoleProps {
@@ -34,16 +23,6 @@ interface WhackAMoleProps {
   config: WhackAMoleConfig;
   onHighScoreProcessStart?: () => void;
   onHighScoreProcessComplete?: () => void;
-}
-
-interface HighScore {
-  id?: string;
-  userId?: string;
-  playerName: string;
-  score: number;
-  configId: string;
-  createdAt: Timestamp | Date;
-  gameType?: string;
 }
 
 const WhackAMole: React.FC<WhackAMoleProps> = ({
@@ -59,11 +38,7 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
   const [timeLeft, setTimeLeft] = useState(config.gameTime);
   const [gameStarted, setGameStarted] = useState(false);
   const [consecutiveHits, setConsecutiveHits] = useState(0);
-  const [highScores, setHighScores] = useState<HighScore[]>([]);
   const [gameOver, setGameOver] = useState(false);
-  const [isHighScore, setIsHighScore] = useState(false);
-  const [showHighScoreDisplayModal, setShowHighScoreDisplayModal] = useState(false);
-  const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -71,102 +46,75 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
   const sceneRef = useRef<any>(null);
   const toast = useToast();
 
-  // Load high scores
+  // Initialize modularized high score system
+  const {
+    highScores,
+    isNewHighScore,
+    showHighScoreModal,
+    setShowHighScoreModal,
+    saveHighScore,
+    isSubmittingScore
+  } = useHighScore({
+    gameType: 'whack-a-mole',
+    configId: config.id || 'default',
+    scoringSystem: 'points-based',
+    enableRateLimit: true,
+    onHighScoreProcessStart,
+    onHighScoreProcessComplete
+  });
+
+  // Game countdown and timer logic
   useEffect(() => {
-    loadHighScores();
-  }, [config.id]);
-
-  const loadHighScores = async () => {
-    if (!config.id) return;
-
-    try {
-      const q = query(
-        collection(db, 'highScores'),
-        where('configId', '==', config.id),
-        orderBy('score', 'desc'),
-        limit(10)
-      );
-      const snapshot = await getDocs(q);
-      const scores: HighScore[] = [];
-      snapshot.forEach(doc => {
-        scores.push({
-          id: doc.id,
-          ...doc.data()
-        } as HighScore);
-      });
-      setHighScores(scores);
-    } catch (error) {
-      console.error('Error loading high scores:', error);
-    }
-  };
-
-  // Game timer
-  useEffect(() => {
-    if (gameStarted && timeLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            endGame();
-            return 0;
-          }
-          return prev - 1;
-        });
+    if (gameStarted && timeLeft > 0 && !gameOver) {
+      timerRef.current = setTimeout(() => {
+        setTimeLeft(timeLeft - 1);
       }, 1000);
-
-      return () => {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
-      };
+    } else if (timeLeft === 0 && gameStarted) {
+      endGame();
     }
-  }, [gameStarted, timeLeft]);
 
-  // Countdown timer effect
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [timeLeft, gameStarted, gameOver]);
+
+  // Countdown logic
   useEffect(() => {
     if (showCountdown && countdown > 0) {
       countdownTimerRef.current = setTimeout(() => {
-        setCountdown(prev => prev - 1);
+        setCountdown(countdown - 1);
       }, 1000);
-      
-      return () => {
-        if (countdownTimerRef.current) {
-          clearTimeout(countdownTimerRef.current);
-        }
-      };
-    } else if (showCountdown && countdown === 0) {
-      // When countdown reaches 0, start the actual game
+    } else if (countdown === 0 && showCountdown) {
       setShowCountdown(false);
       setGameStarted(true);
+      setGameOver(false);
+      if (sceneRef.current) {
+        sceneRef.current.startGame();
+      }
     }
+
+    return () => {
+      if (countdownTimerRef.current) {
+        clearTimeout(countdownTimerRef.current);
+      }
+    };
   }, [showCountdown, countdown]);
 
-  // Add Comic Neue font from Google Fonts
-  useEffect(() => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap';
-    document.head.appendChild(link);
-    
-    return () => {
-      document.head.removeChild(link);
-    };
-  }, []);
-
   const startCountdown = () => {
+    // Reset game state
     setScore(0);
     setTimeLeft(config.gameTime);
-    setGameOver(false);
     setConsecutiveHits(0);
-    setCountdown(3); // Set initial countdown to 3
-    setShowCountdown(true); // Show countdown UI
-  };
-
-  const startGame = () => {
-    setScore(0);
-    setTimeLeft(config.gameTime);
-    setGameStarted(true);
     setGameOver(false);
-    setConsecutiveHits(0);
+    setGameStarted(false);
+    setShowCountdown(true);
+    setCountdown(3);
+    
+    if (sceneRef.current) {
+      sceneRef.current.reset();
+    }
   };
 
   const endGame = () => {
@@ -178,175 +126,17 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
     }
     onGameComplete(score);
     
-    // Check if this is a high score
-    checkHighScore(score);
-  };
-
-  // Check if score qualifies for high score
-  const checkHighScore = (newScore: number) => {
-    console.log('Checking high score:', { 
-      newScore, 
-      highScores: highScores.length, 
-      highScoreThreshold: highScores.length > 0 ? highScores[highScores.length - 1]?.score : 'none',
-      isHighScore: highScores.length < 10 || newScore > (highScores[highScores.length - 1]?.score || 0)
-    });
-    
-    if (highScores.length < 10 || newScore > (highScores[highScores.length - 1]?.score || 0)) {
-      console.log('New high score detected!');
-      setIsHighScore(true);
-      // Skip the name input modal and save directly
-      if (onHighScoreProcessStart) {
-        console.log('Notifying parent: high score process starting');
-        onHighScoreProcessStart();
-      }
-      // Auto-save the high score with the actual final score
-      saveHighScore(newScore);
-    } else {
-      // No high score to save, show high score display immediately
-      console.log('Not a high score, showing display modal');
-      setShowHighScoreDisplayModal(true);
-      // Notify parent that high score process is complete after a delay
-      setTimeout(() => {
-        console.log('Notifying parent: high score process complete (not a high score)');
-        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
-      }, 500);
-    }
-  };
-
-  // Save high score to Firestore
-  const saveHighScore = async (finalScore?: number) => {
-    if (!config.id) {
+    // Save high score using modularized system
+    if (config.id && currentUser) {
+      saveHighScore(score, playerName);
+    } else if (!currentUser) {
+      // Show completion modal without high score for unauthenticated users
       toast({
-        title: 'Error',
-        description: 'Cannot save high score: missing game configuration ID',
-        status: 'error',
-        duration: 3000,
+        title: 'Game Complete!',
+        description: `Final Score: ${score} points. Sign in to save high scores!`,
+        status: 'info',
+        duration: 5000,
       });
-      if (onHighScoreProcessComplete) onHighScoreProcessComplete();
-      return;
-    }
-
-    if (!currentUser) {
-      toast({
-        title: 'Error',
-        description: 'Must be logged in to save high score',
-        status: 'error',
-        duration: 3000,
-      });
-      if (onHighScoreProcessComplete) onHighScoreProcessComplete();
-      return;
-    }
-
-    setIsSubmittingScore(true);
-
-    try {
-      // Get the user's display name from their account
-      let displayName = currentUser.displayName || playerName || 'Student';
-      
-      // Try to get the name from the users collection for more accurate display
-      try {
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          displayName = userData.name || displayName;
-        }
-      } catch (error) {
-        console.log('Could not fetch user name from database, using fallback');
-      }
-
-      // Check for rate limiting (5 scores per 5 minutes per user)
-      const fiveMinutesAgo = new Date();
-      fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
-      
-      const recentScoresQuery = query(
-        collection(db, 'highScores'),
-        where('userId', '==', currentUser.uid),
-        where('configId', '==', config.id),
-        where('createdAt', '>', fiveMinutesAgo),
-        limit(5)
-      );
-      
-      const recentScoresSnap = await getDocs(recentScoresQuery);
-      if (recentScoresSnap.size >= 5) {
-        toast({
-          title: 'Too Many Attempts',
-          description: 'Please wait a few minutes before submitting another score.',
-          status: 'error',
-          duration: 3000,
-        });
-        setIsSubmittingScore(false);
-        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
-        return;
-      }
-
-      // Verify that the game config exists and is valid
-      const configRef = doc(db, 'userGameConfigs', config.id);
-      const configSnap = await getDoc(configRef);
-      
-      if (!configSnap.exists()) {
-        console.error('Game configuration not found:', config.id);
-        toast({
-          title: 'Error Saving Score',
-          description: 'Game configuration not found.',
-          status: 'error',
-          duration: 3000,
-        });
-        setIsSubmittingScore(false);
-        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
-        return;
-      }
-
-      // Use the passed finalScore when available, fall back to state score
-      const scoreToSave = finalScore !== undefined ? finalScore : score;
-      
-      // Validate that we have a valid score
-      if (typeof scoreToSave !== 'number' || isNaN(scoreToSave) || scoreToSave < 0) {
-        console.error('Invalid score detected:', scoreToSave);
-        toast({
-          title: 'Error Saving Score',
-          description: 'Invalid score value detected.',
-          status: 'error',
-          duration: 3000,
-        });
-        setIsSubmittingScore(false);
-        if (onHighScoreProcessComplete) onHighScoreProcessComplete();
-        return;
-      }
-
-      // Create high score with userId and user's name
-      const highScore = {
-        userId: currentUser.uid,
-        playerName: displayName,
-        score: scoreToSave,
-        configId: config.id,
-        createdAt: serverTimestamp(),
-        gameType: 'whack-a-mole'
-      };
-
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, 'highScores'), highScore);
-      
-      toast({
-        title: 'High Score Saved!',
-        description: `Your score of ${scoreToSave} has been recorded.`,
-        status: 'success',
-        duration: 3000,
-      });
-      
-      await loadHighScores();
-      setShowHighScoreDisplayModal(true);
-    } catch (error: any) {
-      console.error('Error saving high score:', error);
-      
-      toast({
-        title: 'Error Saving Score',
-        description: 'Could not save your high score. Please try again.',
-        status: 'error',
-        duration: 3000,
-      });
-      if (onHighScoreProcessComplete) onHighScoreProcessComplete();
-    } finally {
-      setIsSubmittingScore(false);
     }
   };
 
@@ -383,15 +173,9 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
     }
   };
 
-  // Handle high score display modal close
-  const handleHighScoreDisplayModalClose = () => {
-    console.log('High score display modal closed');
-    setShowHighScoreDisplayModal(false);
-    // Notify parent that high score process is complete
-    if (onHighScoreProcessComplete) {
-      console.log('Notifying parent: high score process complete (after modal close)');
-      onHighScoreProcessComplete();
-    }
+  // Handle high score modal close with navigation
+  const handleHighScoreModalClose = () => {
+    setShowHighScoreModal(false);
     
     // Navigate based on user role
     if (isTeacher) {
@@ -450,53 +234,44 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         </HStack>
       </Box>
 
-      {/* Game Scene */}
-      <Box position="absolute" top={0} left={0} right={0} bottom={0}>
-        <Scene
-          ref={sceneRef}
-          gameActive={gameStarted && !gameOver}
-          onMoleHit={handleMoleHit}
-          config={config}
-        />
-      </Box>
+      {/* 3D Scene */}
+      <Scene
+        ref={sceneRef}
+        onMoleHit={handleMoleHit}
+        config={config}
+        gameActive={gameStarted && !gameOver}
+      />
 
-      {/* Countdown Overlay */}
+      {/* Countdown Display */}
       {showCountdown && (
-        <Box
+        <Center
           position="absolute"
-          top={0}
-          left={0}
-          right={0}
-          bottom={0}
-          bg="rgba(0, 0, 0, 0.3)"
-          zIndex={5}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
+          top="50%"
+          left="50%"
+          transform="translate(-50%, -50%)"
+          zIndex={10}
+          bg="rgba(255, 255, 255, 0.95)"
+          borderRadius="full"
+          width="200px"
+          height="200px"
+          border="8px solid #001f3f"
+          boxShadow="0 0 50px rgba(0, 31, 63, 0.3)"
         >
-          <Center 
-            p={8} 
-            bg="white" 
-            borderRadius="full" 
-            boxShadow="0px 0px 20px rgba(0, 31, 63, 0.4)"
-            w="150px"
-            h="150px"
+          <Text
+            fontSize="8xl"
+            fontWeight="bold"
+            color="#001f3f"
+            fontFamily="'Comic Neue', cursive"
+            textShadow="2px 2px 4px rgba(255,255,255,0.8)"
+            lineHeight="1"
           >
-            <Text 
-              fontSize="7xl" 
-              fontWeight="bold" 
-              fontFamily="'Comic Neue', cursive" 
-              color="#001f3f"
-              animation="pulse 1s infinite"
-            >
-              {countdown}
-            </Text>
-          </Center>
-        </Box>
+            {countdown}
+          </Text>
+        </Center>
       )}
 
-      {/* Game Controls */}
-      {(!gameStarted && !showCountdown || gameOver) && !showHighScoreDisplayModal && (
+      {/* Game Start/End Screen */}
+      {(!gameStarted && !showCountdown || gameOver) && !showHighScoreModal && (
         <Box
           position="absolute"
           top="50%"
@@ -545,96 +320,31 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         </Box>
       )}
 
-      {/* High Score Display Modal */}
-      <Modal isOpen={showHighScoreDisplayModal} onClose={handleHighScoreDisplayModalClose} closeOnOverlayClick={false} isCentered size="md">
-        <ModalOverlay />
-        <ModalContent fontFamily="'Comic Neue', cursive">
-          <ModalHeader 
-            fontFamily="'Comic Neue', cursive" 
-            fontWeight="bold" 
-            textAlign="center" 
-            fontSize="2xl"
-            color="#001f3f"
-            borderBottom="2px solid rgba(0, 31, 63, 0.1)"
-            pb={2}
-          >
-            🏆 Top Scores 🏆
-          </ModalHeader>
-          <ModalBody>
-            <VStack spacing={3} align="stretch" my={2}>
-              {highScores.length > 0 ? (
-                <>
-                  <HStack justify="space-between" fontWeight="bold" color="#001f3f" mb={2}>
-                    <Text>Rank</Text>
-                    <Text>Player</Text>
-                    <Text>Score</Text>
-                  </HStack>
-                  {highScores.map((hs, index) => (
-                    <HStack
-                      key={hs.id}
-                      justify="space-between"
-                      bg={isHighScore && score === hs.score && currentUser?.displayName === hs.playerName 
-                          ? "rgba(255, 215, 0, 0.2)" 
-                          : index % 2 === 0 
-                            ? "rgba(0, 31, 63, 0.05)" 
-                            : "transparent"}
-                      p={2}
-                      borderRadius="md"
-                      fontFamily="'Comic Neue', cursive"
-                    >
-                      <Text fontWeight={index < 3 ? "bold" : "normal"} color={index < 3 ? "#001f3f" : "gray.700"}>
-                        {index + 1}.
-                      </Text>
-                      <Text fontWeight={index < 3 ? "bold" : "normal"} color={index < 3 ? "#001f3f" : "gray.700"}>
-                        {hs.playerName}
-                      </Text>
-                      <Text fontWeight={index < 3 ? "bold" : "normal"} color={index < 3 ? "#001f3f" : "gray.700"}>
-                        {hs.score}
-                      </Text>
-                    </HStack>
-                  ))}
-                </>
-              ) : (
-                <Text textAlign="center" color="gray.600" my={4}>
-                  No high scores yet! Be the first to set a record.
-                </Text>
-              )}
-              
-              <Box textAlign="center" mt={4} p={3} bg="rgba(0, 31, 63, 0.05)" borderRadius="md">
-                <Text fontWeight="bold" color="#001f3f">Your Score: {score}</Text>
-                {isHighScore && (
-                  <Text color="green.500" fontWeight="bold" mt={1}>
-                    Congratulations on your high score!
-                  </Text>
-                )}
-              </Box>
-            </VStack>
-          </ModalBody>
-          <ModalFooter justifyContent="center">
-            <Button 
-              colorScheme="blue" 
-              onClick={handleHighScoreDisplayModalClose}
-              size="lg"
-              fontFamily="'Comic Neue', cursive"
-              fontWeight="bold"
-              minW="150px"
-            >
-              Continue
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      {/* Add pulse animation for countdown */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+      {/* Modularized High Score Modal */}
+      <HighScoreModal
+        isOpen={showHighScoreModal}
+        onClose={handleHighScoreModalClose}
+        score={score}
+        isNewHighScore={isNewHighScore}
+        highScores={highScores}
+        scoringSystem="points-based"
+        gameTitle="Whack-a-Mole"
+        additionalStats={[
+          { label: 'Game Time', value: `${config.gameTime}s`, colorScheme: 'blue' },
+          { label: 'Category', value: config.categories[0]?.title || 'Words', colorScheme: 'green' },
+          { label: 'Max Consecutive', value: consecutiveHits, colorScheme: 'purple' }
+        ]}
+        isSubmittingScore={isSubmittingScore}
+        onPlayAgain={startCountdown}
+        customActions={[
+          {
+            label: 'Back to Dashboard',
+            onClick: handleHighScoreModalClose,
+            colorScheme: 'gray',
+            variant: 'outline'
           }
-        `
-      }} />
+        ]}
+      />
     </Box>
   );
 };

@@ -7,11 +7,16 @@ import { setupSendGrid, sendEmail } from './sendgridHelper';
 // Import the new PWA-aware email templates
 import { createAssignmentEmailTemplate } from "./emailTemplates";
 import * as functions from "firebase-functions";
+// AWS Polly imports
+import { PollyClient, SynthesizeSpeechCommand, VoiceId, Engine, OutputFormat } from '@aws-sdk/client-polly';
 
 // Define the secrets
 export const SENDGRID_API_KEY = defineSecret("SENDGRID_API_KEY");
 export const SENDER_EMAIL = defineSecret("SENDER_EMAIL");
 export const APP_URL = defineSecret("APP_URL");
+// AWS secrets for Polly TTS
+export const AWS_ACCESS_KEY_ID = defineSecret("AWS_ACCESS_KEY_ID");
+export const AWS_SECRET_ACCESS_KEY = defineSecret("AWS_SECRET_ACCESS_KEY");
 
 // Get environment
 const isProduction = process.env.NODE_ENV === 'production';
@@ -629,6 +634,107 @@ export const fixStudentPasswordFlag = functions.https.onCall(async (request) => 
   } catch (error) {
     console.error('Error fixing student password flag:', error);
     throw new functions.https.HttpsError('internal', 'Failed to fix student password flag');
+  }
+});
+
+// Text-to-Speech function using Amazon Polly - Firestore Trigger (No CORS issues)
+export const processTTSRequest = onDocumentCreated({
+  document: 'ttsRequests/{requestId}',
+  secrets: [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]
+}, async (event) => {
+  try {
+    const requestId = event.params.requestId;
+    const requestData = event.data?.data();
+    
+    if (!requestData) {
+      console.error('No request data found');
+      return;
+    }
+    
+    const { text, voiceId = 'Joanna', engine = 'neural', ssmlText, userId } = requestData;
+    
+    if (!text && !ssmlText) {
+      console.error('No text or SSML text provided');
+      return;
+    }
+    
+    console.log('Processing TTS request:', { requestId, text: text || 'SSML', voiceId, engine });
+    
+    // Initialize Polly client
+    const pollyClient = new PollyClient({
+      region: 'us-east-1',
+      credentials: {
+        accessKeyId: AWS_ACCESS_KEY_ID.value(),
+        secretAccessKey: AWS_SECRET_ACCESS_KEY.value()
+      }
+    });
+    
+    // Prepare the synthesis command
+    const command = new SynthesizeSpeechCommand({
+      Text: ssmlText || text,
+      TextType: ssmlText ? 'ssml' : 'text',
+      VoiceId: voiceId as VoiceId,
+      Engine: engine as Engine,
+      OutputFormat: 'mp3' as OutputFormat,
+      SampleRate: '22050'
+    });
+    
+    // Call Polly to synthesize speech
+    const response = await pollyClient.send(command);
+    
+    if (!response.AudioStream) {
+      throw new Error('No audio stream received from Polly');
+    }
+    
+    // Convert stream to buffer
+    const audioBuffer = await new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      
+      if (response.AudioStream) {
+        const stream = response.AudioStream as any;
+        
+        stream.on('data', (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+        
+        stream.on('end', () => {
+          resolve(Buffer.concat(chunks));
+        });
+        
+        stream.on('error', (error: any) => {
+          reject(error);
+        });
+      } else {
+        reject(new Error('No audio stream available'));
+      }
+    });
+    
+    // Convert to base64
+    const base64Audio = audioBuffer.toString('base64');
+    
+    // Write result back to Firestore
+    await admin.firestore().doc(`ttsResults/${requestId}`).set({
+      success: true,
+      audioData: base64Audio,
+      mimeType: 'audio/mp3',
+      requestId: requestId,
+      userId: userId,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    console.log('TTS request processed successfully:', requestId);
+    
+  } catch (error) {
+    console.error('Error processing TTS request:', error);
+    
+    // Write error result back to Firestore
+    const requestId = event.params.requestId;
+    await admin.firestore().doc(`ttsResults/${requestId}`).set({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      requestId: requestId,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
   }
 });
 

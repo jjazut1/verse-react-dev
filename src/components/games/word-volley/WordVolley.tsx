@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { PWAGameHeader } from '../PWAGameHeader';
-import { HighScoreModal } from './HighScoreModal';
+import { HighScoreModal } from '../../common/HighScoreModal';
+import { useHighScore } from '../../../hooks/useHighScore';
+import { HighScoreService } from '../../../services/highScoreService';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '../../../config/firebase';
 import { GameControls } from './GameControls';
 import { useGameLogic } from './useGameLogic';
 import { useAudio } from './useAudio';
@@ -12,19 +16,77 @@ import './WordVolley.css';
 interface WordVolleyProps {
   gameConfig?: Partial<GameSettings>;
   onGameComplete?: (score: number, timeElapsed: number) => void;
+  onHighScoreProcessStart?: () => void;
+  onHighScoreProcessComplete?: () => void;
   onGameExit?: () => void;
+  configId?: string;
+  playerName?: string;
 }
 
 export const WordVolley: React.FC<WordVolleyProps> = ({
   gameConfig = {},
   onGameComplete,
-  onGameExit
+  onHighScoreProcessStart,
+  onHighScoreProcessComplete,
+  onGameExit,
+  configId,
+  playerName = 'Student'
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isTeacher } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number>();
   const [mouseY, setMouseY] = useState(CANVAS_HEIGHT / 2);
+  
+  // Initialize modularized high score system
+  const {
+    highScores,
+    isNewHighScore,
+    showHighScoreModal,
+    setShowHighScoreModal,
+    saveHighScore,
+    isSubmittingScore
+  } = useHighScore({
+    gameType: 'word-volley',
+    configId: configId || 'default',
+    scoringSystem: 'points-based',
+    enableRateLimit: true,
+    onHighScoreProcessStart,
+    onHighScoreProcessComplete
+  });
+  
+  // Additional state for general leaderboard viewing (for teachers)
+  const [showGeneralLeaderboard, setShowGeneralLeaderboard] = useState(false);
+  const [generalHighScores, setGeneralHighScores] = useState<any[]>([]);
+  const [loadingGeneralScores, setLoadingGeneralScores] = useState(false);
+  
+  // Function to load general high scores for teachers
+  const loadGeneralLeaderboard = useCallback(async () => {
+    setLoadingGeneralScores(true);
+    try {
+      const wordVolleyScoresRef = collection(db, 'highScores');
+      const q = query(
+        wordVolleyScoresRef,
+        where('gameType', '==', 'word-volley'),
+        orderBy('score', 'desc'),
+        limit(10) // Limit to top 10 scores
+      );
+      const querySnapshot = await getDocs(q);
+      const scores: any[] = [];
+      querySnapshot.forEach((doc) => {
+        scores.push({ id: doc.id, ...doc.data() });
+      });
+      setGeneralHighScores(scores);
+      setShowGeneralLeaderboard(true);
+    } catch (error) {
+      console.error('Error loading general leaderboard:', error);
+      // Fallback to empty array if loading fails
+      setGeneralHighScores([]);
+      setShowGeneralLeaderboard(true);
+    } finally {
+      setLoadingGeneralScores(false);
+    }
+  }, []);
   
   // Enhanced paddle control state
   const [paddleEngaged, setPaddleEngaged] = useState(false);
@@ -96,13 +158,9 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     ...gameConfig
   });
 
-  // Audio hooks
+  // Audio hooks - only using bounce sound for wall hits
   const {
-    playCorrectSound,
-    playWrongSound,
     playBounceSound,
-    playLevelUpSound,
-    playGameOverSound,
     toggleMute,
     isMuted
   } = useAudio();
@@ -1017,37 +1075,29 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
       const hitResult = updateBall();
       
       if (hitResult) {
-        if (hitResult.type === 'correct') {
-          playCorrectSound();
-          // Visual feedback could be added here
-        } else if (hitResult.type === 'wrong') {
-          playWrongSound();
-          // Visual feedback could be added here
-        } else if (hitResult.type === 'aiCorrect') {
-          playCorrectSound(); // AI scored correctly
-        } else if (hitResult.type === 'aiWrong') {
-          playWrongSound(); // AI hit wrong word
-        } else if (hitResult.type === 'aiMiss') {
-          playCorrectSound(); // Player benefits from AI miss
-        } else if (hitResult.type === 'bounce') {
+        if (hitResult.type === 'bounce') {
           playBounceSound();
-        } else if (hitResult.type === 'levelUp') {
-          playLevelUpSound();
         }
+        // All other hit types (correct, wrong, aiCorrect, aiWrong, aiMiss, levelUp) 
+        // now play silently for a more focused audio experience
       }
 
       render();
     } else if (gameState === 'gameOver') {
-      playGameOverSound();
+      // Handle game completion and high score processing
       if (onGameComplete) {
         onGameComplete(score, timeElapsed);
+      }
+      // Save high score using the modularized system
+      if (configId) {
+        saveHighScore(score, playerName);
       }
     }
 
     if (gameState !== 'idle') {
       animationFrameRef.current = requestAnimationFrame(gameLoop);
     }
-  }, [gameState, updateBall, render, score, timeElapsed, onGameComplete, playCorrectSound, playWrongSound, playBounceSound, playLevelUpSound, playGameOverSound]);
+  }, [gameState, updateBall, render, score, timeElapsed, onGameComplete, configId, playerName, saveHighScore, playBounceSound]);
 
   // Start game loop when game becomes active
   useEffect(() => {
@@ -1205,16 +1255,49 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
             </div>
           )}
           
-          {gameState === 'gameOver' && (
+          {gameState === 'gameOver' && !showHighScoreModal && (
             <div className="game-overlay">
-              <HighScoreModal
-                score={score}
-                timeElapsed={timeElapsed}
-                wordsProcessed={wordsProcessed}
-                level={level}
-                onPlayAgain={handleGameReset}
-                onExit={onGameExit}
-              />
+              <div className="start-message">
+                <h3>Game Complete!</h3>
+                <p>Final Score: {score}</p>
+                <p>Time: {Math.floor(timeElapsed / 60)}:{(timeElapsed % 60).toString().padStart(2, '0')}</p>
+                <p>Words Processed: {wordsProcessed}</p>
+                <p>Level Reached: {level}</p>
+                
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '20px' }}>
+                  <button 
+                    className="start-button"
+                    onClick={handleGameReset}
+                  >
+                    Play Again
+                  </button>
+                  
+                  {/* Show View Leaderboard button for teachers */}
+                  {isTeacher && (
+                    <button 
+                      className="start-button"
+                      onClick={loadGeneralLeaderboard}
+                      disabled={loadingGeneralScores}
+                      style={{ 
+                        background: loadingGeneralScores ? '#6c757d' : 'linear-gradient(135deg, #007bff, #0056b3)',
+                        cursor: loadingGeneralScores ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {loadingGeneralScores ? '⏳ Loading...' : '🏆 View Leaderboard'}
+                    </button>
+                  )}
+                  
+                  {onGameExit && (
+                    <button 
+                      className="start-button"
+                      onClick={onGameExit}
+                      style={{ background: '#6c757d' }}
+                    >
+                      Exit Game
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1306,6 +1389,27 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
             >
               {isTextToSpeechEnabled ? '🗣️ TTS On' : '🔇 TTS Off'}
             </button>
+
+            {/* Leaderboard button for teachers */}
+            {isTeacher && (
+              <button
+                onClick={loadGeneralLeaderboard}
+                disabled={loadingGeneralScores}
+                style={{
+                  background: loadingGeneralScores ? '#6c757d' : 'linear-gradient(135deg, #007bff, #0056b3)',
+                  border: 'none',
+                  borderRadius: '20px',
+                  color: 'white',
+                  padding: '10px 20px',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: loadingGeneralScores ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {loadingGeneralScores ? '⏳ Loading...' : '🏆 Leaderboard'}
+              </button>
+            )}
           </div>
 
                       {/* Second Row: Theme Selector and Scoring Button */}
@@ -1474,6 +1578,68 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modularized High Score Modal */}
+      <HighScoreModal
+        isOpen={showHighScoreModal}
+        onClose={() => setShowHighScoreModal(false)}
+        score={score}
+        isNewHighScore={isNewHighScore}
+        highScores={highScores}
+        scoringSystem="points-based"
+        gameTitle="Word Volley"
+        timeElapsed={timeElapsed}
+        additionalStats={[
+          { label: 'Words Processed', value: wordsProcessed, colorScheme: 'blue' },
+          { label: 'Level Reached', value: level, colorScheme: 'purple' },
+          { label: 'Category', value: settings.categoryName || 'Words', colorScheme: 'green' }
+        ]}
+        isSubmittingScore={isSubmittingScore}
+        onPlayAgain={handleGameReset}
+        customActions={onGameExit ? [
+          {
+            label: 'Exit Game',
+            onClick: onGameExit,
+            colorScheme: 'gray',
+            variant: 'outline'
+          }
+        ] : undefined}
+      />
+
+      {/* General Leaderboard Modal for Teachers */}
+      <HighScoreModal
+        isOpen={showGeneralLeaderboard}
+        onClose={() => setShowGeneralLeaderboard(false)}
+        score={score}
+        isNewHighScore={false} // Teachers viewing general leaderboard won't have new high score
+        highScores={generalHighScores}
+        scoringSystem="points-based"
+        gameTitle="Word Volley - General Leaderboard"
+        timeElapsed={timeElapsed}
+        additionalStats={[
+          { label: 'Words Processed', value: wordsProcessed, colorScheme: 'blue' },
+          { label: 'Level Reached', value: level, colorScheme: 'purple' },
+          { label: 'Your Score', value: score, colorScheme: 'orange' }
+        ]}
+        isSubmittingScore={false}
+        onPlayAgain={handleGameReset}
+        customActions={[
+          {
+            label: 'Close Leaderboard',
+            onClick: () => setShowGeneralLeaderboard(false),
+            colorScheme: 'blue',
+            variant: 'solid'
+          },
+          ...(onGameExit ? [
+            {
+              label: 'Exit Game',
+              onClick: onGameExit,
+              colorScheme: 'gray',
+              variant: 'outline'
+            }
+          ] : [])
+        ]}
+      />
     </div>
   );
 }; 

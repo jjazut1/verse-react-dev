@@ -509,5 +509,29 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
+
+    // Text-to-Speech requests (for Amazon Polly integration)
+    match /ttsRequests/{requestId} {
+      // Allow anyone to create TTS requests (for educational games)
+      allow create: if true;
+      
+      // Allow service accounts (Firebase Functions) to read requests for processing
+      allow read: if isServiceAccount();
+      
+      // Allow cleanup - service accounts can delete processed requests
+      allow delete: if isServiceAccount();
+    }
+
+    // Text-to-Speech results (for Amazon Polly integration)
+    match /ttsResults/{requestId} {
+      // Allow service accounts (Firebase Functions) to write results
+      allow create, write: if isServiceAccount();
+      
+      // Allow anyone to read their TTS results (using requestId as access control)
+      allow read: if true;
+      
+      // Allow cleanup - anyone can delete results after use
+      allow delete: if true;
+    }
   }
 } 

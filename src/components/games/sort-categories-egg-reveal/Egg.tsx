@@ -2,156 +2,97 @@ import { Box, Text, useBreakpointValue } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import React, { useState, useEffect } from 'react';
 import { playSound } from '../../../utils/soundUtils';
+import { speakEnhanced, speakWithPollyPhonemes, speakWithPollyRegular, speakPhonics, speakText, isTTSAvailable } from '../../../utils/soundUtils';
 
-interface EggProps {
+interface ContainerProps {
   onClick: () => void;
   item: string;
   category: string;
   cracked: boolean;
   onWordClick: (item: string, category: string, e: React.MouseEvent) => void;
+  enableTextToSpeech?: boolean;
+  usePhonicsMode?: boolean;
+  useAmazonPolly?: boolean;
+  textToSpeechMode?: string;
+  containerType?: string;
 }
 
-const CRACK_SOUND_URL = 'https://github.com/jjazut1/sound-hosting/raw/refs/heads/main/break.mp3';
-
-const generatePastelColor = () => {
-  // Pastel color combinations (hue, saturation, lightness)
-  const colors = [
-    { h: 25, s: 70, l: 85 },  // Peach
-    { h: 180, s: 50, l: 85 }, // Light Blue
-    { h: 280, s: 50, l: 85 }, // Lavender
-    { h: 330, s: 60, l: 85 }, // Pink
-    { h: 130, s: 50, l: 85 }, // Mint
-    { h: 45, s: 70, l: 85 },  // Light Yellow
-    { h: 0, s: 60, l: 85 },   // Light Red
-    { h: 200, s: 50, l: 85 }, // Baby Blue
-  ];
-  
-  const color = colors[Math.floor(Math.random() * colors.length)];
-  const pastelBase = `hsl(${color.h}, ${color.s}%, ${color.l}%)`;
-  const pastelLighter = `hsl(${color.h}, ${color.s}%, ${color.l + 10}%)`;
-  const pastelDarker = `hsl(${color.h}, ${color.s}%, ${color.l - 10}%)`;
-  
-  return { base: pastelBase, lighter: pastelLighter, darker: pastelDarker };
-};
-
-// Rich text rendering component
-const RichText: React.FC<{ content: string; fontSize: any }> = ({ content, fontSize }) => {
-  // Check if this is rich text (contains HTML tags)
-  const isRichText = typeof content === 'string' && content.includes('<');
-  
-  if (!isRichText) {
-    // Plain text
-    return (
-      <Text
-        fontSize={fontSize}
-        color="gray.700"
-        letterSpacing="0.5px"
-        fontWeight="medium"
-        px={2}
-        py={1}
-        borderRadius="md"
-        fontFamily="'Comic Neue', sans-serif"
-      >
-        {content}
-      </Text>
-    );
-  }
-  
-  // Rich text - parse HTML and render with styling
-  const parseRichText = (htmlContent: string) => {
-    // Detect formatting styles
-    const textStyles = {
-      bold: htmlContent.includes('<strong>') || htmlContent.includes('<b>'),
-      italic: htmlContent.includes('<em>') || htmlContent.includes('<i>'),
-      underline: htmlContent.includes('<u>') && htmlContent.includes('</u>'),
-      superscript: htmlContent.includes('<sup>') && htmlContent.includes('</sup>'),
-      subscript: htmlContent.includes('<sub>') && htmlContent.includes('</sub>')
-    };
-    
-    // Extract plain text for simple formatting
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
-    let displayText = tempDiv.textContent || tempDiv.innerText || htmlContent;
-    
-    // For super/subscript, we need special handling
-    if (textStyles.superscript || textStyles.subscript) {
-      // Parse super/subscript text
-      let beforeScript = '';
-      let scriptText = '';
-      let afterScript = '';
-      
-      if (textStyles.superscript) {
-        const supMatch = htmlContent.match(/^(.*?)<sup>(.*?)<\/sup>(.*)$/);
-        if (supMatch) {
-          beforeScript = supMatch[1].replace(/<[^>]*>/g, '');
-          scriptText = supMatch[2];
-          afterScript = supMatch[3].replace(/<[^>]*>/g, '');
-        }
-      } else if (textStyles.subscript) {
-        const subMatch = htmlContent.match(/^(.*?)<sub>(.*?)<\/sub>(.*)$/);
-        if (subMatch) {
-          beforeScript = subMatch[1].replace(/<[^>]*>/g, '');
-          scriptText = subMatch[2];
-          afterScript = subMatch[3].replace(/<[^>]*>/g, '');
-        }
-      }
-      
-      // Render with scripts
-      return (
-        <Text
-          fontSize={fontSize}
-          color="gray.700"
-          letterSpacing="0.5px"
-          fontWeight={textStyles.bold ? "bold" : "medium"}
-          fontStyle={textStyles.italic ? "italic" : "normal"}
-          textDecoration={textStyles.underline ? "underline" : "none"}
-          px={2}
-          py={1}
-          borderRadius="md"
-          fontFamily="'Comic Neue', sans-serif"
-          display="inline-flex"
-          alignItems="baseline"
-        >
-          {beforeScript}
-          <Text
-            as="span"
-            fontSize="0.7em"
-            verticalAlign={textStyles.superscript ? "super" : "sub"}
-            lineHeight="1"
-          >
-            {scriptText}
-          </Text>
-          {afterScript}
-        </Text>
-      );
-    }
-    
-    // Regular formatting (bold, italic, underline)
-    return (
-      <Text
-        fontSize={fontSize}
-        color="gray.700"
-        letterSpacing="0.5px"
-        fontWeight={textStyles.bold ? "bold" : "medium"}
-        fontStyle={textStyles.italic ? "italic" : "normal"}
-        textDecoration={textStyles.underline ? "underline" : "none"}
-        px={2}
-        py={1}
-        borderRadius="md"
-        fontFamily="'Comic Neue', sans-serif"
-      >
-        {displayText}
-      </Text>
-    );
-  };
-  
-  return parseRichText(content);
-};
-
-const Egg: React.FC<EggProps> = ({ onClick, item, category, cracked, onWordClick }) => {
+const Container: React.FC<ContainerProps> = ({ 
+  onClick, 
+  item, 
+  category, 
+  cracked, 
+  onWordClick, 
+  enableTextToSpeech = false, 
+  usePhonicsMode = false, 
+  useAmazonPolly = false,
+  textToSpeechMode,
+  containerType = 'eggs'
+}) => {
   const [showCracks, setShowCracks] = useState(false);
+  const [isOpened, setIsOpened] = useState(false);
   const [pastelColor] = useState(generatePastelColor());
   const [isWordPickedUp, setIsWordPickedUp] = useState(false);
+
+  // Get container-specific styling
+  const getContainerStyle = () => {
+    switch (containerType) {
+      case 'balloons':
+        return {
+          borderRadius: '50%',
+          background: `linear-gradient(135deg, ${pastelColor}, ${adjustBrightness(pastelColor, -20)})`,
+          boxShadow: 'inset -2px -2px 4px rgba(0, 0, 0, 0.1), inset 2px 2px 4px rgba(255, 255, 255, 0.5)',
+          border: '2px solid rgba(255, 255, 255, 0.4)',
+        };
+      case 'presents':
+        return {
+          borderRadius: '8px',
+          background: `linear-gradient(135deg, ${pastelColor}, ${adjustBrightness(pastelColor, -15)})`,
+          boxShadow: 'inset -2px -2px 4px rgba(0, 0, 0, 0.1), inset 2px 2px 4px rgba(255, 255, 255, 0.3)',
+          border: '2px solid rgba(255, 255, 255, 0.3)',
+        };
+      case 'amazon':
+        return {
+          borderRadius: '4px',
+          background: 'linear-gradient(135deg, #ffd89b, #d4a76a)',
+          boxShadow: 'inset -2px -2px 4px rgba(0, 0, 0, 0.1), inset 2px 2px 4px rgba(255, 255, 255, 0.3)',
+          border: '2px solid rgba(139, 69, 19, 0.3)',
+        };
+      default: // eggs
+        return {
+          borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%',
+          background: pastelColor,
+          boxShadow: 'inset -2px -2px 4px rgba(0, 0, 0, 0.1), inset 2px 2px 4px rgba(255, 255, 255, 0.3)',
+          border: '2px solid rgba(255, 255, 255, 0.3)',
+        };
+    }
+  };
+
+  // Get container-specific sound
+  const getContainerSound = () => {
+    switch (containerType) {
+      case 'balloons':
+        return '/sounds/pop.mp3';
+      case 'presents':
+        return '/sounds/unwrap.mp3';
+      case 'amazon':
+        return '/sounds/cardboard.mp3';
+      default: // eggs
+        return '/sounds/crack.mp3';
+    }
+  };
+
+  // Helper function to adjust color brightness
+  const adjustBrightness = (color: string, amount: number) => {
+    // Simple brightness adjustment for HSL colors
+    const hslMatch = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    if (hslMatch) {
+      const [, h, s, l] = hslMatch;
+      const newL = Math.max(0, Math.min(100, parseInt(l) + amount));
+      return `hsl(${h}, ${s}%, ${newL}%)`;
+    }
+    return color;
+  };
   
   // Responsive values
   const eggWidth = useBreakpointValue({ base: "45px", md: "55px", lg: "65px" });
@@ -163,181 +104,319 @@ const Egg: React.FC<EggProps> = ({ onClick, item, category, cracked, onWordClick
     let audio: HTMLAudioElement | null = null;
 
     if (cracked) {
-      // Play sound only when first cracked
-      audio = new Audio(CRACK_SOUND_URL);
-      audio.volume = 0.5;
-      audio.play().catch(err => console.log('Audio play failed:', err));
+      // Determine TTS mode once
+      const ttsMode = textToSpeechMode || (enableTextToSpeech ? 'amazon-polly-phonics' : 'disabled');
       
+      // Always play container sound for immediate feedback
+      try {
+        audio = new Audio(getContainerSound());
+        audio.volume = 0.5; // Reduce volume so it doesn't interfere with TTS
+        
+        // Add error handling for missing sound files
+        audio.addEventListener('error', (e) => {
+          console.warn(`Sound file not found: ${getContainerSound()}. Please add sound files to public/sounds/`);
+        });
+        
+        audio.play().catch((error) => {
+          console.warn('Could not play container sound:', error);
+        });
+      } catch (error) {
+        console.error('Error creating audio element:', error);
+      }
+
+      // Add opening effects
       setShowCracks(true);
+      setIsOpened(true);
       
-      // Hide cracks after 1.5 seconds
-      timeoutId = setTimeout(() => {
-        setShowCracks(false);
-      }, 1500);
+              // TTS: Speak the item text when egg is cracked
+        if (ttsMode !== 'disabled' && isTTSAvailable()) {
+          timeoutId = setTimeout(async () => {
+            const ttsOptions = {
+              rate: 0.8,
+              pitch: 1.0,
+              volume: 0.8
+            };
+
+            try {
+              switch (ttsMode) {
+                case 'amazon-polly-phonics':
+                  await speakWithPollyPhonemes(item, ttsOptions);
+                  break;
+                case 'amazon-polly-regular':
+                  await speakWithPollyRegular(item, ttsOptions);
+                  break;
+                case 'web-speech-phonics':
+                  await speakPhonics(item, ttsOptions);
+                  break;
+                case 'web-speech-regular':
+                  await speakText(item, ttsOptions);
+                  break;
+                default:
+                  // Fallback to enhanced TTS with backward compatibility
+                  if (useAmazonPolly) {
+                    if (usePhonicsMode) {
+                      await speakWithPollyPhonemes(item, ttsOptions);
+                    } else {
+                      await speakWithPollyRegular(item, ttsOptions);
+                    }
+                  } else {
+                    if (usePhonicsMode) {
+                      await speakPhonics(item, ttsOptions);
+                    } else {
+                      await speakText(item, ttsOptions);
+                    }
+                  }
+                  break;
+              }
+            } catch (error) {
+              console.error('TTS error:', error);
+              // Fallback to enhanced TTS
+              try {
+                await speakEnhanced(item, usePhonicsMode, ttsOptions);
+              } catch (fallbackError) {
+                console.error('Fallback TTS error:', fallbackError);
+              }
+            }
+          }, 800); // 800ms delay to let container sound and visual effects complete
+        }
     }
 
-    // Cleanup function
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
       if (audio) {
         audio.pause();
         audio.currentTime = 0;
       }
     };
-  }, [cracked]); // Only depend on cracked prop
+  }, [cracked, enableTextToSpeech, usePhonicsMode, useAmazonPolly, item, textToSpeechMode, containerType]);
 
-  // Generate random crack paths
-  const crackPaths = Array(3).fill(null).map(() => {
-    const startX = 40 + Math.random() * 20;
-    const startY = 30 + Math.random() * 40;
-    let path = `M ${startX} ${startY}`;
-    
-    const segments = 2 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < segments; i++) {
-      const length = 10 + Math.random() * 20;
-      const angle = Math.random() * 360;
-      const rad = angle * Math.PI / 180;
-      const endX = startX + length * Math.cos(rad);
-      const endY = startY + length * Math.sin(rad);
-      path += ` L ${endX} ${endY}`;
-    }
-    return path;
-  });
+  // Generate a random pastel color
+  function generatePastelColor(): string {
+    const hue = Math.floor(Math.random() * 360);
+    const saturation = Math.floor(Math.random() * 30) + 40; // 40-70%
+    const lightness = Math.floor(Math.random() * 20) + 70; // 70-90%
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  }
+
+  const handleWordClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsWordPickedUp(true);
+    onWordClick(item, category, e);
+  };
 
   return (
     <Box
-      as={motion.div}
-      whileHover={!cracked ? { scale: 1.05 } : undefined}
       position="relative"
+      cursor="pointer"
+      onClick={cracked ? undefined : onClick}
       width={eggWidth}
       height={eggHeight}
-      cursor={!cracked ? "pointer" : "default"}
-      onClick={() => !cracked && onClick()}
-      sx={{
-        background: `linear-gradient(135deg, 
-          ${pastelColor.lighter} 0%, 
-          ${pastelColor.base} 50%, 
-          ${pastelColor.darker} 100%
-        )`,
-        borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%',
-        transform: 'rotate(-5deg)',
-        boxShadow: `
-          inset -4px -4px 8px rgba(0,0,0,0.1),
-          inset 4px 4px 8px rgba(255,255,255,0.8),
-          2px 4px 8px rgba(0,0,0,0.1)
-        `,
-        transition: 'all 0.3s ease',
-        opacity: isWordPickedUp ? 0.5 : 1,
-        filter: isWordPickedUp ? 'grayscale(50%)' : 'none',
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      userSelect="none"
+      transition="all 0.3s ease"
+      _hover={{
+        transform: cracked ? "none" : "scale(1.05)",
+        filter: cracked ? "none" : "brightness(1.1)"
       }}
     >
-      {/* Highlight effect */}
-      <Box
-        position="absolute"
-        top="0"
-        left="0"
-        right="0"
-        bottom="0"
-        borderRadius="inherit"
-        sx={{
-          background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 60%)',
-          pointerEvents: 'none'
-        }}
-      />
-
-      {/* Modified Word display */}
-      {cracked && !isWordPickedUp && (
-        <Box
-          as={motion.div}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          position="absolute"
-          top="50%"
-          left="50%"
-          transform="translate(-50%, -50%) rotate(5deg)"
-          textAlign="center"
-          zIndex="2"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsWordPickedUp(true);
-            onWordClick(item, category, e);
-          }}
-          cursor="pointer"
-          sx={{
-            opacity: 0,
-            animation: 'fadeIn 0.1s ease forwards',
-            '@keyframes fadeIn': {
-              '0%': { opacity: 0 },
-              '100%': { opacity: 1 }
-            },
-            '&:hover': {
-              transform: 'translate(-50%, -50%) rotate(5deg) scale(1.1)',
-            }
-          }}
-        >
-          <RichText content={item} fontSize={fontSize} />
-        </Box>
-      )}
-
-      {/* Cracks with AnimatePresence */}
+      {/* Container Shell */}
       <AnimatePresence>
-        {showCracks && (
-          <Box
-            as={motion.div}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ transition: 'opacity 0.3s ease-out' }}
-            position="absolute"
-            top="0"
-            left="0"
-            width="100%"
-            height="100%"
-            pointerEvents="none"
-            zIndex="1"
+        {!cracked && (
+          <motion.div
+            initial={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              ...getContainerStyle(),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
-            <svg width="100%" height="100%" style={{ position: 'absolute' }}>
-              {crackPaths.map((path, index) => (
-                <React.Fragment key={index}>
-                  <path
-                    d={path}
-                    stroke="rgba(70, 40, 0, 0.3)"
-                    strokeWidth="1.5"
-                    fill="none"
-                    style={{
-                      filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1))'
-                    }}
-                  />
-                </React.Fragment>
-              ))}
-            </svg>
-          </Box>
+            {/* Container highlight */}
+            <Box
+              position="absolute"
+              top="20%"
+              left="30%"
+              width="20%"
+              height="20%"
+              borderRadius={containerType === 'presents' || containerType === 'amazon' ? '4px' : '50%'}
+              backgroundColor="rgba(255, 255, 255, 0.4)"
+              filter="blur(2px)"
+            />
+            
+            {/* Container-specific decorations */}
+            {containerType === 'presents' && (
+              <>
+                {/* Ribbon vertical */}
+                <Box
+                  position="absolute"
+                  top="0"
+                  left="50%"
+                  width="15%"
+                  height="100%"
+                  backgroundColor="rgba(255, 0, 0, 0.6)"
+                  transform="translateX(-50%)"
+                />
+                {/* Ribbon horizontal */}
+                <Box
+                  position="absolute"
+                  top="50%"
+                  left="0"
+                  width="100%"
+                  height="15%"
+                  backgroundColor="rgba(255, 0, 0, 0.6)"
+                  transform="translateY(-50%)"
+                />
+              </>
+            )}
+            
+            {containerType === 'amazon' && (
+              <>
+                {/* Amazon tape */}
+                <Box
+                  position="absolute"
+                  top="50%"
+                  left="0"
+                  width="100%"
+                  height="10%"
+                  backgroundColor="rgba(139, 69, 19, 0.4)"
+                  transform="translateY(-50%)"
+                />
+                {/* Amazon smile */}
+                <Box
+                  position="absolute"
+                  bottom="15%"
+                  right="15%"
+                  width="20%"
+                  height="15%"
+                  borderRadius="50%"
+                  backgroundColor="rgba(255, 255, 255, 0.8)"
+                  fontSize="6px"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  color="orange"
+                  fontWeight="bold"
+                >
+                  📦
+                </Box>
+              </>
+            )}
+            
+            {containerType === 'balloons' && (
+              <>
+                {/* Balloon string */}
+                <Box
+                  position="absolute"
+                  bottom="-5px"
+                  left="50%"
+                  width="2px"
+                  height="15px"
+                  backgroundColor="rgba(0, 0, 0, 0.3)"
+                  transform="translateX(-50%)"
+                />
+              </>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Subtle speckles */}
-      <Box
-        position="absolute"
-        top="0"
-        left="0"
-        right="0"
-        bottom="0"
-        opacity="0.05"
-        borderRadius="inherit"
-        sx={{
-          background: `
-            radial-gradient(circle at 70% 20%, #666 1px, transparent 1px),
-            radial-gradient(circle at 30% 50%, #666 1px, transparent 1px),
-            radial-gradient(circle at 60% 80%, #666 1px, transparent 1px)
-          `,
-          backgroundSize: '100% 100%',
-          pointerEvents: 'none'
-        }}
-      />
+      {/* Cracks */}
+      <AnimatePresence>
+        {showCracks && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.2 }}
+            transition={{ duration: 0.5 }}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 2
+            }}
+          >
+            {/* Crack lines */}
+            <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0 }}>
+              <path
+                d="M20,30 L25,45 L30,35 L35,50 L40,40"
+                stroke="#8B4513"
+                strokeWidth="1"
+                fill="none"
+                opacity="0.7"
+              />
+              <path
+                d="M50,25 L45,40 L55,35 L50,55"
+                stroke="#8B4513"
+                strokeWidth="1"
+                fill="none"
+                opacity="0.7"
+              />
+              <path
+                d="M15,45 L25,50 L20,60 L30,55"
+                stroke="#8B4513"
+                strokeWidth="1"
+                fill="none"
+                opacity="0.7"
+              />
+            </svg>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Revealed Word */}
+      <AnimatePresence>
+        {cracked && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.8 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 3
+            }}
+          >
+            <Text
+              fontSize={fontSize}
+              fontWeight="bold"
+              color="gray.800"
+              textAlign="center"
+              cursor="pointer"
+              onClick={handleWordClick}
+              padding="2px"
+              borderRadius="4px"
+              backgroundColor="rgba(255, 255, 255, 0.9)"
+              border="1px solid rgba(0, 0, 0, 0.1)"
+              boxShadow="0 2px 4px rgba(0, 0, 0, 0.1)"
+              transition="all 0.2s ease"
+              _hover={{
+                backgroundColor: "rgba(255, 255, 255, 1)",
+                transform: "scale(1.05)",
+                boxShadow: "0 3px 6px rgba(0, 0, 0, 0.15)"
+              }}
+              opacity={isWordPickedUp ? 0.5 : 1}
+              pointerEvents={isWordPickedUp ? "none" : "auto"}
+            >
+              {item}
+            </Text>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Box>
   );
 };
 
-export default Egg; 
+export default Container; 

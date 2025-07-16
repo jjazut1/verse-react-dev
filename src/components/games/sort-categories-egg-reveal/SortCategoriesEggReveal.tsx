@@ -43,6 +43,11 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
             onGameAreaClick={gameLogic.handleGameAreaClick}
             onEggClick={gameLogic.handleEggClick}
             onWordClick={gameLogic.handleWordClick}
+            enableTextToSpeech={initialConfig.enableTextToSpeech}
+            usePhonicsMode={initialConfig.usePhonicsMode}
+            useAmazonPolly={initialConfig.useAmazonPolly}
+            textToSpeechMode={initialConfig.textToSpeechMode}
+            containerType={initialConfig.containerType}
           />
           <GameControls
             gameState={gameLogic.gameState}

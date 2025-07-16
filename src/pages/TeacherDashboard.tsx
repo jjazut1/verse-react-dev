@@ -1357,6 +1357,8 @@ const TeacherDashboard = () => {
       configRoute = '/configure/sentence-sense';
     } else if (gameType === 'place-value-showdown') {
       configRoute = '/configure/place-value-showdown';
+    } else if (gameType === 'word-volley') {
+      configRoute = '/configure/word-volley';
     }
     
     return {

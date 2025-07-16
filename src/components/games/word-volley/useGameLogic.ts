@@ -340,7 +340,8 @@ export const useGameLogic = (initialSettings: GameSettings) => {
       console.log(`  Ball velocity before: vx=${newBall.vx.toFixed(2)}, vy=${newBall.vy.toFixed(2)}`);
       
       const bounceAngle = calculateBounceAngle(newBall.y, playerPaddle.y, playerPaddle.height);
-      const speed = Math.max(Math.abs(newBall.vx), settings.initialSpeed); // Ensure minimum speed
+      const currentSpeed = Math.sqrt(newBall.vx * newBall.vx + newBall.vy * newBall.vy); // Actual speed magnitude
+      const speed = Math.max(currentSpeed, settings.initialSpeed); // Ensure minimum speed
       
       newBall.vx = -speed * Math.cos(bounceAngle);
       newBall.vy = speed * Math.sin(bounceAngle);
@@ -408,7 +409,8 @@ export const useGameLogic = (initialSettings: GameSettings) => {
       console.log(`  Ball velocity before: vx=${newBall.vx.toFixed(2)}, vy=${newBall.vy.toFixed(2)}`);
       
       const bounceAngle = calculateBounceAngle(newBall.y, aiPaddle.y, aiPaddle.height);
-      const speed = Math.max(Math.abs(newBall.vx), settings.initialSpeed); // Ensure minimum speed
+      const currentSpeed = Math.sqrt(newBall.vx * newBall.vx + newBall.vy * newBall.vy); // Actual speed magnitude
+      const speed = Math.max(currentSpeed, settings.initialSpeed); // Ensure minimum speed
       
       newBall.vx = speed * Math.cos(bounceAngle);
       newBall.vy = speed * Math.sin(bounceAngle);

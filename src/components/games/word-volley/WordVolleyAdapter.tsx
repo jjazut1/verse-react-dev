@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { WordVolley } from './WordVolley';
 import { GameSettings } from './types';
 
@@ -17,37 +18,50 @@ const WordVolleyAdapter: React.FC<WordVolleyAdapterProps> = ({
   onHighScoreProcessStart,
   onHighScoreProcessComplete
 }) => {
+  const navigate = useNavigate();
+
   // Convert Firebase config to WordVolley GameSettings format
   // Map paddle size from 1-10 scale to actual pixel values (40-80 pixels)
   const paddleSizeScale = gameConfig.paddleSize || 5;
-  const actualPaddleSize = 40 + ((paddleSizeScale - 1) * 40) / 9; // Maps 1-10 to 40-80 pixels
-  
+  const actualPaddleSize = 40 + ((paddleSizeScale - 1) / 9) * 40;
+
+  // Convert game speed from 1-10 scale to actual ball speed multiplier
+  const speedScale = gameConfig.gameSpeed || 3;
+  const actualSpeed = 0.5 + ((speedScale - 1) / 9) * 1.5; // 0.5 to 2.0 multiplier
+
   const convertedSettings: Partial<GameSettings> = {
-    targetWords: gameConfig.targetCategory?.words || ['cat', 'bat', 'hat', 'mat', 'rat'],
-    nonTargetWords: gameConfig.nonTargetCategory?.words || ['dog', 'tree', 'house', 'car', 'sun'],
-    categoryName: gameConfig.targetCategory?.name || 'Target Words',
-    theme: gameConfig.theme || 'classic',
-    initialSpeed: gameConfig.gameSpeed || 3,
-    paddleSize: Math.round(actualPaddleSize),
+    gameTime: (gameConfig.gameDuration || 3) * 60, // Convert minutes to seconds
+    paddleSize: actualPaddleSize,
+    initialSpeed: actualSpeed,
+    categoryName: gameConfig.targetCategory?.name || 'Words',
+    targetWords: gameConfig.targetCategory?.words || [],
+    nonTargetWords: gameConfig.nonTargetCategory?.words || [],
+    enableTextToSpeech: gameConfig.enableTextToSpeech ?? true,
+    theme: 'classic',
     maxLives: 3,
-    speedIncrement: 0.5,
+    speedIncrement: 1.0,
     wordsPerLevel: 10,
-    enableSound: true,
-    gameTime: gameConfig.timeLimit || 300
+    enableSound: true
   };
 
-  // Handle game completion with score and time
   const handleGameComplete = (score: number, timeElapsed: number) => {
     onGameComplete(score);
+  };
+
+  const handleGameExit = () => {
+    // Navigate back to the previous page or dashboard
+    navigate(-1); // Goes back to previous page
   };
 
   return (
     <WordVolley
       gameConfig={convertedSettings}
       onGameComplete={handleGameComplete}
-      onGameExit={() => {
-        // Handle game exit if needed
-      }}
+      onHighScoreProcessStart={onHighScoreProcessStart}
+      onHighScoreProcessComplete={onHighScoreProcessComplete}
+      configId={gameConfig.id}
+      playerName={playerName}
+      onGameExit={handleGameExit}
     />
   );
 };

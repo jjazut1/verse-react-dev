@@ -64,13 +64,14 @@ export interface ConfigField {
   defaultValue?: any;
   validation?: (value: any) => string | undefined;
   component?: React.ComponentType<any>;
+  width?: string; // Added width property for styling
 }
 
 // Configuration section interface
 export interface ConfigSection {
   title: string;
   description?: string;
-  fields: ConfigField[];
+  fields?: ConfigField[]; // Make fields optional since some sections use components
   component?: React.ComponentType<any>; // For complex custom sections
 }
 
@@ -197,6 +198,7 @@ const FieldRenderer: React.FC<{
           max={field.max}
           step={field.step}
           isInvalid={isInvalid}
+          width={field.width || 'auto'}
         >
           <NumberInputField className="apple-input" />
           <NumberInputStepper>
@@ -218,6 +220,7 @@ const FieldRenderer: React.FC<{
           placeholder={field.placeholder}
           isInvalid={isInvalid}
           className="apple-input"
+          width={field.width || 'auto'}
         >
           {field.options?.map((option) => (
             <option key={option.value} value={option.value}>
@@ -294,7 +297,7 @@ const SectionRenderer: React.FC<{
       </CardHeader>
       <CardBody>
         <VStack spacing={4}>
-          {section.fields.map((field) => (
+          {section.fields?.map((field) => (
             <FormControl key={field.name} isInvalid={!!errors[field.name]}>
               <FormLabel>{field.label}</FormLabel>
               <FieldRenderer
@@ -340,11 +343,14 @@ export const ConfigurationFramework: React.FC<ConfigurationFrameworkProps> = ({
   const initializeFormData = () => {
     const defaults: any = {};
     schema.sections.forEach(section => {
-      section.fields.forEach(field => {
-        if (field.defaultValue !== undefined) {
-          defaults[field.name] = field.defaultValue;
-        }
-      });
+      // Only process sections that have fields (not component-based sections)
+      if (section.fields) {
+        section.fields.forEach(field => {
+          if (field.defaultValue !== undefined) {
+            defaults[field.name] = field.defaultValue;
+          }
+        });
+      }
     });
     return { ...defaults, ...initialData };
   };
@@ -382,7 +388,7 @@ export const ConfigurationFramework: React.FC<ConfigurationFrameworkProps> = ({
     
     // Validate all fields
     schema.sections.forEach(section => {
-      section.fields.forEach(field => {
+      section.fields?.forEach(field => { // Use optional chaining
         if (field.required && !formData[field.name]) {
           newErrors[field.name] = `${field.label} is required`;
         }

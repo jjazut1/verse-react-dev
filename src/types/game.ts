@@ -95,6 +95,9 @@ export interface WhackAMoleConfig extends BaseGameConfig {
 interface SortCategoriesConfig extends BaseGameConfig {
   type: 'sort-categories-egg';
   eggQty: number;
+  enableTextToSpeech?: boolean;
+  usePhonicsMode?: boolean;
+  useAmazonPolly?: boolean;
   categories: Array<{
     name: string;
     items: string[] | Array<{ content: string; text: string; }>;
