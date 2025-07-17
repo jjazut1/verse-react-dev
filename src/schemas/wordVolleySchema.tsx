@@ -298,7 +298,7 @@ const generateConfig = (formData: Partial<WordVolleyFormData>, user: any) => {
   const safeFormData = {
     title: formData.title || 'Pong Game',
     description: formData.description || 'Educational Pong-style word categorization game',
-    gameSpeed: formData.gameSpeed || 3,
+    gameSpeed: formData.gameSpeed || 5,
     paddleSize: formData.paddleSize || 5,
     gameDuration: formData.gameDuration || 3,
     enableTextToSpeech: formData.enableTextToSpeech ?? true,
@@ -381,13 +381,13 @@ export const wordVolleySchema = {
           type: 'select' as const,
           required: true,
           options: [
-            { value: 1, label: 'Slow' },
-            { value: 3, label: 'Medium' },
-            { value: 5, label: 'Normal' },
-            { value: 7, label: 'Fast' },
-            { value: 10, label: 'Very Fast' }
+            { value: 2, label: 'Slow' },
+            { value: 5, label: 'Medium' },
+            { value: 8, label: 'Normal' },
+            { value: 11, label: 'Fast' },
+            { value: 15, label: 'Very Fast' }
           ],
-          defaultValue: 3,
+          defaultValue: 5,
           width: '140px',
           helpText: 'Controls ball speed (Slow to Very Fast)'
         },

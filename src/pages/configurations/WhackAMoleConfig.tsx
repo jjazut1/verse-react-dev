@@ -25,12 +25,12 @@ const WhackAMoleConfig: React.FC = () => {
   useEffect(() => {
     const loadTemplate = async () => {
       if (!templateId) return;
-
+      
       // Check if this is a copy operation
       const urlParams = new URLSearchParams(window.location.search);
       const isCopy = urlParams.get('copy') === 'true';
       setIsCopyOperation(isCopy);
-
+      
       setIsLoading(true);
       try {
         // Try multiple collections like other configs
@@ -41,7 +41,7 @@ const WhackAMoleConfig: React.FC = () => {
         for (const collectionName of collections) {
           const docRef = doc(db, collectionName, templateId);
           docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
+        if (docSnap.exists()) {
             foundCollection = collectionName;
             break;
           }
@@ -113,33 +113,33 @@ const WhackAMoleConfig: React.FC = () => {
               return {
                 id: category.id || `cat-${generateId()}`,
                 title: category.title || '',
-                items: [{
+              items: [{
                   id: `item-${generateId()}`,
-                  content: '',
-                  text: ''
-                }]
+                content: '',
+                text: ''
+              }]
               };
             });
           }
 
           setInitialData(loadedData);
-        } else {
-          toast({
-            title: "Configuration not found",
-            description: "The requested configuration could not be found.",
-            status: "error",
-            duration: 5000,
-          });
+          } else {
+            toast({
+              title: "Configuration not found",
+              description: "The requested configuration could not be found.",
+              status: "error",
+              duration: 5000,
+            });
           navigate('/configure/whack-a-mole');
         }
       } catch (error) {
         console.error("Error loading configuration:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load the configuration.",
-          status: "error",
-          duration: 5000,
-        });
+          toast({
+            title: "Error",
+            description: "Failed to load the configuration.",
+            status: "error",
+            duration: 5000,
+          });
         navigate('/configure/whack-a-mole');
       } finally {
         setIsLoading(false);

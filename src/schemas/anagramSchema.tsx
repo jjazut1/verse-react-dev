@@ -39,6 +39,18 @@ const AnagramManager: React.FC<{
     const defaultAnagrams = [{ id: '1', word: 'LISTEN', definition: 'To hear with attention' }];
     updateField('anagrams', defaultAnagrams);
     formData.anagrams = defaultAnagrams; // Also set it directly to avoid race condition
+  } else {
+    // CRITICAL FIX: Check if anagrams have 'original' field instead of 'word' (from saved configs)
+    const needsConversion = formData.anagrams.some((anagram: any) => anagram.original && !anagram.word);
+    if (needsConversion) {
+      const convertedAnagrams = formData.anagrams.map((anagram: any) => ({
+        id: anagram.id || Date.now().toString(),
+        word: anagram.original || anagram.word || '', // Use 'original' field if 'word' doesn't exist
+        definition: anagram.definition || ''
+      }));
+      updateField('anagrams', convertedAnagrams);
+      formData.anagrams = convertedAnagrams;
+    }
   }
 
   // Additional useEffect for safety
@@ -48,6 +60,17 @@ const AnagramManager: React.FC<{
     }
     if (!formData.anagrams || formData.anagrams.length === 0) {
       updateField('anagrams', [{ id: '1', word: 'LISTEN', definition: 'To hear with attention' }]);
+    } else {
+      // Check for format conversion in useEffect as well
+      const needsConversion = formData.anagrams.some((anagram: any) => anagram.original && !anagram.word);
+      if (needsConversion) {
+        const convertedAnagrams = formData.anagrams.map((anagram: any) => ({
+          id: anagram.id || Date.now().toString(),
+          word: anagram.original || anagram.word || '',
+          definition: anagram.definition || ''
+        }));
+        updateField('anagrams', convertedAnagrams);
+      }
     }
   }, [formData.withDefinitions, formData.anagrams]);
   

@@ -11,6 +11,7 @@ import { useGameLogic } from './useGameLogic';
 import { useAudio } from './useAudio';
 import { GameTheme, GameSettings, GameState, GameWord, Position, Ball, Paddle, ThemeType } from './types';
 import { THEMES, DEFAULT_SETTINGS, CANVAS_WIDTH, CANVAS_HEIGHT, speakWord } from './utils';
+import { defaultTextRenderer } from '../../../utils/textRenderer';
 import './WordVolley.css';
 
 interface WordVolleyProps {
@@ -37,6 +38,9 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number>();
   const [mouseY, setMouseY] = useState(CANVAS_HEIGHT / 2);
+  
+  // Reference to track theme changes for cache clearing
+  const lastThemeRef = useRef<string>('');
   
   // Initialize modularized high score system
   const {
@@ -94,6 +98,10 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
   const [showPaddleHint, setShowPaddleHint] = useState(true);
   const [showScoringModal, setShowScoringModal] = useState(false);
   
+  // Speed debugging state
+  const [showSpeedDebug, setShowSpeedDebug] = useState(true); // Enable by default to measure speeds
+  const [currentBallSpeed, setCurrentBallSpeed] = useState(0);
+  
   // Theme state
   const [currentTheme, setCurrentTheme] = useState<ThemeType>('classic');
   
@@ -106,6 +114,14 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
   const toggleTextToSpeech = useCallback(() => {
     setIsTextToSpeechEnabled(prev => !prev);
   }, []);
+  
+  // Clear word cache when theme changes
+  useEffect(() => {
+    if (lastThemeRef.current !== currentTheme) {
+      defaultTextRenderer.clearCache();
+      lastThemeRef.current = currentTheme;
+    }
+  }, [currentTheme]);
   
   // Cat animation state for Enchanted Forest theme
   const [catVisible, setCatVisible] = useState(false);
@@ -626,34 +642,26 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     ctx.arc(ballX, ballY, ball.radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Save context state
-    ctx.save();
-
-    // Font setup
+    // Pre-rendered text approach for crisp, non-blurry text at high speeds
     const maxWidth = ball.radius * 1.6;
     let fontSize = Math.max(14, Math.min(24, ball.radius * 0.7));
     fontSize = Math.round(fontSize); // Pixel-perfect size
-    ctx.font = `bold ${fontSize}px ${theme.text.fontFamily}`;
 
-    // Shrink font if needed
-    let textMetrics = ctx.measureText(ball.word.text);
-    while (textMetrics.width > maxWidth && fontSize > 10) {
-      fontSize -= 1;
-      ctx.font = `bold ${fontSize}px ${theme.text.fontFamily}`;
-      textMetrics = ctx.measureText(ball.word.text);
-    }
-
-    // Text rendering settings
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Draw text at pixel-aligned coordinates
-    const textX = Math.round(ballX);
-    const textY = Math.round(ballY);
-    ctx.fillStyle = theme.text.target; // Always use same color to not give away answer
-    ctx.fillText(ball.word.text, textX, textY);
-
-    ctx.restore();
+    // Use the reusable text renderer utility for crisp text
+    defaultTextRenderer.drawPreRenderedText(
+      ctx,
+      ball.word.text,
+      ballX,
+      ballY,
+      {
+        fontSize,
+        color: theme.text.target, // Always use same color to not give away answer
+        fontFamily: theme.text.fontFamily,
+        maxWidth,
+        bold: true
+      },
+      true // centered
+    );
 
     // Draw UI elements
     drawUI(ctx, theme);
@@ -1071,6 +1079,10 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
   // Game loop
   const gameLoop = useCallback(() => {
     if (gameState === 'playing') {
+      // Calculate and track ball speed for debugging
+      const ballSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+      setCurrentBallSpeed(ballSpeed);
+      
       // Update ball position and handle collisions
       const hitResult = updateBall();
       
@@ -1097,7 +1109,7 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     if (gameState !== 'idle') {
       animationFrameRef.current = requestAnimationFrame(gameLoop);
     }
-  }, [gameState, updateBall, render, score, timeElapsed, onGameComplete, configId, playerName, saveHighScore, playBounceSound]);
+  }, [gameState, updateBall, render, score, timeElapsed, onGameComplete, configId, playerName, saveHighScore, playBounceSound, ball]);
 
   // Start game loop when game becomes active
   useEffect(() => {
@@ -1218,6 +1230,56 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
             Hit: <strong style={{ color: '#059669' }}>{settings.categoryName}</strong> words | 
             Avoid: <strong style={{ color: '#dc2626' }}>Non-{settings.categoryName}</strong> words
           </div>
+
+          {/* Speed Debug Information */}
+          {showSpeedDebug && (
+            <div style={{
+              textAlign: 'center',
+              fontSize: '0.8rem',
+              color: '#374151',
+              fontWeight: '500',
+              padding: '4px 8px',
+              background: 'rgba(59, 130, 246, 0.1)',
+              borderRadius: '4px',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              fontFamily: 'monospace'
+            }}>
+              Speed Debug: <strong>{currentBallSpeed.toFixed(2)} px/frame</strong> | 
+              vx: <strong>{ball.vx.toFixed(2)}</strong>, vy: <strong>{ball.vy.toFixed(2)}</strong> | 
+              Config: <strong>{settings.initialSpeed.toFixed(2)}</strong>
+              <button 
+                onClick={() => setShowSpeedDebug(false)}
+                style={{
+                  marginLeft: '8px',
+                  padding: '2px 6px',
+                  fontSize: '0.7rem',
+                  background: 'rgba(59, 130, 246, 0.2)',
+                  border: '1px solid rgba(59, 130, 246, 0.5)',
+                  borderRadius: '3px',
+                  cursor: 'pointer'
+                }}
+              >
+                Hide
+              </button>
+            </div>
+          )}
+          
+          {!showSpeedDebug && (
+            <button 
+              onClick={() => setShowSpeedDebug(true)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '0.8rem',
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                color: '#374151'
+              }}
+            >
+              Show Speed Debug
+            </button>
+          )}
         </div>
 
         <div 

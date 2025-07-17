@@ -25,9 +25,9 @@ const WordVolleyAdapter: React.FC<WordVolleyAdapterProps> = ({
   const paddleSizeScale = gameConfig.paddleSize || 5;
   const actualPaddleSize = 40 + ((paddleSizeScale - 1) / 9) * 40;
 
-  // Convert game speed from 1-10 scale to actual ball speed multiplier
-  const speedScale = gameConfig.gameSpeed || 3;
-  const actualSpeed = 0.5 + ((speedScale - 1) / 9) * 1.5; // 0.5 to 2.0 multiplier
+  // Convert game speed from 2-15 scale to actual ball speed multiplier
+  const speedScale = gameConfig.gameSpeed || 5;
+  const actualSpeed = 3 + ((speedScale - 2) / 13) * 12; // 3 to 15 px/frame for proper Pong speed
 
   const convertedSettings: Partial<GameSettings> = {
     gameTime: (gameConfig.gameDuration || 3) * 60, // Convert minutes to seconds

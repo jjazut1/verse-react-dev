@@ -90,9 +90,6 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
       setShowCountdown(false);
       setGameStarted(true);
       setGameOver(false);
-      if (sceneRef.current) {
-        sceneRef.current.startGame();
-      }
     }
 
     return () => {

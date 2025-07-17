@@ -15,7 +15,12 @@ import {
   Badge,
   Collapse,
   Flex,
-  useToast
+  useToast,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import SlateEditor from '../components/SlateEditor';
@@ -402,9 +407,6 @@ const CategoryManager: React.FC<{
   const [activeEditorId, setActiveEditorId] = useState<string | null>(null);
   const [lastSelectionPath, setLastSelectionPath] = useState<[number, number] | null>(null);
   
-  // Track collapsed state for categories
-  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
-  
   // Track last added item for focus management
   const lastAddedItemRef = useRef<{categoryIndex: number, itemIndex: number, id: string | null}>({
     categoryIndex: 0, 
@@ -412,24 +414,34 @@ const CategoryManager: React.FC<{
     id: null
   });
 
-  // Initialize categories synchronously if they don't exist
-  if (!formData.categories || formData.categories.length === 0) {
-    console.log('🚀 [CategoryManager] SYNC INIT - Creating default categories');
-    const defaultCategories: Category[] = [{
-      id: generateId(),
-      title: '',
-      items: [{
-        id: generateId(),
-        content: '' // Use simple string
-      }]
-    }];
+  // Initialize exactly two categories if they don't exist
+  if (!formData.categories || formData.categories.length !== 2) {
+    console.log('🚀 [CategoryManager] SYNC INIT - Creating default two categories');
+    const defaultCategories: Category[] = [
+      {
+        id: 'whack-these',
+        title: 'Whack These',
+        items: [{
+          id: generateId(),
+          content: '' // Use simple string
+        }]
+      },
+      {
+        id: 'do-not-whack',
+        title: 'Do Not Whack These',
+        items: [{
+          id: generateId(),
+          content: '' // Use simple string
+        }]
+      }
+    ];
     updateField('categories', defaultCategories);
     console.log('🚀 [CategoryManager] SYNC INIT - Set formData.categories:', defaultCategories);
   }
 
-  // Ensure all existing categories have items initialized
+  // Ensure both categories have items initialized
   let categoriesUpdated = false;
-  const safeCategoryData = formData.categories?.map((category: any) => {
+  const safeCategoryData = formData.categories?.map((category: any, index: number) => {
     if (!category.items) {
       console.log('🔧 [CategoryManager] SAFETY - Initializing missing items for category:', category.title);
       categoriesUpdated = true;
@@ -441,7 +453,16 @@ const CategoryManager: React.FC<{
         }]
       };
     }
-    return category;
+    // Ensure correct IDs and titles for the two categories
+    const updatedCategory = { ...category };
+    if (index === 0) {
+      updatedCategory.id = 'whack-these';
+      updatedCategory.title = 'Whack These';
+    } else if (index === 1) {
+      updatedCategory.id = 'do-not-whack';
+      updatedCategory.title = 'Do Not Whack These';
+    }
+    return updatedCategory;
   }) || [];
 
   if (categoriesUpdated) {
@@ -449,39 +470,6 @@ const CategoryManager: React.FC<{
   }
 
   const categories: Category[] = safeCategoryData;
-
-  // Toggle collapse state for a category
-  const toggleCategoryCollapse = (categoryId: string) => {
-    setCollapsedCategories(prev => ({
-      ...prev,
-      [categoryId]: !prev[categoryId]
-    }));
-  };
-
-  // Category management handlers
-  const handleAddCategory = () => {
-    const newCategories = [...categories, {
-      id: generateId(),
-      title: '',
-      items: [{
-        id: generateId(),
-        content: '' // Use simple string
-      }]
-    }];
-    updateField('categories', newCategories);
-  };
-
-  const handleRemoveCategory = (index: number) => {
-    const newCategories = [...categories];
-    newCategories.splice(index, 1);
-    updateField('categories', newCategories);
-  };
-
-  const handleCategoryTitleChange = (index: number, value: string) => {
-    const newCategories = [...categories];
-    newCategories[index].title = value;
-    updateField('categories', newCategories);
-  };
 
   // Handler functions for item management
   const handleItemContentChange = (categoryIndex: number, itemIndex: number, content: any) => {
@@ -643,102 +631,54 @@ const CategoryManager: React.FC<{
     }}>
       <VStack spacing={6} align="stretch">
         <Text fontSize="sm" color="gray.600" mb={4}>
-          Create categories of words or phrases that students need to identify and "whack" when they appear.
+          Create two categories of words or phrases: items students should "whack" and items they should avoid.
         </Text>
         
-        {categories.map((category, categoryIndex) => (
-          <Box 
-            key={category.id || categoryIndex} 
-            p={4} 
-            borderWidth="1px" 
-            borderRadius="md" 
-            mb={4}
-            className="category-box"
-          >
-            <Flex 
-              justify="space-between" 
-              align="center" 
-              mb={3}
-              className="category-header"
-            >
+        <Tabs>
+          <TabList>
+            <Tab>
               <HStack>
-                <Heading size="sm">Category {categoryIndex + 1}</Heading>
-                <Badge colorScheme="blue" variant="subtle">
-                  {category.items?.length || 0} items
+                <Text>Whack These</Text>
+                <Badge colorScheme="green" variant="subtle">
+                  {categories[0]?.items?.length || 0} items
                 </Badge>
               </HStack>
-              <HStack spacing={1} className="order-buttons">
-                <IconButton
-                  icon={<ChevronUpIcon boxSize={3} />}
-                  aria-label="Move category up"
-                  size="sm"
-                  variant="ghost"
-                  isDisabled={categoryIndex === 0}
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent collapse toggle
-                    const newCategories = [...categories];
-                    const temp = newCategories[categoryIndex];
-                    newCategories[categoryIndex] = newCategories[categoryIndex - 1];
-                    newCategories[categoryIndex - 1] = temp;
-                    updateField('categories', newCategories);
-                  }}
-                  sx={appleStyleIconButton}
-                  className="apple-button"
-                />
-                <IconButton
-                  icon={<ChevronDownIcon boxSize={3} />}
-                  aria-label="Move category down"
-                  size="sm"
-                  variant="ghost"
-                  isDisabled={categoryIndex === categories.length - 1}
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent collapse toggle
-                    const newCategories = [...categories];
-                    const temp = newCategories[categoryIndex];
-                    newCategories[categoryIndex] = newCategories[categoryIndex + 1];
-                    newCategories[categoryIndex + 1] = temp;
-                    updateField('categories', newCategories);
-                  }}
-                  sx={appleStyleIconButton}
-                  className="apple-button"
-                />
-                <IconButton
-                  icon={collapsedCategories[category.id] ? <ChevronDownIcon boxSize={4} /> : <ChevronUpIcon boxSize={4} />}
-                  aria-label={collapsedCategories[category.id] ? "Expand category" : "Collapse category"}
-                  size="sm"
-                  variant="ghost"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleCategoryCollapse(category.id);
-                  }}
-                  sx={appleStyleIconButton}
-                  className="apple-button"
-                />
+            </Tab>
+            <Tab>
+              <HStack>
+                <Text>Do Not Whack These</Text>
+                <Badge colorScheme="red" variant="subtle">
+                  {categories[1]?.items?.length || 0} items
+                </Badge>
               </HStack>
-            </Flex>
-            
-            <Collapse in={!collapsedCategories[category.id]} animateOpacity>
-              <Box p={4}>
-                <FormControl mb={4} isInvalid={saveAttempted && !category.title}>
-                  <FormLabel>Category Name</FormLabel>
-                  <Input
-                    value={category.title}
-                    onChange={(e) => handleCategoryTitleChange(categoryIndex, e.target.value)}
-                    placeholder="Category title"
-                    maxW="400px"
-                    className="apple-input"
-                  />
-                </FormControl>
-            
+            </Tab>
+          </TabList>
+
+          <TabPanels>
+            {/* Whack These Tab */}
+            <TabPanel>
+              <Box 
+                p={4} 
+                borderWidth="1px" 
+                borderRadius="md" 
+                className="category-box"
+              >
+                <VStack align="start" spacing={1} mb={4}>
+                  <Heading size="md" color="green.600">Whack These</Heading>
+                  <Text fontSize="sm" color="gray.600">
+                    Words or phrases that students should hit to earn points
+                  </Text>
+                </VStack>
+                
                 <Box mb={4}>
                   <FormLabel>Items</FormLabel>
                   <Text fontSize="sm" color="gray.600" mb={3}>
-                    Enter items to be displayed on moles that players will hit. (Minimum 1 Item)
+                    Enter items to be displayed on moles that players should hit. (Minimum 1 Item)
                   </Text>
                   
-                  {(category.items || []).map((item, itemIndex) => (
+                  {(categories[0]?.items || []).map((item, itemIndex) => (
                     <Box 
-                      key={item.id || `item-${categoryIndex}-${itemIndex}`}
+                      key={item.id || `item-0-${itemIndex}`}
                       mb={2}
                     >
                       <Flex 
@@ -759,7 +699,7 @@ const CategoryManager: React.FC<{
                         >
                           <MemoizedItemEditor
                             value={item.content}
-                            onChange={(content) => handleItemContentChange(categoryIndex, itemIndex, content)}
+                            onChange={(content) => handleItemContentChange(0, itemIndex, content)}
                             onFocus={handleEditorFocus(item.id)}
                             placeholder={`Enter word ${itemIndex + 1}`}
                             editorId={item.id}
@@ -772,7 +712,7 @@ const CategoryManager: React.FC<{
                             size="sm"
                             variant="ghost"
                             isDisabled={itemIndex === 0}
-                            onClick={() => handleMoveItemUp(categoryIndex, itemIndex)}
+                            onClick={() => handleMoveItemUp(0, itemIndex)}
                             mr={1}
                             sx={appleStyleIconButton}
                             className="apple-button"
@@ -782,8 +722,8 @@ const CategoryManager: React.FC<{
                             aria-label="Move item down"
                             size="sm"
                             variant="ghost"
-                            isDisabled={!category.items || itemIndex === category.items.length - 1}
-                            onClick={() => handleMoveItemDown(categoryIndex, itemIndex)}
+                            isDisabled={!categories[0]?.items || itemIndex === categories[0].items.length - 1}
+                            onClick={() => handleMoveItemDown(0, itemIndex)}
                             mr={1}
                             sx={appleStyleIconButton}
                             className="apple-button"
@@ -793,8 +733,8 @@ const CategoryManager: React.FC<{
                             aria-label="Delete item"
                             size="sm"
                             variant="ghost"
-                            isDisabled={!category.items || category.items.length <= 1}
-                            onClick={() => handleDeleteItem(categoryIndex, itemIndex)}
+                            isDisabled={!categories[0]?.items || categories[0].items.length <= 1}
+                            onClick={() => handleDeleteItem(0, itemIndex)}
                             sx={subtleDeleteButton}
                             className="apple-button"
                           />
@@ -803,99 +743,130 @@ const CategoryManager: React.FC<{
                     </Box>
                   ))}
                   
-                  <Flex justifyContent="space-between" mt={4} mb={2}>
-                    <Button 
-                      leftIcon={<AddIcon />}
-                      onClick={() => handleAddItem(categoryIndex)}
-                      size="sm" 
-                      colorScheme="blue"
-                      _hover={{ bg: 'blue.600' }}
-                      className="apple-button apple-button-primary"
-                    >
-                      Add Item
-                    </Button>
-                    
-                    {categories.length > 1 && (
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        colorScheme="gray"
-                        onClick={() => handleRemoveCategory(categoryIndex)}
-                        className="apple-button"
-                        sx={{
-                          color: 'gray.500',
-                          borderColor: 'gray.200',
-                          _hover: {
-                            bg: 'red.50',
-                            color: 'red.500',
-                            borderColor: 'red.100'
-                          }
-                        }}
-                      >
-                        Remove Category
-                      </Button>
-                    )}
-                  </Flex>
+                  <Button 
+                    leftIcon={<AddIcon />}
+                    onClick={() => handleAddItem(0)}
+                    size="sm" 
+                    colorScheme="green"
+                    _hover={{ bg: 'green.600' }}
+                    className="apple-button apple-button-primary"
+                    mt={4}
+                  >
+                    Add Item to Whack
+                  </Button>
                 </Box>
               </Box>
-            </Collapse>
-          </Box>
-        ))}
-        
-        <Flex justify="space-between" mb={4}>
-          <Button 
-            colorScheme="blue" 
-            onClick={handleAddCategory} 
-            leftIcon={<AddIcon />}
-            size="md"
-            borderRadius="md"
-            bg="blue.500"
-            _hover={{ bg: 'blue.600' }}
-            width="auto"
-            className="apple-button apple-button-primary"
-          >
-            Add Category
-          </Button>
-          
-          {categories.length > 1 && categories.some(cat => !collapsedCategories[cat.id]) && (
-            <Button
-              colorScheme="gray"
-              onClick={() => {
-                const allCategoryIds = categories.map(cat => cat.id);
-                const newCollapsedState = allCategoryIds.reduce((acc, id) => {
-                  acc[id] = true;
-                  return acc;
-                }, {} as Record<string, boolean>);
-                setCollapsedCategories(newCollapsedState);
-              }}
-              size="md"
-            >
-              Collapse All
-            </Button>
-          )}
-          
-          {categories.length > 1 && categories.some(cat => collapsedCategories[cat.id]) && (
-            <Button
-              colorScheme="gray"
-              onClick={() => {
-                const allCategoryIds = categories.map(cat => cat.id);
-                const newCollapsedState = allCategoryIds.reduce((acc, id) => {
-                  acc[id] = false;
-                  return acc;
-                }, {} as Record<string, boolean>);
-                setCollapsedCategories(newCollapsedState);
-              }}
-              size="md"
-            >
-              Expand All
-            </Button>
-          )}
-        </Flex>
+            </TabPanel>
+
+            {/* Do Not Whack These Tab */}
+            <TabPanel>
+              <Box 
+                p={4} 
+                borderWidth="1px" 
+                borderRadius="md" 
+                className="category-box"
+              >
+                <VStack align="start" spacing={1} mb={4}>
+                  <Heading size="md" color="red.600">Do Not Whack These</Heading>
+                  <Text fontSize="sm" color="gray.600">
+                    Words or phrases that students should avoid (distractors that cause point penalties)
+                  </Text>
+                </VStack>
+                
+                <Box mb={4}>
+                  <FormLabel>Items</FormLabel>
+                  <Text fontSize="sm" color="gray.600" mb={3}>
+                    Enter items to be displayed on moles that players should avoid hitting. (Minimum 1 Item)
+                  </Text>
+                  
+                  {(categories[1]?.items || []).map((item, itemIndex) => (
+                    <Box 
+                      key={item.id || `item-1-${itemIndex}`}
+                      mb={2}
+                    >
+                      <Flex 
+                        align="center"
+                        direction="row"
+                      >
+                        <Text 
+                          mr={2} 
+                          fontWeight="bold" 
+                          width="25px" 
+                          color="gray.500"
+                        >
+                          {itemIndex + 1}.
+                        </Text>
+                        <Box 
+                          flex="1" 
+                          mr={2}
+                        >
+                          <MemoizedItemEditor
+                            value={item.content}
+                            onChange={(content) => handleItemContentChange(1, itemIndex, content)}
+                            onFocus={handleEditorFocus(item.id)}
+                            placeholder={`Enter word ${itemIndex + 1}`}
+                            editorId={item.id}
+                          />
+                        </Box>
+                        <HStack spacing={1}>
+                          <IconButton
+                            icon={<ChevronUpIcon boxSize={3} />}
+                            aria-label="Move item up"
+                            size="sm"
+                            variant="ghost"
+                            isDisabled={itemIndex === 0}
+                            onClick={() => handleMoveItemUp(1, itemIndex)}
+                            mr={1}
+                            sx={appleStyleIconButton}
+                            className="apple-button"
+                          />
+                          <IconButton
+                            icon={<ChevronDownIcon boxSize={3} />}
+                            aria-label="Move item down"
+                            size="sm"
+                            variant="ghost"
+                            isDisabled={!categories[1]?.items || itemIndex === categories[1].items.length - 1}
+                            onClick={() => handleMoveItemDown(1, itemIndex)}
+                            mr={1}
+                            sx={appleStyleIconButton}
+                            className="apple-button"
+                          />
+                          <IconButton
+                            icon={<DeleteIcon boxSize={4} />}
+                            aria-label="Delete item"
+                            size="sm"
+                            variant="ghost"
+                            isDisabled={!categories[1]?.items || categories[1].items.length <= 1}
+                            onClick={() => handleDeleteItem(1, itemIndex)}
+                            sx={subtleDeleteButton}
+                            className="apple-button"
+                          />
+                        </HStack>
+                      </Flex>
+                    </Box>
+                  ))}
+                  
+                  <Button 
+                    leftIcon={<AddIcon />}
+                    onClick={() => handleAddItem(1)}
+                    size="sm" 
+                    colorScheme="red"
+                    _hover={{ bg: 'red.600' }}
+                    className="apple-button apple-button-primary"
+                    mt={4}
+                  >
+                    Add Item to Avoid
+                  </Button>
+                </Box>
+              </Box>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
         
         {categories.length === 0 && (
           <Box textAlign="center" py={8} color="gray.500">
             <Text>No categories created yet.</Text>
-            <Text fontSize="sm">Click "Add Category" to get started.</Text>
+            <Text fontSize="sm">Categories will be automatically created.</Text>
           </Box>
         )}
       </VStack>
@@ -1046,7 +1017,7 @@ export const whackAMoleSchema: ConfigSchema = {
     },
     {
       title: 'Categories',
-      description: 'Create categories of words or phrases for students to identify',
+      description: 'Create words that students should "whack" and words they should avoid',
       component: CategoryManager
     },
     {
@@ -1070,20 +1041,27 @@ export const whackAMoleSchema: ConfigSchema = {
       return 'Please enter a title for your game';
     }
 
-    // Validate categories
-    if (!formData.categories || formData.categories.length === 0) {
-      return 'Please add at least one category with items';
+    // Validate that we have exactly two categories
+    if (!formData.categories || formData.categories.length !== 2) {
+      return 'Both "Whack These" and "Do Not Whack These" categories are required';
     }
     
-    // Check if all categories have titles and items
-    for (const category of formData.categories) {
-      if (!category.title.trim()) {
-        return 'All categories must have a title';
-      }
-      if (!category.items || category.items.length === 0) {
-        return 'All categories must have at least one item';
-      }
-      // Check if items have content
+    // Check both categories have items
+    const whackTheseCategory = formData.categories[0];
+    const doNotWhackCategory = formData.categories[1];
+    
+    if (!whackTheseCategory.items || whackTheseCategory.items.length === 0) {
+      return '"Whack These" category must have at least one item';
+    }
+    
+    if (!doNotWhackCategory.items || doNotWhackCategory.items.length === 0) {
+      return '"Do Not Whack These" category must have at least one item';
+    }
+    
+    // Check if items have content in both categories
+    for (const [categoryIndex, category] of formData.categories.entries()) {
+      const categoryName = categoryIndex === 0 ? 'Whack These' : 'Do Not Whack These';
+      
       for (const item of category.items) {
         const hasContent = item.text || 
           (typeof item.content === 'string' && item.content.trim()) ||
@@ -1091,7 +1069,7 @@ export const whackAMoleSchema: ConfigSchema = {
             typeof node.text === 'string' && node.text.trim()
           ));
         if (!hasContent) {
-          return 'All category items must have content';
+          return `All items in "${categoryName}" category must have content`;
         }
       }
     }
@@ -1135,8 +1113,22 @@ export const whackAMoleSchema: ConfigSchema = {
     const gameSpeed = Number(safeFormData.gameSpeed) || 2;
     const instructions = safeFormData.instructions || '';
     
-    // Convert categories to the format expected by the game
-    const wordCategories = (safeFormData.categories || []).map((category: any) => convertCategoryToWordCategory(category));
+    // Convert the two categories to the format expected by the game
+    // The game expects the first category to be the "correct" category (Whack These)
+    const whackTheseCategory = safeFormData.categories?.[0];
+    const doNotWhackCategory = safeFormData.categories?.[1];
+    
+    const wordCategories = [];
+    
+    // Add "Whack These" category as the first (correct) category
+    if (whackTheseCategory) {
+      wordCategories.push(convertCategoryToWordCategory(whackTheseCategory));
+    }
+    
+    // Add "Do Not Whack These" category as additional categories
+    if (doNotWhackCategory) {
+      wordCategories.push(convertCategoryToWordCategory(doNotWhackCategory));
+    }
     
     // Create final config object with all required fields
     const config = {
@@ -1150,7 +1142,7 @@ export const whackAMoleSchema: ConfigSchema = {
       speed: gameSpeed,
       instructions: instructions,
       categories: wordCategories,
-      richCategories: (safeFormData.categories || []).map((category: Category) => {
+      richCategories: [whackTheseCategory, doNotWhackCategory].filter(Boolean).map((category: Category) => {
         return {
           id: category.id || generateId(), // Ensure id is never undefined
           title: category.title || '',
@@ -1196,7 +1188,7 @@ export const whackAMoleSchema: ConfigSchema = {
         };
       }),
       share: share,
-      description: `3D word categorization game with ${wordCategories.length} categories`,
+      description: `3D word categorization game with "Whack These" and "Do Not Whack These" categories`,
       email: currentUser?.email,
       userId: currentUser?.uid,
       createdAt: serverTimestamp(),
