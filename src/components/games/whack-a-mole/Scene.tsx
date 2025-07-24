@@ -405,8 +405,8 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
         });
     }
     
-    // 70% chance to show a point-generating word
-    const shouldShowPointGeneratingWord = Math.random() < 0.7;
+    // 50% chance to show a point-generating word (balanced gameplay)
+    const shouldShowPointGeneratingWord = Math.random() < 0.5;
     
     if (shouldShowPointGeneratingWord && pointGeneratingWords.length > 0) {
       // Pick a random word from the point-generating category
@@ -2920,6 +2920,9 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
       case 3: // Fast: 14-16 moles
         targetMoleCount = 15;
         break;
+      case 4: // Very Fast: 20-22 moles
+        targetMoleCount = 21;
+        break;
       case 2: // Medium: 11-13 moles
       default:
         targetMoleCount = 12;
@@ -2930,12 +2933,12 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
     let molesShown = 0;
     
     // Be very conservative - top of range only if fast speed
-    const maxMolesToShow = speed === 3 ? 
-      targetMoleCount + Math.floor(Math.random() * 2) : // For fast: full range
+    const maxMolesToShow = speed === 3 || speed === 4 ? 
+      targetMoleCount + Math.floor(Math.random() * 2) : // For fast/very fast: full range
       targetMoleCount - Math.floor(Math.random() * 2);  // For medium/slow: lower end of range
     
     console.log(`⭐ STRICT MOLE LIMITER ENABLED ⭐`);
-    console.log(`Game Speed: ${speed} (${speed === 1 ? 'Slow' : speed === 2 ? 'Medium' : 'Fast'})`);
+    console.log(`Game Speed: ${speed} (${speed === 1 ? 'Slow' : speed === 2 ? 'Medium' : speed === 3 ? 'Fast' : speed === 4 ? 'Very Fast' : 'Unknown'})`);
     console.log(`Target mole count: ${maxMolesToShow} in ${config.gameTime}s`);
     
     // Calculate base interval between moles with larger minimum
@@ -3188,6 +3191,10 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
 
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
+    
+    // Add click debouncing to prevent double-clicks in remote control environments
+    const clickDebounceMap = new Map<THREE.Group, number>();
+    const CLICK_DEBOUNCE_TIME = 600; // 600ms debounce for remote control compatibility
 
     const handleClick = (event: MouseEvent | TouchEvent) => {
       if (!gameActive) {
@@ -3226,6 +3233,18 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
         const mole = hitObject.userData.parentMole || hitObject.parent;
         
         if (mole && mole.userData.isUp && !mole.userData.isMoving) {
+          const currentTime = Date.now();
+          const lastClickTime = clickDebounceMap.get(mole) || 0;
+          
+          // Check if enough time has passed since last click on this mole
+          if (currentTime - lastClickTime < CLICK_DEBOUNCE_TIME) {
+            console.log('Click ignored - too soon after previous click (remote control protection)');
+            return;
+          }
+          
+          // Record this click time for debouncing
+          clickDebounceMap.set(mole, currentTime);
+          
           console.log('Processing hit on mole, isCorrect:', mole.userData.isCorrectWord);
           onMoleHit(mole.userData.word, mole.userData.isCorrectWord);
           
@@ -3284,12 +3303,22 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
               } else {
                 mole.scale.set(startScale, startScale, startScale);
                 animateMole(mole, false);
+                
+                // Clean up debounce entry when mole goes down
+                setTimeout(() => {
+                  clickDebounceMap.delete(mole);
+                }, 100);
               }
             };
             
             explode();
           } else {
             animateMole(mole, false);
+            
+            // Clean up debounce entry when mole goes down
+            setTimeout(() => {
+              clickDebounceMap.delete(mole);
+            }, 100);
           }
         }
       } else {

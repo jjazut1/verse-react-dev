@@ -9,6 +9,7 @@ interface WheelRendererProps {
   isZoomed: boolean;
   zoomTarget: ZoomTarget;
   spinning: boolean;
+  wheelSize?: number; // Add optional wheelSize prop
 }
 
 export const WheelRenderer: React.FC<WheelRendererProps> = ({
@@ -16,13 +17,22 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
   rotation,
   isZoomed,
   zoomTarget,
-  spinning
+  spinning,
+  wheelSize = 480 // Default to original size
 }) => {
-  const radius = 220; // Match original
-  const center = 240; // Match original
+  // Calculate responsive dimensions based on wheelSize
+  const scale = wheelSize / 480; // Scale factor relative to original 480px
+  const radius = 220 * scale;
+  const center = wheelSize / 2; // Center point should be half of total size
   const angle = 360 / items.length;
+  
+  // Scale other dimensions proportionally
+  const centerCircleRadius = 20 * scale;
+  const centerDotRadius = 12 * scale;
+  const pointerOffset = 14 * scale; // How far pointer extends beyond wheel edge
+  const fontSize = Math.max(12, 18 * scale); // Min font size of 12px, scaled from 18px
 
-  const renderRichTextSVG = (htmlContent: string, x: number, y: number, transform: string, textColor: string, fontSize: number = 18) => {
+  const renderRichTextSVG = (htmlContent: string, x: number, y: number, transform: string, textColor: string, scaledFontSize: number = fontSize) => {
     const parsedNodes = parseHTML(htmlContent);
     
     return (
@@ -31,7 +41,7 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
         y={y}
         textAnchor="middle"
         dominantBaseline="middle"
-        fontSize={fontSize}
+        fontSize={scaledFontSize}
         fontWeight="normal"
         fontFamily="'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
         fill={textColor}
@@ -51,20 +61,20 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
           }
           if (segment.underline) style.textDecoration = 'underline';
           
-          let segmentFontSize = fontSize;
+          let segmentFontSize = scaledFontSize;
           let dy = 0;
           
           const prevSegment = index > 0 ? parsedNodes[index - 1] : null;
           const wasScript = prevSegment && (prevSegment.superscript || prevSegment.subscript);
           
           if (segment.superscript) {
-            segmentFontSize = fontSize * 0.75;
-            dy = wasScript ? (-fontSize * 0.3) - (fontSize * 0.2) : -fontSize * 0.3;
+            segmentFontSize = scaledFontSize * 0.75;
+            dy = wasScript ? (-scaledFontSize * 0.3) - (scaledFontSize * 0.2) : -scaledFontSize * 0.3;
           } else if (segment.subscript) {
-            segmentFontSize = fontSize * 0.75;
-            dy = wasScript ? (fontSize * 0.2) + (fontSize * 0.3) : fontSize * 0.2;
+            segmentFontSize = scaledFontSize * 0.75;
+            dy = wasScript ? (scaledFontSize * 0.2) + (scaledFontSize * 0.3) : scaledFontSize * 0.2;
           } else if (wasScript) {
-            dy = prevSegment.superscript ? fontSize * 0.3 : -fontSize * 0.2;
+            dy = prevSegment.superscript ? scaledFontSize * 0.3 : -scaledFontSize * 0.2;
           }
           
           return (
@@ -89,20 +99,61 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
     if (items.length === 0) return null;
 
     console.log('🎨 [WheelRenderer] Rendering items:', items);
-    console.log('🎨 [WheelRenderer] First item:', items[0]);
-    console.log('🎨 [WheelRenderer] First item has content:', !!items[0]?.content);
-    console.log('🎨 [WheelRenderer] First item content value:', items[0]?.content);
+    console.log('🎨 [WheelRenderer] Wheel size:', wheelSize, 'Scale:', scale);
 
-    // Calculate zoom transform - match original scaling
+    // Calculate zoom transform - center the graphic in viewport
     const zoomScale = isZoomed ? 2.4 : 1;
-    const zoomTranslateX = isZoomed ? (240 - zoomTarget.x) : 0;
-    const zoomTranslateY = isZoomed ? (240 - zoomTarget.y) : 0;
+    
+    // When zoomed, center the wheel in the viewport
+    let zoomTranslateX = 0;
+    let zoomTranslateY = 0;
+    
+    if (isZoomed) {
+      // Get viewport dimensions
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Account for PWA header and control buttons space
+      const headerHeight = 60;
+      const controlButtonsHeight = 140; // Increased to account for more spacing between buttons
+      const totalTopOffset = headerHeight + controlButtonsHeight;
+      const availableHeight = viewportHeight - totalTopOffset;
+      
+      // Position graphic up and to the right as requested
+      // Instead of centering, offset the position
+      const horizontalOffset = viewportWidth * 0.12; // Move 12% to the right from center
+      const verticalOffset = availableHeight * 0.3; // Increased from 0.15 to 0.3 - move up 30% from center
+      
+      const targetX = (viewportWidth / 2) + horizontalOffset; // Right of center
+      const targetY = totalTopOffset + (availableHeight / 2) - verticalOffset; // Up from center
+      
+      // Account for zoom scale in translation
+      zoomTranslateX = (targetX - center) / zoomScale;
+      zoomTranslateY = (targetY - center) / zoomScale;
+      
+      console.log('🎯 [Zoom Position] Up and right positioning:', {
+        viewportWidth,
+        viewportHeight,
+        headerHeight,
+        controlButtonsHeight,
+        totalTopOffset,
+        availableHeight,
+        horizontalOffset,
+        verticalOffset,
+        wheelCenter: center,
+        targetX,
+        targetY,
+        zoomScale,
+        translateX: zoomTranslateX.toFixed(2),
+        translateY: zoomTranslateY.toFixed(2)
+      });
+    }
 
     return (
       <Box 
         position="relative" 
-        width="480px" 
-        height="480px"
+        width={`${wheelSize}px`}
+        height={`${wheelSize}px`}
         display="flex" 
         justifyContent="center" 
         alignItems="center" 
@@ -114,8 +165,8 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
         }}
       >
         <svg 
-          width={480}
-          height={480}
+          width={wheelSize}
+          height={wheelSize}
           style={{ 
             transition: spinning ? 'none' : 'transform 0.3s ease',
             transform: `rotate(${rotation}deg)`
@@ -149,30 +200,33 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
               // Calculate contrasting text color based on background color
               const textColor = getContrastingTextColor(item.color);
               
+              // Adjust text length based on wheel size
+              const maxTextLength = wheelSize < 320 ? 8 : wheelSize < 400 ? 10 : 12;
+              
               return (
                 <g key={item.id}>
                   <path
                     d={path}
                     fill={item.color}
                     stroke={isWinningSegment ? "#FFD700" : "#fff"}
-                    strokeWidth={isWinningSegment ? "4" : "2"}
+                    strokeWidth={isWinningSegment ? Math.max(2, 4 * scale) : Math.max(1, 2 * scale)}
                     filter={isWinningSegment ? "drop-shadow(0 0 10px rgba(255, 215, 0, 0.8))" : "none"}
                   />
                   {item.content ? (
-                    renderRichTextSVG(item.content, textX, textY, transformText, textColor, 18)
+                    renderRichTextSVG(item.content, textX, textY, transformText, textColor, fontSize)
                   ) : (
                     <text
                       x={textX}
                       y={textY}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fontSize="18"
+                      fontSize={fontSize}
                       fontWeight="normal"
                       fontFamily="'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
                       fill={textColor}
                       transform={transformText}
                     >
-                      {item.text.length > 10 ? item.text.substring(0, 10) + '...' : item.text}
+                      {item.text.length > maxTextLength ? item.text.substring(0, maxTextLength) + '...' : item.text}
                     </text>
                   )}
                 </g>
@@ -181,20 +235,20 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
           </g>
           
           {/* Center circle */}
-          <circle cx={center} cy={center} r={20} fill="#9CA3AF" />
-          <circle cx={center} cy={center} r={12} fill="#fff" />
+          <circle cx={center} cy={center} r={centerCircleRadius} fill="#9CA3AF" />
+          <circle cx={center} cy={center} r={centerDotRadius} fill="#fff" />
         </svg>
         
-        {/* Pointer - realistic teardrop pin that just touches the wheel edge */}
+        {/* Responsive Pointer - scales with wheel size */}
         <Box
           position="absolute"
           top="50%"
           left="50%"
-          transform="translate(-254px, -40px)"
+          transform={`translate(${-radius - pointerOffset}px, ${-20 * scale}px)`}
           zIndex={10}
         >
           <Box
-            transformOrigin="12.5px 40px"
+            transformOrigin={`${12.5 * scale}px ${40 * scale}px`}
             sx={{
               animation: spinning ? 'pointerBounce 0.1s ease-in-out infinite alternate' : 'none',
               '@keyframes pointerBounce': {
@@ -204,7 +258,7 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
               transform: spinning ? undefined : 'rotate(90deg)'
             }}
           >
-            <svg width="25" height="50" viewBox="0 0 25 50">
+            <svg width={25 * scale} height={50 * scale} viewBox="0 0 25 50">
               {/* Main teardrop body */}
               <path 
                 d="M12.5 45 C6 45, 2 37, 2 28 C2 18, 8 8, 12.5 8 C17 8, 23 18, 23 28 C23 37, 19 45, 12.5 45 Z" 
@@ -234,8 +288,13 @@ export const WheelRenderer: React.FC<WheelRendererProps> = ({
       display="flex" 
       justifyContent="center" 
       alignItems="center"
-      overflow={isZoomed ? "hidden" : "visible"}
+      overflow="visible" // Always allow overflow for proper zoom display
       transition="all 0.3s ease"
+      w="100%"
+      maxW={isZoomed ? "none" : `${wheelSize}px`} // Remove width constraints when zoomed
+      mx="auto"
+      // Ensure proper z-index layering when zoomed
+      zIndex={isZoomed ? 1000 : 1}
     >
       {renderWheel()}
     </Box>

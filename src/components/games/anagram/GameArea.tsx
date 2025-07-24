@@ -138,12 +138,15 @@ const GameArea: React.FC<GameAreaProps> = ({
                 border="2px dashed" 
                 borderColor={scrambledBorder} 
                 borderRadius="md"
+                w="100%"
+                maxW="100%"
               >
                 {currentAnagram.scrambled.map((letter, index) => (
                   <Box
                     key={index}
-                    w="50px"
-                    h="50px"
+                    w={{ base: "40px", sm: "45px", md: "50px" }} // Responsive width to match answer section
+                    h={{ base: "40px", sm: "45px", md: "50px" }} // Responsive height to match answer section
+                    minW={{ base: "40px", sm: "45px", md: "50px" }} // Prevent shrinking below minimum
                     border="2px solid"
                     borderColor={letter ? "blue.300" : "gray.300"}
                     borderRadius="md"
@@ -155,10 +158,11 @@ const GameArea: React.FC<GameAreaProps> = ({
                     onClick={() => onLetterClick(letter, index, 'scrambled')}
                     _hover={letter ? { transform: "translateY(-2px)", boxShadow: "md" } : {}}
                     transition="all 0.2s"
-                    fontSize="xl"
+                    fontSize={{ base: "lg", sm: "xl", md: "xl" }} // Responsive font size to match answer section
                     fontWeight="bold"
                     fontFamily="'Comic Neue', sans-serif"
                     color={letter ? "blue.600" : "gray.400"}
+                    flexShrink={0} // Prevent boxes from shrinking
                   >
                     {letter}
                   </Box>
@@ -170,7 +174,7 @@ const GameArea: React.FC<GameAreaProps> = ({
             <VStack spacing={3} w="full">
               <Heading size="sm" color="gray.600" fontFamily="'Comic Neue', sans-serif">Your Answer</Heading>
               <Flex 
-                wrap="wrap" 
+                wrap="nowrap" // Changed from "wrap" to "nowrap" to prevent multiple rows
                 gap={2} 
                 justify="center" 
                 minH="60px" 
@@ -179,12 +183,16 @@ const GameArea: React.FC<GameAreaProps> = ({
                 border="2px dashed" 
                 borderColor={answerBorder} 
                 borderRadius="md"
+                overflowX="auto" // Allow horizontal scrolling if needed on very small screens
+                w="100%"
+                maxW="100%"
               >
                 {currentAnagram.currentAnswer.map((letter, index) => (
                   <Box
                     key={index}
-                    w="50px"
-                    h="50px"
+                    w={{ base: "40px", sm: "45px", md: "50px" }} // Responsive width
+                    h={{ base: "40px", sm: "45px", md: "50px" }} // Responsive height
+                    minW={{ base: "40px", sm: "45px", md: "50px" }} // Prevent shrinking below minimum
                     border="2px solid"
                     borderColor={letter ? "green.300" : "gray.300"}
                     borderRadius="md"
@@ -196,10 +204,11 @@ const GameArea: React.FC<GameAreaProps> = ({
                     onClick={() => onLetterClick(letter, index, 'answer')}
                     _hover={letter ? { transform: "translateY(-2px)", boxShadow: "md" } : {}}
                     transition="all 0.2s"
-                    fontSize="xl"
+                    fontSize={{ base: "lg", sm: "xl", md: "xl" }} // Responsive font size
                     fontWeight="bold"
                     fontFamily="'Comic Neue', sans-serif"
                     color={letter ? "green.600" : "gray.400"}
+                    flexShrink={0} // Prevent boxes from shrinking
                   >
                     {letter}
                   </Box>

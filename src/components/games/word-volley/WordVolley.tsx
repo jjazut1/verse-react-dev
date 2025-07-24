@@ -12,6 +12,12 @@ import { useAudio } from './useAudio';
 import { GameTheme, GameSettings, GameState, GameWord, Position, Ball, Paddle, ThemeType } from './types';
 import { THEMES, DEFAULT_SETTINGS, CANVAS_WIDTH, CANVAS_HEIGHT, speakWord } from './utils';
 import { defaultTextRenderer } from '../../../utils/textRenderer';
+import {
+  Box,
+  Text,
+  VStack,
+  Center
+} from '@chakra-ui/react';
 import './WordVolley.css';
 
 interface WordVolleyProps {
@@ -23,6 +29,129 @@ interface WordVolleyProps {
   configId?: string;
   playerName?: string;
 }
+
+// Simple CSS-based rotation icon
+const RotationIcon: React.FC = () => {
+  return (
+    <Box
+      width="60px"
+      height="60px"
+      borderRadius="8px"
+      bg="white"
+      color="#001f3f"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      position="relative"
+      fontSize="2xl"
+      fontWeight="bold"
+      transform="rotate(90deg)"
+      transition="transform 0.3s ease"
+      _hover={{ transform: "rotate(90deg) scale(1.1)" }}
+    >
+      📱
+      <Box
+        position="absolute"
+        top="-8px"
+        right="-8px"
+        width="20px"
+        height="20px"
+        borderRadius="full"
+        bg="#007AFF"
+        color="white"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        fontSize="xs"
+      >
+        🔄
+      </Box>
+    </Box>
+  );
+};
+
+// Rotation Prompt Component
+const RotationPrompt: React.FC = () => {
+  return (
+    <Box
+      position="fixed"
+      top={0}
+      left={0}
+      right={0}
+      bottom={0}
+      bg="rgba(0, 31, 63, 0.95)"
+      zIndex={9999}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+    >
+      <Center>
+        <VStack spacing={6} textAlign="center" color="white" p={8}>
+          <Box
+            bg="rgba(255, 255, 255, 0.1)"
+            borderRadius="20px"
+            p={6}
+            boxShadow="0 0 30px rgba(255, 255, 255, 0.2)"
+            border="2px solid rgba(255, 255, 255, 0.3)"
+          >
+            <RotationIcon />
+          </Box>
+          
+          <VStack spacing={3}>
+            <Text 
+              fontSize="xl" 
+              fontFamily="'Comic Neue', cursive"
+              textShadow="1px 1px 2px rgba(0,0,0,0.3)"
+              fontWeight="bold"
+            >
+              Rotate Your Device
+            </Text>
+            <Text 
+              fontSize="lg" 
+              fontFamily="'Comic Neue', cursive"
+              textAlign="center"
+              lineHeight="1.5"
+            >
+              For the best Word Volley experience,{'\n'}
+              please rotate your device to landscape mode
+            </Text>
+            <Text 
+              fontSize="md" 
+              fontFamily="'Comic Neue', cursive"
+              opacity={0.8}
+              mt={2}
+            >
+              🔄 Turn your phone sideways
+            </Text>
+          </VStack>
+        </VStack>
+      </Center>
+    </Box>
+  );
+};
+
+// Hook to detect orientation
+const useOrientation = () => {
+  const [isLandscape, setIsLandscape] = useState(
+    window.innerWidth > window.innerHeight
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
+  return isLandscape;
+};
 
 export const WordVolley: React.FC<WordVolleyProps> = ({
   gameConfig = {},
@@ -38,6 +167,75 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number>();
   const [mouseY, setMouseY] = useState(CANVAS_HEIGHT / 2);
+  
+  // Check if device is in landscape orientation (moved after other state hooks)
+  const isLandscape = useOrientation();
+  
+  // Responsive canvas dimensions
+  const [canvasWidth, setCanvasWidth] = useState(CANVAS_WIDTH);
+  const [canvasHeight, setCanvasHeight] = useState(CANVAS_HEIGHT);
+  const [scaleFactor, setScaleFactor] = useState(1);
+  
+  // Calculate responsive canvas size
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      if (!containerRef.current) return;
+      
+      const container = containerRef.current;
+      const containerRect = container.getBoundingClientRect();
+      
+      // Get available space (accounting for UI elements above and below)
+      const availableWidth = Math.min(window.innerWidth - 40, 1000); // Max width with padding
+      const availableHeight = Math.min(window.innerHeight - 300, 600); // Account for UI elements
+      
+      // Calculate scale factor to fit while maintaining aspect ratio
+      const targetAspectRatio = CANVAS_WIDTH / CANVAS_HEIGHT; // 800/500 = 1.6
+      const availableAspectRatio = availableWidth / availableHeight;
+      
+      let newWidth, newHeight, newScaleFactor;
+      
+      if (availableAspectRatio > targetAspectRatio) {
+        // Limited by height
+        newHeight = availableHeight;
+        newWidth = newHeight * targetAspectRatio;
+        newScaleFactor = newHeight / CANVAS_HEIGHT;
+      } else {
+        // Limited by width
+        newWidth = availableWidth;
+        newHeight = newWidth / targetAspectRatio;
+        newScaleFactor = newWidth / CANVAS_WIDTH;
+      }
+      
+      // Ensure minimum size for playability
+      const minWidth = 400;
+      const minHeight = 250;
+      
+      if (newWidth < minWidth) {
+        newWidth = minWidth;
+        newHeight = minWidth / targetAspectRatio;
+        newScaleFactor = newWidth / CANVAS_WIDTH;
+      }
+      
+      if (newHeight < minHeight) {
+        newHeight = minHeight;
+        newWidth = minHeight * targetAspectRatio;
+        newScaleFactor = newHeight / CANVAS_HEIGHT;
+      }
+      
+      setCanvasWidth(Math.round(newWidth));
+      setCanvasHeight(Math.round(newHeight));
+      setScaleFactor(newScaleFactor);
+    };
+    
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    window.addEventListener('orientationchange', updateCanvasSize);
+    
+    return () => {
+      window.removeEventListener('resize', updateCanvasSize);
+      window.removeEventListener('orientationchange', updateCanvasSize);
+    };
+  }, []);
   
   // Reference to track theme changes for cache clearing
   const lastThemeRef = useRef<string>('');
@@ -97,10 +295,6 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
   const [cursorOnScreen, setCursorOnScreen] = useState(false);
   const [showPaddleHint, setShowPaddleHint] = useState(true);
   const [showScoringModal, setShowScoringModal] = useState(false);
-  
-  // Speed debugging state
-  const [showSpeedDebug, setShowSpeedDebug] = useState(true); // Enable by default to measure speeds
-  const [currentBallSpeed, setCurrentBallSpeed] = useState(0);
   
   // Theme state
   const [currentTheme, setCurrentTheme] = useState<ThemeType>('classic');
@@ -212,11 +406,15 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     const mouseX = e.clientX - canvasRect.left;
     const mouseY = e.clientY - canvasRect.top;
     
-    // Update cursor position for visual indicator
-    setMouseY(mouseY);
+    // Convert to game coordinates (scale from display size to game size)
+    const gameMouseX = (mouseX / canvasWidth) * CANVAS_WIDTH;
+    const gameMouseY = (mouseY / canvasHeight) * CANVAS_HEIGHT;
     
-    // Check if mouse is within canvas bounds
-    const isInCanvas = mouseX >= 0 && mouseX <= CANVAS_WIDTH && mouseY >= 0 && mouseY <= CANVAS_HEIGHT;
+    // Update cursor position for visual indicator
+    setMouseY(gameMouseY);
+    
+    // Check if mouse is within canvas bounds (in display coordinates)
+    const isInCanvas = mouseX >= 0 && mouseX <= canvasWidth && mouseY >= 0 && mouseY <= canvasHeight;
     setCursorOnScreen(isInCanvas);
     
     // Only update paddle if it's engaged and cursor is on screen
@@ -226,20 +424,20 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
         setShowPaddleHint(false);
       }
       
-      // Update paddle position - clamp to canvas bounds
-      let effectiveY = mouseY;
+      // Update paddle position - clamp to game canvas bounds
+      let effectiveY = gameMouseY;
       
-      // Clamp to canvas bounds
-      if (mouseY < 0) {
+      // Clamp to game canvas bounds
+      if (gameMouseY < 0) {
         effectiveY = 0;
-      } else if (mouseY > CANVAS_HEIGHT) {
+      } else if (gameMouseY > CANVAS_HEIGHT) {
         effectiveY = CANVAS_HEIGHT;
       }
       
       setMouseY(effectiveY);
       updatePlayerPaddle(effectiveY);
     }
-  }, [isGameActive, updatePlayerPaddle, paddleEngaged, showPaddleHint]);
+  }, [isGameActive, updatePlayerPaddle, paddleEngaged, showPaddleHint, canvasWidth, canvasHeight]);
 
   // Handle clicks to engage/disengage paddle control
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -252,9 +450,13 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     const mouseX = e.clientX - canvasRect.left;
     const mouseY = e.clientY - canvasRect.top;
     
+    // Convert to game coordinates
+    const gameMouseX = (mouseX / canvasWidth) * CANVAS_WIDTH;
+    const gameMouseY = (mouseY / canvasHeight) * CANVAS_HEIGHT;
+    
     if (!paddleEngaged) {
       // Check if clicking on or near the paddle to engage
-      if (isMouseOverPaddle(mouseX, mouseY)) {
+      if (isMouseOverPaddle(gameMouseX, gameMouseY)) {
         setPaddleEngaged(true);
         setShowPaddleHint(false);
         
@@ -262,7 +464,7 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
         startBallMovement();
         
         // Immediately update paddle position to mouse location
-        const effectiveY = Math.max(0, Math.min(CANVAS_HEIGHT, mouseY));
+        const effectiveY = Math.max(0, Math.min(CANVAS_HEIGHT, gameMouseY));
         setMouseY(effectiveY);
         updatePlayerPaddle(effectiveY);
       }
@@ -271,7 +473,7 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
       // For now, we'll keep it engaged until mouse leaves screen
       // setPaddleEngaged(false);
     }
-  }, [isGameActive, paddleEngaged, isMouseOverPaddle, updatePlayerPaddle, startBallMovement]);
+  }, [isGameActive, paddleEngaged, isMouseOverPaddle, updatePlayerPaddle, startBallMovement, canvasWidth, canvasHeight]);
 
   // Enhanced touch support for mobile
   const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
@@ -286,8 +488,11 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     const touchX = touch.clientX - canvasRect.left;
     const touchY = touch.clientY - canvasRect.top;
     
+    // Convert to game coordinates
+    const gameTouchY = (touchY / canvasHeight) * CANVAS_HEIGHT;
+    
     // Update cursor position for visual indicator
-    setMouseY(touchY);
+    setMouseY(gameTouchY);
     setCursorOnScreen(true);
     
     // For touch, automatically engage on first touch
@@ -298,11 +503,11 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     
     // Update paddle position if engaged
     if (paddleEngaged) {
-      const effectiveY = Math.max(0, Math.min(CANVAS_HEIGHT, touchY));
+      const effectiveY = Math.max(0, Math.min(CANVAS_HEIGHT, gameTouchY));
       setMouseY(effectiveY);
       updatePlayerPaddle(effectiveY);
     }
-  }, [isGameActive, updatePlayerPaddle, paddleEngaged]);
+  }, [isGameActive, updatePlayerPaddle, paddleEngaged, canvasHeight]);
 
   // Handle touch start to engage paddle
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
@@ -316,6 +521,9 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     const canvasRect = canvas.getBoundingClientRect();
     const touchY = touch.clientY - canvasRect.top;
     
+    // Convert to game coordinates
+    const gameTouchY = (touchY / canvasHeight) * CANVAS_HEIGHT;
+    
     // Engage paddle control on touch
     setPaddleEngaged(true);
     setShowPaddleHint(false);
@@ -325,10 +533,10 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     startBallMovement();
     
     // Immediately update paddle position
-    const effectiveY = Math.max(0, Math.min(CANVAS_HEIGHT, touchY));
+    const effectiveY = Math.max(0, Math.min(CANVAS_HEIGHT, gameTouchY));
     setMouseY(effectiveY);
     updatePlayerPaddle(effectiveY);
-  }, [isGameActive, updatePlayerPaddle, startBallMovement]);
+  }, [isGameActive, updatePlayerPaddle, startBallMovement, canvasHeight]);
 
   // Handle mouse enter/leave for paddle control
   const handleMouseEnter = useCallback(() => {
@@ -552,7 +760,13 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
 
     const theme = THEMES[currentTheme];
     
-    // Clear canvas
+    // Save the current context state
+    ctx.save();
+    
+    // Scale the context to match the responsive canvas size
+    ctx.scale(scaleFactor, scaleFactor);
+    
+    // Clear canvas (using original game dimensions)
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     
     // Draw background
@@ -684,7 +898,10 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
       drawRocket(ctx);
     }
 
-  }, [ball, playerPaddle, aiPaddle, currentTheme, score, level, paddleEngaged, cursorOnScreen, showPaddleHint, isGameActive, catVisible, catPosition, catFrame, dolphinVisible, dolphinPosition, dolphinFrame, rocketVisible, rocketPosition, rocketFrame, rocketX]);
+    // Restore the context state
+    ctx.restore();
+
+  }, [ball, playerPaddle, aiPaddle, currentTheme, score, level, paddleEngaged, cursorOnScreen, showPaddleHint, isGameActive, catVisible, catPosition, catFrame, dolphinVisible, dolphinPosition, dolphinFrame, rocketVisible, rocketPosition, rocketFrame, rocketX, scaleFactor]);
 
   // Helper function to draw rounded rectangles
   const drawRoundedRect = (
@@ -1079,10 +1296,6 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
   // Game loop
   const gameLoop = useCallback(() => {
     if (gameState === 'playing') {
-      // Calculate and track ball speed for debugging
-      const ballSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-      setCurrentBallSpeed(ballSpeed);
-      
       // Update ball position and handle collisions
       const hitResult = updateBall();
       
@@ -1161,6 +1374,16 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Show rotation prompt if not in landscape mode (moved to end after all hooks)
+  if (!isLandscape) {
+    return (
+      <>
+        <PWAGameHeader gameTitle="Pong" variant="compact" />
+        <RotationPrompt />
+      </>
+    );
+  }
+
   return (
     <div className="word-volley-game">
       <PWAGameHeader 
@@ -1171,12 +1394,12 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
       <div className="game-container">
         {/* Game Info Section - Above Canvas */}
         <div style={{
-          padding: '12px 24px',
+          padding: `${Math.max(8, scaleFactor * 12)}px ${Math.max(12, scaleFactor * 24)}px`,
           background: '#f8f9fa',
           borderRadius: '12px 12px 0 0',
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
+          gap: `${Math.max(4, scaleFactor * 8)}px`,
           marginBottom: '-12px',
           position: 'relative',
           zIndex: 1
@@ -1187,10 +1410,10 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: '12px'
+            gap: `${Math.max(8, scaleFactor * 12)}px`
           }}>
             <div style={{
-              fontSize: '1.2rem',
+              fontSize: `${Math.max(1, scaleFactor * 1.2)}rem`,
               fontWeight: 'bold',
               color: '#dc2626'
             }}>
@@ -1198,7 +1421,7 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
             </div>
             
             <div style={{
-              fontSize: '1.4rem',
+              fontSize: `${Math.max(1.1, scaleFactor * 1.4)}rem`,
               fontWeight: 'bold',
               color: timeRemaining <= 30 ? '#dc2626' : timeRemaining <= 60 ? '#ea580c' : '#1f2937',
               textAlign: 'center',
@@ -1208,7 +1431,7 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
             </div>
             
             <div style={{
-              fontSize: '1.2rem',
+              fontSize: `${Math.max(1, scaleFactor * 1.2)}rem`,
               fontWeight: 'bold',
               color: '#2563eb'
             }}>
@@ -1219,10 +1442,10 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
           {/* Category Instruction */}
           <div style={{
             textAlign: 'center',
-            fontSize: '0.9rem',
+            fontSize: `${Math.max(0.8, scaleFactor * 0.9)}rem`,
             color: '#6b7280',
             fontWeight: '500',
-            padding: '6px 12px',
+            padding: `${Math.max(4, scaleFactor * 6)}px ${Math.max(8, scaleFactor * 12)}px`,
             background: 'rgba(255, 255, 255, 0.7)',
             borderRadius: '6px',
             border: '1px solid rgba(0, 0, 0, 0.1)'
@@ -1230,56 +1453,7 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
             Hit: <strong style={{ color: '#059669' }}>{settings.categoryName}</strong> words | 
             Avoid: <strong style={{ color: '#dc2626' }}>Non-{settings.categoryName}</strong> words
           </div>
-
-          {/* Speed Debug Information */}
-          {showSpeedDebug && (
-            <div style={{
-              textAlign: 'center',
-              fontSize: '0.8rem',
-              color: '#374151',
-              fontWeight: '500',
-              padding: '4px 8px',
-              background: 'rgba(59, 130, 246, 0.1)',
-              borderRadius: '4px',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              fontFamily: 'monospace'
-            }}>
-              Speed Debug: <strong>{currentBallSpeed.toFixed(2)} px/frame</strong> | 
-              vx: <strong>{ball.vx.toFixed(2)}</strong>, vy: <strong>{ball.vy.toFixed(2)}</strong> | 
-              Config: <strong>{settings.initialSpeed.toFixed(2)}</strong>
-              <button 
-                onClick={() => setShowSpeedDebug(false)}
-                style={{
-                  marginLeft: '8px',
-                  padding: '2px 6px',
-                  fontSize: '0.7rem',
-                  background: 'rgba(59, 130, 246, 0.2)',
-                  border: '1px solid rgba(59, 130, 246, 0.5)',
-                  borderRadius: '3px',
-                  cursor: 'pointer'
-                }}
-              >
-                Hide
-              </button>
-            </div>
-          )}
           
-          {!showSpeedDebug && (
-            <button 
-              onClick={() => setShowSpeedDebug(true)}
-              style={{
-                padding: '4px 8px',
-                fontSize: '0.8rem',
-                background: 'rgba(59, 130, 246, 0.1)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                color: '#374151'
-              }}
-            >
-              Show Speed Debug
-            </button>
-          )}
         </div>
 
         <div 
@@ -1291,14 +1465,29 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
           onTouchStart={handleTouchStart}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          style={{ cursor: paddleEngaged && cursorOnScreen ? 'none' : 'pointer' }}
+          style={{ 
+            cursor: paddleEngaged && cursorOnScreen ? 'none' : 'pointer',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: `${canvasHeight + 40}px`,
+            padding: '20px',
+            background: '#f8f9fa',
+            overflow: 'visible'
+          }}
         >
           <canvas
             ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
+            width={canvasWidth}
+            height={canvasHeight}
             className={`game-canvas ball-text-optimized theme-${currentTheme} ${paddleEngaged ? 'paddle-engaged' : ''}`}
-            style={{ touchAction: 'none' }}
+            style={{ 
+              touchAction: 'none',
+              width: `${canvasWidth}px`,
+              height: `${canvasHeight}px`,
+              maxWidth: '100%',
+              maxHeight: '100%'
+            }}
           />
           
 
@@ -1366,13 +1555,13 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
 
         {/* Unified Game Controls Container */}
         <div style={{
-          padding: '16px 24px',
+          padding: `${Math.max(12, scaleFactor * 16)}px ${Math.max(16, scaleFactor * 24)}px`,
           background: '#f8f9fa',
           borderRadius: '12px',
           marginTop: '0px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px'
+          gap: `${Math.max(8, scaleFactor * 12)}px`
         }}>
           {/* Game Control Buttons Row */}
           <div style={{
@@ -1380,7 +1569,7 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
             justifyContent: 'center',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: '12px'
+            gap: `${Math.max(8, scaleFactor * 12)}px`
           }}>
             <button
               onClick={handleGamePause}
@@ -1390,8 +1579,8 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
                 border: 'none',
                 borderRadius: '20px',
                 color: 'white',
-                padding: '10px 20px',
-                fontSize: '0.9rem',
+                padding: `${Math.max(8, scaleFactor * 10)}px ${Math.max(16, scaleFactor * 20)}px`,
+                fontSize: `${Math.max(0.8, scaleFactor * 0.9)}rem`,
                 fontWeight: '600',
                 cursor: gameState !== 'playing' && gameState !== 'paused' ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease',
@@ -1408,8 +1597,8 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
                 border: 'none',
                 borderRadius: '20px',
                 color: 'white',
-                padding: '10px 20px',
-                fontSize: '0.9rem',
+                padding: `${Math.max(8, scaleFactor * 10)}px ${Math.max(16, scaleFactor * 20)}px`,
+                fontSize: `${Math.max(0.8, scaleFactor * 0.9)}rem`,
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
@@ -1425,8 +1614,8 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
                 border: 'none',
                 borderRadius: '20px',
                 color: 'white',
-                padding: '10px 20px',
-                fontSize: '0.9rem',
+                padding: `${Math.max(8, scaleFactor * 10)}px ${Math.max(16, scaleFactor * 20)}px`,
+                fontSize: `${Math.max(0.8, scaleFactor * 0.9)}rem`,
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
@@ -1442,8 +1631,8 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
                 border: 'none',
                 borderRadius: '20px',
                 color: 'white',
-                padding: '10px 20px',
-                fontSize: '0.9rem',
+                padding: `${Math.max(8, scaleFactor * 10)}px ${Math.max(16, scaleFactor * 20)}px`,
+                fontSize: `${Math.max(0.8, scaleFactor * 0.9)}rem`,
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
@@ -1462,8 +1651,8 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
                   border: 'none',
                   borderRadius: '20px',
                   color: 'white',
-                  padding: '10px 20px',
-                  fontSize: '0.9rem',
+                  padding: `${Math.max(8, scaleFactor * 10)}px ${Math.max(16, scaleFactor * 20)}px`,
+                  fontSize: `${Math.max(0.8, scaleFactor * 0.9)}rem`,
                   fontWeight: '600',
                   cursor: loadingGeneralScores ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s ease'
@@ -1480,16 +1669,16 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
               justifyContent: 'center',
               alignItems: 'center',
               flexWrap: 'wrap',
-              gap: '12px'
+              gap: `${Math.max(8, scaleFactor * 12)}px`
             }}>
             {/* Theme Dropdown */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: `${Math.max(6, scaleFactor * 8)}px`
             }}>
               <label style={{
-                fontSize: '0.9rem',
+                fontSize: `${Math.max(0.8, scaleFactor * 0.9)}rem`,
                 fontWeight: '600',
                 color: '#495057'
               }}>
@@ -1503,11 +1692,11 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
                   console.log('Theme changed to:', newTheme);
                 }}
                 style={{
-                  padding: '8px 12px',
+                  padding: `${Math.max(6, scaleFactor * 8)}px ${Math.max(8, scaleFactor * 12)}px`,
                   borderRadius: '15px',
                   border: '2px solid #dee2e6',
                   background: 'white',
-                  fontSize: '0.9rem',
+                  fontSize: `${Math.max(0.8, scaleFactor * 0.9)}rem`,
                   fontWeight: '500',
                   color: '#495057',
                   cursor: 'pointer',
@@ -1539,8 +1728,8 @@ export const WordVolley: React.FC<WordVolleyProps> = ({
                 border: 'none',
                 borderRadius: '20px',
                 color: 'white',
-                padding: '10px 20px',
-                fontSize: '0.9rem',
+                padding: `${Math.max(8, scaleFactor * 10)}px ${Math.max(16, scaleFactor * 20)}px`,
+                fontSize: `${Math.max(0.8, scaleFactor * 0.9)}rem`,
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',

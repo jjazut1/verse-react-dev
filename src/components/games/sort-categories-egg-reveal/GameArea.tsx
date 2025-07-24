@@ -37,13 +37,30 @@ const GameArea: React.FC<GameAreaProps> = ({
   textToSpeechMode,
   containerType = 'eggs'
 }) => {
-  // Responsive values
-  const containerPadding = useBreakpointValue({ base: 2, md: 3, lg: 4 });
-  const gameHeight = useBreakpointValue({ base: "300px", md: "400px", lg: "450px" });
+  // Enhanced responsive values for better landscape support
+  const containerPadding = useBreakpointValue({ base: 1, md: 2, lg: 3 });
+  
+  // Better responsive game height for landscape devices
+  const gameHeight = useBreakpointValue({ 
+    base: "calc(100vh - 140px)", // Mobile: account for header + some margin
+    md: "calc(100vh - 160px)",   // Tablet: account for header + controls
+    lg: "calc(100vh - 180px)"    // Desktop: account for header + controls + margin
+  });
+  
   const basketStackDirection = useBreakpointValue({ base: "column", md: "row" }) as ResponsiveValue<"column" | "row">;
-  const eggSize = useBreakpointValue({ base: "45px", md: "50px", lg: "55px" });
-  const basketWidth = useBreakpointValue({ base: "120px", md: "140px", lg: "160px" });
-  const basketSpacing = useBreakpointValue({ base: 2, md: 3, lg: 4 });
+  
+  // Responsive egg/container sizing
+  const eggSize = useBreakpointValue({ base: "35px", md: "45px", lg: "55px" });
+  
+  // Responsive basket sizing for better landscape fit
+  const basketWidth = useBreakpointValue({ 
+    base: "90px", 
+    md: "110px", 
+    lg: "130px",
+    xl: "150px"
+  });
+  
+  const basketSpacing = useBreakpointValue({ base: 1, md: 2, lg: 3 });
 
   return (
     <Box 
@@ -56,16 +73,16 @@ const GameArea: React.FC<GameAreaProps> = ({
     >
       <Box
         width="100%"
-        maxW="1400px"
+        maxW="1600px" // Increased max width for better landscape support
         mx="auto"
         px={containerPadding}
-        py={4}
+        py={2} // Reduced padding for more space
       >
         <Box
           ref={gameAreaRef}
           position="relative"
           width="100%"
-          height={gameHeight}
+          height={gameHeight} // Use responsive height
           bg="blue.100"
           borderRadius="lg"
           overflow="hidden"
@@ -73,6 +90,7 @@ const GameArea: React.FC<GameAreaProps> = ({
           onClick={onGameAreaClick}
           cursor={gameState.isWordSelected ? "pointer" : "default"}
           boxShadow="lg"
+          minHeight="400px" // Ensure minimum playable height
         >
           {/* Game area background pattern */}
           <Box
@@ -113,10 +131,10 @@ const GameArea: React.FC<GameAreaProps> = ({
             </Box>
           ))}
           
-          {/* Baskets */}
+          {/* Baskets - positioned at bottom within game area for working drag/drop */}
           <Flex
             position="absolute"
-            bottom="10px"
+            bottom="4px" // Reduced bottom spacing for more space
             left="0"
             right="0"
             direction={basketStackDirection}
@@ -124,14 +142,18 @@ const GameArea: React.FC<GameAreaProps> = ({
             align="center"
             px={basketSpacing}
             gap={basketSpacing}
+            flexWrap="wrap" // Allow wrapping if needed
+            maxHeight="28%" // Slightly reduced height for more game space
           >
             {gameState.baskets.map((basket) => (
               <Box 
                 key={basket.id}
                 width={basketWidth}
-                mb={{ base: 2, md: 0 }}
+                minWidth="80px" // Ensure minimum readable size
+                mb={{ base: 1, md: 0 }} // Reduced margin
                 flex={{ base: "1", md: "0 1 auto" }}
-                className={`basket-${basket.id}`}
+                className={`basket basket-${basket.id}`} // Keep both classes for compatibility
+                data-basket-id={basket.name} // Keep data attribute for click detection
               >
                 <Basket
                   category={{ name: basket.name }}
