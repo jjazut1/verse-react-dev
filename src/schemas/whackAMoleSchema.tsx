@@ -477,46 +477,52 @@ const CategoryManager: React.FC<{
     
     const newCategories = [...categories];
     
-    // Handle rich text content
+    // Handle rich text content - ensure we always have serializable data
     let plainText = '';
-    let richContent = content;
+    let serializableContent = content;
     
-    // If content is HTML string, extract plain text and keep rich content
+    // Extract plain text from various content formats
     if (typeof content === 'string') {
-      // Extract plain text from HTML
+      // If content is HTML string, extract plain text and keep HTML
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = content;
       plainText = tempDiv.textContent || tempDiv.innerText || '';
-      richContent = content; // Keep the HTML for rich text
+      serializableContent = content; // Keep the HTML string
     } else if (Array.isArray(content)) {
-      // If it's Slate structure, extract plain text and keep structure
-      const traverse = (nodes: any[]) => {
+      // If it's Slate structure, extract plain text and convert to serializable format
+      const traverse = (nodes: any[]): string => {
+        let text = '';
         for (const node of nodes) {
           if (typeof node.text === 'string') {
-            plainText += node.text;
-          } else if (node.children) {
-            traverse(node.children);
+            text += node.text;
+          } else if (node.children && Array.isArray(node.children)) {
+            text += traverse(node.children);
           }
         }
+        return text;
       };
-      traverse(content);
-      richContent = content; // Keep the Slate structure
+      
+      plainText = traverse(content);
+      
+      // Convert Slate structure to a serializable format
+      // Instead of keeping complex Slate objects, just keep the HTML representation
+      serializableContent = plainText; // Use plain text to avoid Firestore serialization issues
     } else {
       // Fallback for other types
       plainText = String(content || '');
-      richContent = plainText;
+      serializableContent = plainText;
     }
 
     console.log('Processed content:', { 
       plainText, 
-      richContent: typeof richContent === 'string' ? richContent : 'Rich structure',
-      contentType: typeof richContent
+      serializableContent: typeof serializableContent === 'string' ? serializableContent : 'Object (converted to plain text)',
+      contentType: typeof serializableContent
     });
 
-    // Update the item with both plain text and rich content
+    // Update the item with both plain text and serializable content
     newCategories[categoryIndex].items[itemIndex] = {
       ...newCategories[categoryIndex].items[itemIndex],
-      content: richContent, // Rich content for editor
+      content: serializableContent, // Use serializable content for editor
       text: plainText // Plain text for game compatibility
     };
     
@@ -933,11 +939,16 @@ export const whackAMoleSchema: ConfigSchema = {
         },
         {
           name: 'gameTime',
-          label: 'Game Time (seconds)',
-          type: 'number',
+          label: 'Game Time',
+          type: 'select',
           required: true,
-          min: 30,
-          max: 300,
+          options: [
+            { value: 30, label: '30 seconds' },
+            { value: 45, label: '45 seconds' },
+            { value: 60, label: '1 minute' },
+            { value: 90, label: '1 minute 30 seconds' },
+            { value: 120, label: '2 minutes' }
+          ],
           defaultValue: 30,
           width: '200px',
           helpText: 'How long each game session lasts'
@@ -950,7 +961,8 @@ export const whackAMoleSchema: ConfigSchema = {
           options: [
             { value: 1, label: 'Slow (10-12 moles)' },
             { value: 2, label: 'Medium (14-16 moles)' },
-            { value: 3, label: 'Fast (17-19 moles)' }
+            { value: 3, label: 'Fast (17-19 moles)' },
+            { value: 4, label: 'Very Fast (20-22 moles)' }
           ],
           defaultValue: 2,
           width: '300px',
@@ -1130,6 +1142,46 @@ export const whackAMoleSchema: ConfigSchema = {
       wordCategories.push(convertCategoryToWordCategory(doNotWhackCategory));
     }
     
+    // Helper function to ensure content is serializable
+    const ensureSerializable = (value: any): any => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return value;
+      }
+      
+      if (Array.isArray(value)) {
+        // For arrays (like Slate content), extract text content
+        try {
+          let text = '';
+          const traverse = (nodes: any[]): void => {
+            for (const node of nodes) {
+              if (typeof node.text === 'string') {
+                text += node.text;
+              } else if (node.children && Array.isArray(node.children)) {
+                traverse(node.children);
+              }
+            }
+          };
+          traverse(value);
+          return text;
+        } catch (e) {
+          console.warn('Failed to extract text from array content:', e);
+          return String(value);
+        }
+      }
+      
+      // For objects, try to convert to string
+      try {
+        return String(value);
+      } catch (e) {
+        console.warn('Failed to serialize value:', value, e);
+        return '';
+      }
+    };
+    
     // Create final config object with all required fields
     const config = {
       type: 'whack-a-mole' as const,
@@ -1148,39 +1200,25 @@ export const whackAMoleSchema: ConfigSchema = {
           title: category.title || '',
           items: (category.items || []).map(item => {
             // Ensure we extract plain text properly for the text field
-            let plainText = item.text || '';
+            let plainText = '';
             
-            // If we don't have plain text, extract it from content
-            if (!plainText && item.content) {
-              if (typeof item.content === 'string') {
-                // Extract from HTML
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = item.content;
-                plainText = tempDiv.textContent || tempDiv.innerText || '';
-              } else if (Array.isArray(item.content)) {
-                // Extract from Slate structure
-                const traverse = (nodes: any[]) => {
-                  for (const node of nodes) {
-                    if (typeof node.text === 'string') {
-                      plainText += node.text;
-                    } else if (node.children) {
-                      traverse(node.children);
-                    }
-                  }
-                };
-                traverse(item.content);
-              }
+            // If we have text field, use it
+            if (typeof item.text === 'string') {
+              plainText = item.text;
+            } else if (item.content) {
+              // Extract plain text from content using our serializable helper
+              plainText = ensureSerializable(item.content);
             }
             
-            // Ensure no undefined values
+            // Ensure no undefined values and all content is serializable
             const processedItem: any = {
               id: item.id || generateId(), // Ensure id is never undefined
               text: plainText || '' // Ensure text is never undefined
             };
             
-            // Only add content field if it has a valid value (avoid undefined)
+            // Only add content field if it has a valid serializable value
             if (item.content !== undefined && item.content !== null) {
-              processedItem.content = item.content;
+              processedItem.content = ensureSerializable(item.content);
             }
             
             return processedItem;
@@ -1194,6 +1232,8 @@ export const whackAMoleSchema: ConfigSchema = {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
+    
+    console.log('Generated Whack-a-Mole config (serialization-safe):', config);
     
     return config;
   }

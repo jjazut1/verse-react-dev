@@ -84,7 +84,7 @@ export interface WhackAMoleConfig extends BaseGameConfig {
   penaltyPoints: number;
   bonusPoints: number;
   bonusThreshold: number;
-  speed?: 1 | 2 | 3; // Speed setting: 1=slow (10-12 moles), 2=medium (14-16 moles), 3=fast (17-19 moles)
+  speed?: 1 | 2 | 3 | 4; // Speed setting: 1=slow (10-12 moles), 2=medium (14-16 moles), 3=fast (17-19 moles), 4=very fast (20-22 moles)
   instructions?: string; // Custom instructions for the game
   categories: Array<{
     title: string;

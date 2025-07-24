@@ -25,6 +25,128 @@ interface WhackAMoleProps {
   onHighScoreProcessComplete?: () => void;
 }
 
+// Simple CSS-based rotation icon
+const RotationIcon: React.FC = () => {
+  return (
+    <Box
+      width="60px"
+      height="60px"
+      borderRadius="8px"
+      bg="white"
+      color="#001f3f"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      position="relative"
+      fontSize="2xl"
+      fontWeight="bold"
+      transform="rotate(90deg)"
+      transition="transform 0.3s ease"
+      _hover={{ transform: "rotate(90deg) scale(1.1)" }}
+    >
+      📱
+      <Box
+        position="absolute"
+        top="-8px"
+        right="-8px"
+        width="20px"
+        height="20px"
+        borderRadius="full"
+        bg="#007AFF"
+        color="white"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        fontSize="xs"
+      >
+        🔄
+      </Box>
+    </Box>
+  );
+};
+
+// Rotation Prompt Component
+const RotationPrompt: React.FC = () => {
+  return (
+    <Box
+      position="fixed"
+      top={0}
+      left={0}
+      right={0}
+      bottom={0}
+      bg="rgba(0, 31, 63, 0.95)"
+      zIndex={9999}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+    >
+      <Center>
+        <VStack spacing={6} textAlign="center" color="white" p={8}>
+          <Box
+            bg="rgba(255, 255, 255, 0.1)"
+            borderRadius="20px"
+            p={6}
+            boxShadow="0 0 30px rgba(255, 255, 255, 0.2)"
+            border="2px solid rgba(255, 255, 255, 0.3)"
+          >
+            <RotationIcon />
+          </Box>
+          
+          <VStack spacing={3}>
+            <Heading 
+              size="lg" 
+              fontFamily="'Comic Neue', cursive"
+              textShadow="1px 1px 2px rgba(0,0,0,0.3)"
+            >
+              Rotate Your Device
+            </Heading>
+            <Text 
+              fontSize="lg" 
+              fontFamily="'Comic Neue', cursive"
+              textAlign="center"
+              lineHeight="1.5"
+            >
+              For the best Whack-a-Mole experience,{'\n'}
+              please rotate your device to landscape mode
+            </Text>
+            <Text 
+              fontSize="md" 
+              fontFamily="'Comic Neue', cursive"
+              opacity={0.8}
+              mt={2}
+            >
+              🔄 Turn your phone sideways
+            </Text>
+          </VStack>
+        </VStack>
+      </Center>
+    </Box>
+  );
+};
+
+// Hook to detect orientation
+const useOrientation = () => {
+  const [isLandscape, setIsLandscape] = useState(
+    window.innerWidth > window.innerHeight
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
+  return isLandscape;
+};
+
 const WhackAMole: React.FC<WhackAMoleProps> = ({
   playerName,
   onGameComplete,
@@ -45,6 +167,9 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   const sceneRef = useRef<any>(null);
   const toast = useToast();
+  
+  // Check if device is in landscape orientation (moved after other state hooks)
+  const isLandscape = useOrientation();
 
   // Initialize modularized high score system
   const {
@@ -184,6 +309,16 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
     }
   };
 
+  // Show rotation prompt if not in landscape mode (moved to end after all hooks)
+  if (!isLandscape) {
+    return (
+      <>
+        <PWAGameHeader gameTitle="Whack-a-Mole" variant="compact" />
+        <RotationPrompt />
+      </>
+    );
+  }
+
   return (
     <Box width="100%" height="100vh" position="relative">
       <PWAGameHeader gameTitle="Whack-a-Mole" variant="compact" />
@@ -191,27 +326,29 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
       {/* Game UI */}
       <Box
         position="absolute"
-        top={0}
+        top="60px" // Account for PWAGameHeader height
         left={0}
         right={0}
-        zIndex={1}
+        zIndex={1000} // Higher z-index to ensure visibility above 3D scene
         p={4}
         display="flex"
         justifyContent="space-between"
+        // Removed: bg, backdropFilter, borderRadius to eliminate banner effect
       >
         {/* Title Display */}
         <Box 
-          bg="transparent" 
-          p={4} 
+          bg="transparent" // Remove background
+          p={2} 
           borderRadius="md"
           maxWidth="400px"
+          // Removed: boxShadow
         >
           <Text 
-            fontSize="2xl" 
+            fontSize="xl" 
             fontWeight="bold" 
             color="#001f3f" 
             fontFamily="'Comic Neue', cursive" 
-            textShadow="1px 1px 2px rgba(255,255,255,0.8)"
+            textShadow="3px 3px 6px rgba(255,255,255,0.95)" // Stronger shadow for readability
             isTruncated
           >
             {config.title}
@@ -221,13 +358,38 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         {/* Score and Timer */}
         <HStack 
           justify="space-between" 
-          bg="transparent" 
-          p={4} 
+          bg="transparent" // Remove background
+          p={2} 
           borderRadius="md"
-          width="300px"
+          width="320px"
+          // Removed: boxShadow
+          spacing={4}
         >
-          <Text fontSize="2xl" fontWeight="bold" color="#001f3f" fontFamily="'Comic Neue', cursive" textShadow="1px 1px 2px rgba(255,255,255,0.8)">Score: {score}</Text>
-          <Text fontSize="2xl" fontWeight="bold" color="#001f3f" fontFamily="'Comic Neue', cursive" textShadow="1px 1px 2px rgba(255,255,255,0.8)">Time: {timeLeft}s</Text>
+          <Text 
+            fontSize="xl" 
+            fontWeight="bold" 
+            color="#001f3f" 
+            fontFamily="'Comic Neue', cursive" 
+            textShadow="3px 3px 6px rgba(255,255,255,0.95)" // Stronger shadow for readability
+          >
+            Score: {score}
+          </Text>
+          <Text 
+            fontSize="xl" 
+            fontWeight="bold" 
+            color={timeLeft <= 10 ? "#dc2626" : "#001f3f"}
+            fontFamily="'Comic Neue', cursive" 
+            textShadow="3px 3px 6px rgba(255,255,255,0.95)" // Stronger shadow for readability
+            sx={{
+              animation: timeLeft <= 10 ? "pulse 1s ease-in-out infinite" : "none",
+              "@keyframes pulse": {
+                "0%, 100%": { transform: "scale(1)", opacity: 1 },
+                "50%": { transform: "scale(1.1)", opacity: 0.8 }
+              }
+            }}
+          >
+            Time: {timeLeft}s
+          </Text>
         </HStack>
       </Box>
 
