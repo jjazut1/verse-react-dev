@@ -302,6 +302,9 @@ service cloud.firestore {
       allow list: if isAuthenticated() && 
         request.auth.token.email != null;
       
+      // Allow teachers and admins to list students assigned to them
+      allow list: if isTeacherOrAdmin();
+      
       // Allow unauthenticated users to query for temporary password checking
       // This is needed for the login page to check if a user has a temporary password
       allow list: if request.auth == null;

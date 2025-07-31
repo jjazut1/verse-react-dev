@@ -78,6 +78,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       
+      // BYPASS: Special handling for james@luminatelearn.com (DISABLED - no longer needed)
+      // if (user.email === 'james@luminatelearn.com') {
+      //   console.log('🔧 BYPASS: Creating fresh admin document for james@luminatelearn.com');
+      //   // BYPASS DISABLED - document should already exist
+      // }
+      
       // Check if they have a role in their user document
       try {
         const userDocRef = doc(db, 'users', user.uid);

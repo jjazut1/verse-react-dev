@@ -25,6 +25,8 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
   activeTab,
   onStudentHandlersReady
 }) => {
+  console.log('🔍 DEBUG: StudentsTab component rendered, activeTab:', activeTab, 'currentUser:', currentUser?.uid);
+  
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
@@ -37,6 +39,9 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
     
     setIsLoadingStudents(true);
     try {
+      console.log('🔍 DEBUG: Fetching students for teacher UID:', currentUser.uid);
+      console.log('🔍 DEBUG: Teacher email:', currentUser.email);
+      
       // Use the users collection instead of students
       const usersCollection = collection(db, 'users');
       // Query for users with role 'student' and associated with the current teacher
@@ -45,10 +50,19 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
         where('role', '==', 'student'), 
         where('teacherId', '==', currentUser.uid)
       );
+      console.log('🔍 DEBUG: Executing query with teacherId:', currentUser.uid);
       const querySnapshot = await getDocs(q);
+      console.log('🔍 DEBUG: Query returned', querySnapshot.docs.length, 'documents');
       
       const studentsList = querySnapshot.docs.map(doc => {
         const data = doc.data();
+        console.log('🔍 DEBUG: Found student document:', {
+          id: doc.id,
+          email: data.email,
+          name: data.name,
+          teacherId: data.teacherId,
+          role: data.role
+        });
         return {
           id: doc.id,
           name: data.name || '',
@@ -61,6 +75,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
         } as Student;
       });
       
+      console.log('🔍 DEBUG: Final students list:', studentsList.map(s => ({id: s.id, email: s.email, name: s.name})));
       setStudents(studentsList);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -320,8 +335,12 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
 
   // Load students when component mounts or currentUser changes
   useEffect(() => {
+    console.log('🔍 DEBUG: StudentsTab useEffect triggered, currentUser:', currentUser?.uid, currentUser?.email);
     if (currentUser) {
+      console.log('🔍 DEBUG: currentUser exists, calling fetchStudents');
       fetchStudents();
+    } else {
+      console.log('🔍 DEBUG: currentUser is null/undefined, not fetching students');
     }
   }, [currentUser]);
 

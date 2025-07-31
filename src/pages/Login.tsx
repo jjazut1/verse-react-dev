@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getAuth, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { safeGoogleSignIn, checkRedirectResult } from '../services/authService';
+import { checkRedirectResult } from '../services/authService';
 
 // Add reCAPTCHA types
 declare global {
@@ -227,11 +227,15 @@ const Login = () => {
 
   // Effect to handle redirect once role is determined
   useEffect(() => {
+    console.log('🔍 LOGIN REDIRECT CHECK:', { pendingRedirect, isTeacher, isStudent, currentUser: !!currentUser });
     if (pendingRedirect) {
       if (isTeacher || isStudent) {
-      setPendingRedirect(false);
-      navigate(getRedirectPath());
-    }
+        console.log('🔍 REDIRECTING to:', getRedirectPath());
+        setPendingRedirect(false);
+        navigate(getRedirectPath());
+      } else {
+        console.log('🔍 WAITING for role to be determined...');
+      }
     }
   }, [pendingRedirect, isTeacher, isStudent, navigate, currentUser]);
 
@@ -553,13 +557,27 @@ const Login = () => {
       setIsLoading(true);
       setError('');
       
-      // Call the clean Google Sign-In with login hint if email is provided
-      const result = await safeGoogleSignIn(email || undefined);
+      // Use AuthContext's native Google Sign-In with login hint if email is provided
+      const result = await loginWithGoogle(false, email || undefined);
       
       if (result && result.user) {
+      console.log('🔍 Google Sign-In result received, setting up redirect logic');
       // Set pending redirect flag - the useEffect will handle the actual redirect
       // once the user's role is determined
-      setPendingRedirect(true);
+      // Add small delay to allow AuthContext to process user document and set roles
+      setTimeout(() => {
+        console.log('🔍 Setting pendingRedirect to true');
+        setPendingRedirect(true);
+        
+        // Safety timeout - if role isn't determined in 10 seconds, force redirect to home
+        setTimeout(() => {
+          if (pendingRedirect && !isTeacher && !isStudent) {
+            console.log('⚠️ Role determination timeout - redirecting to home');
+            setPendingRedirect(false);
+            navigate('/');
+          }
+        }, 10000);
+      }, 500);
       } else if (result === null) {
         // Redirect method was used - the page will redirect to Google
         // Don't set loading to false - keep the loading state since we're redirecting

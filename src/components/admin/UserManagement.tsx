@@ -44,6 +44,7 @@ import {
   setDoc
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface User {
   id: string;
@@ -58,6 +59,7 @@ interface User {
 }
 
 const UserManagement: React.FC = () => {
+  const { currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +69,16 @@ const UserManagement: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState('user');
+  const [newName, setNewName] = useState('');
   const toast = useToast();
+
+  // Reset form when modal closes
+  const resetAddUserForm = () => {
+    setNewEmail('');
+    setNewRole('user');
+    setNewName('');
+    setIsAddModalOpen(false);
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -196,6 +207,18 @@ const UserManagement: React.FC = () => {
       return;
     }
     
+    // Require name for students to ensure proper password setup emails
+    if (newRole === 'student' && !newName.trim()) {
+      toast({
+        title: 'Student name required',
+        description: 'Please provide a name for the student',
+        status: 'warning',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+    
     setIsLoading(true);
     try {
       // Check if user already exists with this email
@@ -224,7 +247,14 @@ const UserManagement: React.FC = () => {
         email: newEmail,
         role: newRole,
         userId: newId, // Include userId field that matches the document ID
-        displayName: newEmail.split('@')[0], // Generate a display name from the email
+        // For students, use the provided name; for others, generate from email
+        name: newRole === 'student' && newName.trim() ? newName.trim() : undefined,
+        displayName: newRole === 'student' && newName.trim() ? newName.trim() : newEmail.split('@')[0],
+        // For students, assign to the admin (assuming admin is also a teacher)
+        ...(newRole === 'student' && currentUser ? { 
+          teacherId: currentUser.uid,
+          teacherEmail: currentUser.email 
+        } : {}),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         lastLogin: null,
@@ -240,17 +270,20 @@ const UserManagement: React.FC = () => {
       // Add to our local state
       setUsers([...users, { id: newId, ...newUser }]);
       
+      const successMessage = newRole === 'student' 
+        ? `${newName} (${newEmail}) has been added as a student. They will receive a password setup email automatically.`
+        : `${newEmail} has been added with role: ${newRole}. They will need to sign in to activate their account.`;
+      
       toast({
-        title: 'User added',
-        description: `${newEmail} has been added with role: ${newRole}. They will need to sign in to activate their account.`,
+        title: 'User added successfully',
+        description: successMessage,
         status: 'success',
-        duration: 5000,
+        duration: 7000,
         isClosable: true,
       });
       
-      // Reset form
-      setNewEmail('');
-      setNewRole('user');
+      // Reset form and close modal
+      resetAddUserForm();
     } catch (err) {
       console.error('Error adding user:', err);
       toast({
@@ -626,7 +659,7 @@ const UserManagement: React.FC = () => {
       </Modal>
 
       {/* Add User Modal */}
-      <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)}>
+      <Modal isOpen={isAddModalOpen} onClose={resetAddUserForm}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Add New User</ModalHeader>
@@ -648,13 +681,15 @@ const UserManagement: React.FC = () => {
                 placeholder="user@example.com"
               />
             </FormControl>
-            <FormControl>
+            
+            <FormControl mb={4}>
               <FormLabel>Role</FormLabel>
               <Select 
                 value={newRole} 
                 onChange={(e) => setNewRole(e.target.value)}
               >
                 <option value="user">User</option>
+                <option value="student">Student</option>
                 <option value="teacher">Teacher (can create assignments)</option>
                 <option value="admin">Admin (includes teacher privileges)</option>
               </Select>
@@ -662,9 +697,23 @@ const UserManagement: React.FC = () => {
                 Roles are hierarchical: admins have all teacher privileges, plus admin capabilities.
               </Text>
             </FormControl>
+            
+            {newRole === 'student' && (
+              <FormControl mb={4}>
+                <FormLabel>Student Name <Text as="span" color="red.500">*</Text></FormLabel>
+                <Input 
+                  value={newName} 
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Enter student's full name"
+                />
+                <Text fontSize="sm" color="gray.600" mt={1}>
+                  Required for students to receive proper welcome emails with their name.
+                </Text>
+              </FormControl>
+            )}
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={() => setIsAddModalOpen(false)}>
+            <Button variant="ghost" mr={3} onClick={resetAddUserForm}>
               Cancel
             </Button>
             <Button colorScheme="green" onClick={handleAddUser} isLoading={isLoading}>
