@@ -321,7 +321,7 @@ class Cloud {
   }
 }
 
-const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, ref) => {
+const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config, onMolePopUp }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene>();
   const cameraRef = useRef<THREE.PerspectiveCamera>();
@@ -2982,6 +2982,11 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config }, re
         
         console.log(`🔵 Showing mole #${molesShown}/${maxMolesToShow} at:`, randomMole.position);
         animateMole(randomMole, true);
+        
+        // Play mole pop-up sound
+        if (onMolePopUp) {
+          onMolePopUp();
+        }
         
         // Track when this mole went up
         moleActivationTimes.set(randomMole, Date.now());

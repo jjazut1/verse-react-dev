@@ -48,8 +48,21 @@ const SmartRouter: React.FC = () => {
         'window.location.href': window.location.href,
         'window.location.hostname': window.location.hostname,
         'window.outerHeight - innerHeight': window.outerHeight - window.innerHeight,
-        'serviceWorker available': 'serviceWorker' in navigator
+        'serviceWorker available': 'serviceWorker' in navigator,
+        'userAgent': navigator.userAgent,
+        'isInEmailClient': isInEmailClient()
       });
+
+      // Check if we're in an email client web view
+      function isInEmailClient() {
+        const userAgent = navigator.userAgent.toLowerCase();
+        return userAgent.includes('yahoo') || 
+               userAgent.includes('gmail') || 
+               userAgent.includes('outlook') ||
+               userAgent.includes('mail') ||
+               document.referrer.includes('mail') ||
+               window.location.href.includes('from=email');
+      }
 
       // Handle explicit mode requests first
       if (forceBrowser) {

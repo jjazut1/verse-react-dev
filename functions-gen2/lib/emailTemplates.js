@@ -122,18 +122,18 @@ assignmentDetails) => {
 
         <!-- Single Smart Link -->
         <div class="primary-actions">
-            <h2 style="margin-top: 0; font-size: 24px; margin-bottom: 15px;">🚀 Ready to Start?</h2>
+            <h2 style="margin-top: 0; font-size: 24px; margin-bottom: 15px;">Access Your Assignment</h2>
             <p style="margin: 0 0 25px 0; font-size: 16px; opacity: 0.9;">
                 Click the button below to access your Student Dashboard:
             </p>
             <a href="${smartDashboardLink}" class="smart-button">
-                📱 Open Student Dashboard
+                Open Student Dashboard
             </a>
         </div>
 
         <!-- How It Works -->
         <div class="how-it-works">
-            <h3 style="color: #047857; margin-top: 0; font-size: 18px;">✨ How This Works:</h3>
+            <h3 style="color: #047857; margin-top: 0; font-size: 18px;">How This Works:</h3>
             <div style="color: #047857;">
                 <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
                     <li><strong>📱 If you have the app installed:</strong> Opens directly in your Lumino Learning app</li>

@@ -115,7 +115,7 @@ exports.sendAssignmentEmail = (0, firestore_1.onDocumentCreated)({
             email: exports.SENDER_EMAIL.value().trim(),
             name: "LuminateLearn"
         },
-        subject: `📱 New Assignment: ${assignment.gameTitle || assignment.gameName}`,
+        subject: `New Assignment: ${assignment.gameTitle || assignment.gameName}`,
         html: emailHtml,
         // Explicitly disable all SendGrid tracking
         trackingSettings: {
@@ -156,12 +156,22 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
         console.log("Skipping password setup email: not a new student or already sent", { userId });
         return;
     }
-    const { email: studentEmail, name: studentName } = userData;
+    const { email: studentEmail, name: studentName, displayName } = userData;
     firebase_functions_1.logger.info('🔵 sendPasswordSetupEmail triggered for new student:', studentEmail);
-    if (!studentEmail || !studentName) {
-        firebase_functions_1.logger.error('Missing required student data:', { studentEmail, studentName });
+    if (!studentEmail) {
+        firebase_functions_1.logger.error('Missing required student email:', { studentEmail });
         return;
     }
+    // Use name if available, otherwise fall back to displayName, or derive from email
+    const finalStudentName = studentName || displayName || studentEmail.split('@')[0];
+    if (!finalStudentName) {
+        firebase_functions_1.logger.error('Could not determine student name from any available fields:', { studentEmail, studentName, displayName });
+        return;
+    }
+    firebase_functions_1.logger.info('Using student name for email:', {
+        finalStudentName,
+        source: studentName ? 'name field' : (displayName ? 'displayName field' : 'email prefix')
+    });
     try {
         // First, create or get the Firebase Auth user
         let authUser;
@@ -189,7 +199,7 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
                 authUser = await admin.auth().createUser({
                     uid: userId, // Use the same UID as the Firestore document
                     email: studentEmail,
-                    displayName: studentName,
+                    displayName: finalStudentName,
                     emailVerified: false
                 });
                 actualAuthUid = userId; // New user gets the Firestore document ID as their UID
@@ -245,7 +255,7 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
             <td>
               <h1 style="color: #2D3748; text-align: center; margin: 0 0 20px 0;">Welcome to LuminateLearn!</h1>
           
-              <p style="margin: 0 0 15px 0; font-size: 16px; color: #4A5568;">Hi ${studentName},</p>
+              <p style="margin: 0 0 15px 0; font-size: 16px; color: #4A5568;">Hi ${finalStudentName},</p>
           
               <p style="margin: 0 0 20px 0; font-size: 16px; color: #4A5568;">Your teacher has created an account for you on our educational gaming platform. Here are your login credentials:</p>
               
@@ -346,6 +356,36 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
             return;
         }
         firebase_functions_1.logger.info('✅ Password setup email sent successfully to:', studentEmail);
+        // Send separate notification email to admin
+        const adminNotificationMsg = {
+            to: 'james@luminatelearn.com',
+            from: {
+                email: exports.SENDER_EMAIL.value().trim(),
+                name: "LuminateLearn Admin"
+            },
+            subject: `New Student Account Created: ${finalStudentName}`,
+            html: `
+          <h3>New Student Account Notification</h3>
+          <p><strong>Student:</strong> ${finalStudentName}</p>
+          <p><strong>Email:</strong> ${studentEmail}</p>
+          <p><strong>Password Setup Email:</strong> Sent successfully</p>
+          <p><strong>Temporary Password:</strong> ${temporaryPassword}</p>
+          <p><em>This is an admin notification. The student received a separate welcome email.</em></p>
+        `,
+            trackingSettings: {
+                clickTracking: { enable: false },
+                openTracking: { enable: false },
+                subscriptionTracking: { enable: false },
+                ganalytics: { enable: false }
+            }
+        };
+        const isAdminEmailSent = await (0, sendgridHelper_1.sendEmail)(adminNotificationMsg);
+        if (isAdminEmailSent) {
+            firebase_functions_1.logger.info('📧 Admin notification sent to james@luminatelearn.com');
+        }
+        else {
+            firebase_functions_1.logger.warn('⚠️ Failed to send admin notification (student email was successful)');
+        }
         // Mark as sent in the user document
         await admin.firestore().collection("users").doc(userId).update({
             passwordSetupSent: true,

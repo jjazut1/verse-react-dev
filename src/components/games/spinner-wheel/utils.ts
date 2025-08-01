@@ -103,9 +103,10 @@ export const getItemColors = (items: SpinnerWheelItem[], theme: string = 'primar
 };
 
 // Calculate zoom target for winner segment - always focus on 9 o'clock position
-export const calculateZoomTarget = (segmentIndex: number): { x: number; y: number; segmentIndex: number } => {
-  const radius = 220;
-  const center = 240;
+export const calculateZoomTarget = (segmentIndex: number, wheelSize: number = 480): { x: number; y: number; segmentIndex: number } => {
+  const scale = wheelSize / 480; // Scale factor relative to original 480px
+  const radius = 220 * scale;
+  const center = wheelSize / 2; // Center point should be half of total size
   
   // Always focus on 9 o'clock position (180 degrees) where the winning segment lands
   // This is where our pointer is positioned and where the winning segment stops

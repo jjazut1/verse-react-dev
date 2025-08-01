@@ -21,8 +21,182 @@ import {
   HStack,
   useToast
 } from '@chakra-ui/react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../config/firebase';
+
+// Add responsive CSS for navbar
+const navbarStyles = `
+.navbar-responsive {
+  background-color: var(--color-primary-500);
+  padding: var(--spacing-3) var(--spacing-4);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.navbar-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+}
+
+.navbar-left {
+  display: flex;
+  gap: var(--spacing-4);
+  flex: 1;
+  min-width: 0;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-shrink: 0;
+}
+
+.navbar-user-info {
+  color: white;
+  font-size: 0.9rem;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navbar-button {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: none;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s ease-in-out;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.navbar-button:hover {
+  opacity: 0.8;
+  transform: translateY(-1px);
+}
+
+.navbar-button.teacher {
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--color-primary-600);
+  font-weight: bold;
+}
+
+.navbar-link {
+  color: white;
+  font-weight: bold;
+  text-decoration: none;
+  transition: opacity 0.2s ease-in-out;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--border-radius-sm);
+  white-space: nowrap;
+}
+
+.navbar-link:hover {
+  opacity: 0.8;
+}
+
+.navbar-link.active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.admin-link {
+  color: #FFD700 !important;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .navbar-responsive {
+    padding: var(--spacing-2) var(--spacing-3);
+  }
+  
+  .navbar-container {
+    gap: var(--spacing-1);
+  }
+  
+  .navbar-left {
+    gap: var(--spacing-2);
+  }
+  
+  .navbar-right {
+    gap: var(--spacing-1);
+  }
+  
+  .navbar-user-info {
+    max-width: 100px;
+    font-size: 0.8rem;
+  }
+  
+  .navbar-button {
+    padding: var(--spacing-2);
+    font-size: 0.8rem;
+    min-width: 60px;
+  }
+  
+  .navbar-button.teacher {
+    font-size: 0.75rem;
+    padding: var(--spacing-2) var(--spacing-3);
+  }
+  
+  .navbar-link {
+    padding: var(--spacing-2);
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-container {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  
+  .navbar-user-info {
+    display: none; /* Hide email on very small screens */
+  }
+  
+  .navbar-button {
+    padding: var(--spacing-1) var(--spacing-2);
+    font-size: 0.75rem;
+    min-width: 50px;
+  }
+  
+  .navbar-button.teacher {
+    font-size: 0.7rem;
+    padding: var(--spacing-1) var(--spacing-2);
+  }
+  
+  .navbar-link {
+    padding: var(--spacing-1) var(--spacing-2);
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .navbar-right {
+    gap: 0;
+  }
+  
+  .navbar-button {
+    padding: var(--spacing-1);
+    font-size: 0.7rem;
+    min-width: 45px;
+  }
+  
+  .navbar-button.teacher {
+    font-size: 0.65rem;
+    padding: var(--spacing-1);
+  }
+}
+`;
 
 // Teacher Signup Modal Component - defined outside to prevent recreation
 const TeacherSignupModal = ({ 
@@ -60,10 +234,10 @@ const TeacherSignupModal = ({
       <ModalHeader>
         <VStack spacing={2} align="center">
           <Text fontSize="2xl" fontWeight="bold" color="blue.600">
-            👨‍🏫 Get Started as a Teacher
+            🚀 Get Started as a Teacher
           </Text>
           <Text fontSize="sm" color="gray.600" textAlign="center">
-            Create your educator account and start building custom learning games
+            Create your teacher account to start building amazing educational games
           </Text>
         </VStack>
       </ModalHeader>
@@ -73,7 +247,6 @@ const TeacherSignupModal = ({
           <FormControl>
             <FormLabel>Full Name</FormLabel>
             <Input
-              type="text"
               value={teacherName}
               onChange={(e) => setTeacherName(e.target.value)}
               placeholder="Enter your full name"
@@ -98,7 +271,7 @@ const TeacherSignupModal = ({
               type="password"
               value={teacherPassword}
               onChange={(e) => setTeacherPassword(e.target.value)}
-              placeholder="Create a password (min 6 characters)"
+              placeholder="Create a strong password"
               disabled={isLoading}
             />
           </FormControl>
@@ -251,7 +424,7 @@ const MemberLoginModal = ({
 );
 
 const Navbar = () => {
-  const { currentUser, isTeacher, isStudent, logout } = useAuth();
+  const { currentUser, isTeacher, isStudent, logout, loginWithGoogle } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { hasUnsavedChanges, promptBeforeLeaving } = useUnsavedChangesContext();
@@ -295,8 +468,6 @@ const Navbar = () => {
   const studentInUse = isStudentInActiveUse();
   const shouldShowAuthButtons = !currentUser && !studentInUse;
   
-
-  
   // Check if user is an admin
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -323,35 +494,6 @@ const Navbar = () => {
     
     checkAdminStatus();
   }, [currentUser]);
-  
-  const navLinkStyle = (path: string) => ({
-    color: 'white',
-    fontWeight: 'bold',
-    textDecoration: 'none',
-    transition: 'opacity 0.2s ease-in-out',
-    padding: 'var(--spacing-2) var(--spacing-3)',
-    borderRadius: 'var(--border-radius-sm)',
-    backgroundColor: location.pathname === path ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-  });
-
-  const buttonStyle = {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    color: 'white',
-    padding: 'var(--spacing-2) var(--spacing-4)',
-    border: 'none',
-    borderRadius: 'var(--border-radius-md)',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    transition: 'opacity 0.2s ease-in-out',
-    marginLeft: 'var(--spacing-2)'
-  };
-
-  const teacherButtonStyle = {
-    ...buttonStyle,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    color: 'var(--color-primary-600)',
-    fontWeight: 'bold'
-  };
   
   // Handle navigation with unsaved changes check
   const handleNavClick = async (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
@@ -496,8 +638,9 @@ const Navbar = () => {
   const handleTeacherGoogleSignup = async () => {
     setIsLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
+      // Use AuthContext's native Google Sign-In
+      const userCredential = await loginWithGoogle();
+      if (!userCredential) return;
       const user = userCredential.user;
       
       // Check if user document already exists
@@ -657,8 +800,9 @@ const Navbar = () => {
   const handleMemberGoogleLogin = async () => {
     setIsLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
+      // Use AuthContext's native Google Sign-In
+      const userCredential = await loginWithGoogle();
+      if (!userCredential) return;
       const user = userCredential.user;
       
       // Check if user exists in Firestore database
@@ -727,20 +871,15 @@ const Navbar = () => {
 
   return (
     <>
-      <nav style={{ backgroundColor: 'var(--color-primary-500)', padding: 'var(--spacing-4)' }}>
-        <div style={{ 
-          maxWidth: '1200px', 
-          margin: '0 auto', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between' 
-        }}>
-          <div style={{ display: 'flex', gap: 'var(--spacing-4)' }}>
+      <style>{navbarStyles}</style>
+      <nav className="navbar-responsive">
+        <div className="navbar-container">
+          <div className="navbar-left">
             {/* Only show Home for non-authenticated users who aren't students using the app */}
             {!currentUser && !studentInUse && (
               <RouterLink 
                 to="/" 
-                style={navLinkStyle('/')}
+                className={`navbar-link ${location.pathname === '/' ? 'active' : ''}`}
                 onClick={(e) => handleNavClick(e, '/')}
                 onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
                 onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
@@ -752,7 +891,7 @@ const Navbar = () => {
               <>
                 <RouterLink 
                   to="/teacher" 
-                  style={navLinkStyle('/teacher')}
+                  className={`navbar-link ${location.pathname === '/teacher' ? 'active' : ''}`}
                   onClick={(e) => handleNavClick(e, '/teacher')}
                   onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
                   onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
@@ -764,7 +903,7 @@ const Navbar = () => {
             {isStudent && (
                 <RouterLink 
                 to="/student" 
-                style={navLinkStyle('/student')}
+                className={`navbar-link ${location.pathname === '/student' ? 'active' : ''}`}
                 onClick={(e) => handleNavClick(e, '/student')}
                   onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
                   onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
@@ -775,10 +914,7 @@ const Navbar = () => {
                 {isAdmin && (
                   <RouterLink 
                     to="/admin" 
-                    style={{
-                      ...navLinkStyle('/admin'),
-                      color: '#FFD700' // Gold color for admin link
-                    }}
+                    className={`navbar-link admin-link ${location.pathname === '/admin' ? 'active' : ''}`}
                     onClick={(e) => handleNavClick(e, '/admin')}
                     onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
                     onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
@@ -788,13 +924,13 @@ const Navbar = () => {
             )}
           </div>
           
-          <div style={{ display: 'flex', gap: 'var(--spacing-2)', alignItems: 'center' }}>
+          <div className="navbar-right">
             {currentUser ? (
               <>
-                <div style={{ color: 'white' }}>{currentUser.email}</div>
+                <div className="navbar-user-info">{currentUser.email}</div>
                 <button
                   onClick={handleLogout}
-                  style={buttonStyle}
+                  className="navbar-button"
                   onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
                   onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
                 >
@@ -805,7 +941,7 @@ const Navbar = () => {
               <>
                 <button
                   onClick={() => setIsTeacherSignupOpen(true)}
-                  style={teacherButtonStyle}
+                  className="navbar-button teacher"
                   onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
                   onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
                 >
@@ -813,7 +949,7 @@ const Navbar = () => {
                 </button>
                 <button
                   onClick={() => setIsMemberLoginOpen(true)}
-                  style={buttonStyle}
+                  className="navbar-button"
                   onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
                   onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
                 >

@@ -12,7 +12,7 @@ const SENDER_EMAIL = functions.config().email?.sender || 'Lumino Learning <james
 
 // Initialize SendGrid with the key
 console.log("Configuring SendGrid with key:", SENDGRID_API_KEY ? 'Key set' : 'No key set');
-if (SENDGRID_API_KEY && SENDGRID_API_KEY.startsWith('SG.')) {
+if (SENDGRID_API_KEY && .startsWith('SG.')) {
   sgMail.setApiKey(SENDGRID_API_KEY);
   console.log('SendGrid API key configured successfully');
 } else {

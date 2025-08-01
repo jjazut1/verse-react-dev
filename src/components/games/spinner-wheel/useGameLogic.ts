@@ -129,8 +129,10 @@ export const useGameLogic = (onGameComplete: (score: number) => void, config: Ga
         console.log(`Final rotation: ${finalRotation.toFixed(1)}°`);
         console.log('=====================');
         
-        // Calculate zoom target
-        const zoomCoords = calculateZoomTarget(actualSegmentAtPointer);
+        // Calculate zoom target - use default wheelSize for now since it's not passed to this hook
+        // TODO: In a future refactor, wheelSize could be passed to useGameLogic for better accuracy
+        const defaultWheelSize = 480;
+        const zoomCoords = calculateZoomTarget(actualSegmentAtPointer, defaultWheelSize);
         
         setGameState(prev => ({
           ...prev,

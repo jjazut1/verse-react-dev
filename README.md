@@ -121,7 +121,7 @@ LuminateLearn is a comprehensive educational platform designed for K-12 teachers
 - **COOP Header Removal**: Eliminated `Cross-Origin-Opener-Policy: unsafe-none` header that was blocking Google OAuth popups
 - **Enhanced Fallback Logic**: Automatic fallback from `signInWithPopup` to `signInWithRedirect` when popups are blocked
 - **Race Condition Resolution**: Added 500ms delay in login flow to allow proper role determination
-- **Environment Detection**: Improved Capacitor detection using `Capacitor.isNativePlatform()` for accurate web vs native context
+- **Environment Detection**: Improved web authentication handling for better cross-browser compatibility
 
 **👥 Student Management System Fixed**:
 - **Firestore Query Resolution**: Enhanced security rules to allow `list` operations for teachers querying their students

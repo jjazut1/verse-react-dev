@@ -15,9 +15,9 @@ interface StartScreenProps {
 }
 
 const StartScreen: React.FC<StartScreenProps> = ({ onStartGame, onLoadConfig }) => {
-  // Responsive values
+  // Responsive values for landscape optimization
   const containerPadding = useBreakpointValue({ base: 2, md: 3, lg: 4 });
-  const headingSize = useBreakpointValue({ base: "sm", md: "md" });
+  const headingSize = useBreakpointValue({ base: "md", md: "lg" });
 
   return (
     <Box 
@@ -33,10 +33,15 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStartGame, onLoadConfig }) 
         maxW="1400px"
         mx="auto"
         px={containerPadding}
-        py={8}
+        py={6} // Reduced padding for landscape
       >
         <VStack spacing={6} align="center" width="100%">
-          <Heading size={headingSize} textAlign="center" fontFamily="'Comic Neue', sans-serif">
+          <Heading 
+            size={headingSize} 
+            textAlign="center" 
+            fontFamily="'Comic Neue', sans-serif"
+            color="blue.700"
+          >
             Sort Categories Egg Reveal
           </Heading>
           <Text 
@@ -44,6 +49,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStartGame, onLoadConfig }) 
             textAlign="center" 
             maxW="600px"
             fontFamily="'Comic Neue', sans-serif"
+            color="gray.600"
           >
             Find eggs, crack them open, and sort words into the correct categories!
           </Text>
@@ -52,7 +58,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStartGame, onLoadConfig }) 
             columns={{ base: 1, md: 2 }} 
             spacing={4} 
             width="100%" 
-            maxW="600px" 
+            maxW="500px" 
             mt={4}
           >
             <Button
@@ -67,12 +73,13 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStartGame, onLoadConfig }) 
             
             <Button
               variant="outline"
+              colorScheme="blue"
               size={{ base: "md", md: "lg" }}
               onClick={onLoadConfig}
               width="100%"
               fontFamily="'Comic Neue', sans-serif"
             >
-              Load Saved Configuration
+              Load Configuration
             </Button>
           </SimpleGrid>
         </VStack>

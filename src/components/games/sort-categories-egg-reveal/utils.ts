@@ -36,18 +36,18 @@ export const generateEggs = (config: SortCategoriesConfig): EggType[] => {
   const newEggs: EggType[] = [];
   const numEggs = Math.min(config.eggQty, allWords.length);
   
-  // Define safe zones for container placement
-  const titleHeight = 8; // Reserve top 8% for title
-  const bottomReserve = 45; // Reserve bottom 45% for baskets and labels
-  const usableHeight = 100 - titleHeight - bottomReserve; // Remaining space for containers
+  // Define safe zones for container placement - optimized for landscape with baskets in game area
+  const titleHeight = 3; // Small top reserve for spacing
+  const bottomReserve = 30; // Reserve space for baskets at bottom (reduced from 35% for more space)
+  const usableHeight = 100 - titleHeight - bottomReserve; // Available space for eggs
   
-  const horizontalPadding = 8; // 8% padding from sides
+  const horizontalPadding = 4; // Balanced horizontal padding
   const usableWidth = 100 - (2 * horizontalPadding);
   
-  // Container size estimates for collision detection (in percentage units)
-  const containerWidth = 6; // Approximate container width
-  const containerHeight = 8; // Approximate container height
-  const minDistance = 9; // Minimum distance between container centers
+  // Container size estimates for collision detection (in percentage units) - optimized for landscape
+  const containerWidth = 3.5; // Balanced container width for good density
+  const containerHeight = 5; // Balanced container height
+  const minDistance = 6.5; // Good minimum distance for landscape density without overlap
   
   // Shuffle allWords array before creating eggs
   const shuffledWords = [...allWords].sort(() => Math.random() - 0.5);

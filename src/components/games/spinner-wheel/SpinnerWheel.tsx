@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, VStack, Heading, Center, Text } from '@chakra-ui/react';
+import { Box, VStack, Heading, Center, Text, useBreakpointValue } from '@chakra-ui/react';
 import { SpinnerWheelProps } from './types';
 import { useGameLogic } from './useGameLogic';
 import { WheelRenderer } from './WheelRenderer';
@@ -12,6 +12,28 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   config
 }) => {
   const gameLogic = useGameLogic(onGameComplete, config);
+  
+  // Responsive values for different screen sizes
+  const wheelSize = useBreakpointValue({ 
+    base: 280, // Mobile: 280px
+    sm: 320,   // Small tablet: 320px  
+    md: 400,   // Medium: 400px
+    lg: 480    // Large: 480px (original size)
+  });
+  
+  const containerPadding = useBreakpointValue({
+    base: 2,   // Mobile: minimal padding
+    sm: 4,     // Small: some padding
+    md: 6,     // Medium: normal padding
+    lg: 6      // Large: normal padding
+  });
+  
+  const headingSize = useBreakpointValue({
+    base: "md",
+    sm: "lg", 
+    md: "lg",
+    lg: "lg"
+  });
 
   if (gameLogic.items.length === 0) {
     return (
@@ -32,7 +54,7 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
       display="flex"
       flexDirection="column"
       zIndex={1}
-      overflow="auto"
+      overflow={gameLogic.isZoomed ? "visible" : "auto"} // Allow overflow when zoomed for proper centering
     >
       <PWAGameHeader gameTitle="Spinner Wheel" variant="compact" />
       
@@ -41,65 +63,78 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
         display="flex"
         justifyContent="center"
         alignItems="center"
+        p={{ base: 2, sm: 4, md: 6 }}
+        overflow="hidden"
       >
-      <Box 
-        maxW="600px" 
-        p={6} 
-        fontFamily="'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
-        bg="#E6F3FF" 
-        borderRadius="xl"
-        position="relative"
-        marginTop="auto"
-        marginBottom="auto"
-      >
-        <VStack spacing={6}>
-          {/* Header - Only show when NOT zoomed */}
-          {!gameLogic.isZoomed && (
-            <VStack spacing={2} textAlign="center">
-              <Heading size="lg" color="blue.600">
-                🎡 {config.title || 'Spinner Wheel'}
-              </Heading>
-            </VStack>
-          )}
+        <Box 
+          w="100%"
+          maxW={{ base: "100%", sm: "90%", md: "600px" }}
+          fontFamily="'Comic Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
+          bg="#E6F3FF" 
+          borderRadius={{ base: "lg", md: "xl" }}
+          position="relative"
+          display="flex"
+          flexDirection="column"
+          alignItems="center"
+          minH="0" // Allow flex shrinking
+        >
+          <VStack spacing={{ base: 3, sm: 4, md: 6 }} w="100%" align="center">
+            {/* Header - Only show when NOT zoomed */}
+            {!gameLogic.isZoomed && (
+              <VStack spacing={2} textAlign="center">
+                <Heading size={headingSize} color="blue.600">
+                  🎡 {config.title || 'Spinner Wheel'}
+                </Heading>
+              </VStack>
+            )}
 
-          {/* Wheel Container */}
-          <Box 
-            bg="#E6F3FF" 
-            p={6} 
-            borderRadius="xl" 
-            shadow={gameLogic.isZoomed ? "none" : "lg"} 
-            position="relative"
-          >
-            <WheelRenderer
-              items={gameLogic.items}
-              rotation={gameLogic.rotation}
+            {/* Wheel Container */}
+            <Box 
+              bg="#E6F3FF" 
+              p={containerPadding} 
+              borderRadius={{ base: "lg", md: "xl" }}
+              shadow={gameLogic.isZoomed ? "none" : "lg"} 
+              position="relative"
+              w="100%"
+              display="flex"
+              justifyContent="center"
+              alignItems="center"
+              overflow="visible" // Always allow overflow for zoom
+              // Adjust container for zoom state
+              zIndex={gameLogic.isZoomed ? 999 : 1}
+            >
+              <WheelRenderer
+                items={gameLogic.items}
+                rotation={gameLogic.rotation}
+                isZoomed={gameLogic.isZoomed}
+                zoomTarget={gameLogic.zoomTarget}
+                spinning={gameLogic.spinning}
+                wheelSize={wheelSize} // Pass responsive wheel size
+              />
+              
+              <ZoomedControls
+                isZoomed={gameLogic.isZoomed}
+                selected={gameLogic.selected}
+                items={gameLogic.items}
+                config={config}
+                onZoomOut={gameLogic.handleZoomOut}
+                onRemoveSelected={gameLogic.removeSelectedItem}
+                wheelSize={wheelSize} // Pass wheel size for proper positioning
+              />
+            </Box>
+
+            {/* Game Controls */}
+            <GameControls
               isZoomed={gameLogic.isZoomed}
-              zoomTarget={gameLogic.zoomTarget}
               spinning={gameLogic.spinning}
+              gameComplete={gameLogic.gameComplete}
+              itemsLength={gameLogic.items.length}
+              spinCount={gameLogic.spinCount}
+              onSpin={gameLogic.spin}
+              onReset={gameLogic.resetGame}
             />
-            
-            <ZoomedControls
-              isZoomed={gameLogic.isZoomed}
-              selected={gameLogic.selected}
-              items={gameLogic.items}
-              config={config}
-              onZoomOut={gameLogic.handleZoomOut}
-              onRemoveSelected={gameLogic.removeSelectedItem}
-            />
-          </Box>
-
-          {/* Game Controls */}
-          <GameControls
-            isZoomed={gameLogic.isZoomed}
-            spinning={gameLogic.spinning}
-            gameComplete={gameLogic.gameComplete}
-            itemsLength={gameLogic.items.length}
-            spinCount={gameLogic.spinCount}
-            onSpin={gameLogic.spin}
-            onReset={gameLogic.resetGame}
-          />
-        </VStack>
-      </Box>
+          </VStack>
+        </Box>
       </Box>
     </Box>
   );

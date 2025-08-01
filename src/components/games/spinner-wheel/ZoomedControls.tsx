@@ -13,6 +13,7 @@ interface ZoomedControlsProps {
   config: GameConfig;
   onZoomOut: () => void;
   onRemoveSelected: () => void;
+  wheelSize?: number; // Add optional wheelSize prop
 }
 
 export const ZoomedControls: React.FC<ZoomedControlsProps> = ({
@@ -21,36 +22,56 @@ export const ZoomedControls: React.FC<ZoomedControlsProps> = ({
   items,
   config,
   onZoomOut,
-  onRemoveSelected
+  onRemoveSelected,
+  wheelSize = 480 // Default to original size
 }) => {
   if (!isZoomed) return null;
 
+  // Button size adjustments for smaller screens
+  const buttonSize = wheelSize < 320 ? 'sm' : 'md';
+  const fontSize = wheelSize < 320 ? 'sm' : 'md';
+  const paddingX = wheelSize < 320 ? 3 : 4;
+  const paddingY = wheelSize < 320 ? 2 : 3;
+
   return (
     <>
-      {/* Floating buttons when zoomed - positioned above pointer area */}
+      {/* Floating buttons when zoomed - positioned at top center */}
       <VStack 
-        position="absolute" 
-        top="80px" 
-        left="-155px" 
-        spacing={3}
-        zIndex={1000}
+        position="fixed" // Use fixed positioning for better mobile support
+        top="70px" // Optimized position below PWA header
+        left="50%" // Center horizontally
+        transform="translateX(-50%)" // Adjust for true centering
+        spacing={4} // Increased spacing between buttons to prevent mistakes
+        zIndex={1001} // Higher z-index to ensure visibility
+        align="center"
+        // Make background match page background to be invisible
+        bg="#E6F3FF" // Match the page background color
+        borderRadius="lg"
+        p={3}
+        // Remove visible styling to make container invisible
+        shadow="none"
+        border="none"
       >
+        {/* ZOOM OUT button - always show when zoomed */}
         <Button
           onClick={onZoomOut}
           bg="#4ECDC4"
           color="white"
           _hover={{ bg: "#45B7D1" }}
           _active={{ bg: "#3A9BC1" }}
-          size="md"
-          fontSize="lg"
-          px={6}
-          py={4}
+          size={buttonSize}
+          fontSize={fontSize}
+          px={paddingX}
+          py={paddingY}
           borderRadius="full"
           shadow="lg"
+          border="2px solid white"
+          minW="120px" // Ensure consistent button width
         >
           🔍 ZOOM OUT
         </Button>
         
+        {/* REMOVE button - only show if removeOnSelect is enabled and item is selected */}
         {((config as any).removeOnSelect) && selected && (
           <Button
             onClick={onRemoveSelected}
@@ -58,13 +79,15 @@ export const ZoomedControls: React.FC<ZoomedControlsProps> = ({
             color="#8B4513"
             _hover={{ bg: "#F0E68C" }}
             _active={{ bg: "#DDD6C1" }}
-            size="md"
-            fontSize="lg"
-            px={6}
-            py={4}
+            size={buttonSize}
+            fontSize={fontSize}
+            px={paddingX}
+            py={paddingY}
             borderRadius="full"
             shadow="lg"
+            border="2px solid white"
             leftIcon={<span>🗑️</span>}
+            minW="120px" // Ensure consistent button width
           >
             REMOVE
           </Button>

@@ -21,32 +21,33 @@ const GameControls: React.FC<GameControlsProps> = ({
   return (
     <Flex 
       position="absolute"
-      top={4}
-      right={4}
+      top={2} // Reduced top spacing
+      right={2} // Reduced right spacing
       direction={{ base: "column", md: "row" }} 
       justify="flex-end"
       align="center" 
       gap={2}
       bg="white"
-      p={3}
+      p={2} // Reduced padding
       borderRadius="lg"
       boxShadow="md"
       fontFamily="'Comic Neue', sans-serif"
       width="auto"
       zIndex={10}
+      fontSize="sm" // Smaller font size for compactness
     >
-      <HStack spacing={4}>
-        <Text fontSize={{ base: "md", md: "lg" }} fontWeight="bold" color="blue.600">
+      <HStack spacing={3}> {/* Reduced spacing */}
+        <Text fontSize={{ base: "sm", md: "md" }} fontWeight="bold" color="blue.600">
           Score: {gameState.score}
         </Text>
       </HStack>
       
       {gameState.isGameComplete && (
-        <HStack spacing={4} ml={4}>
+        <HStack spacing={2} ml={2}> {/* Reduced spacing and margin */}
           <Button 
             colorScheme="blue" 
             onClick={onResetGame}
-            size={{ base: "sm", md: "md" }}
+            size="sm" // Always use small size for compactness
             fontFamily="'Comic Neue', sans-serif"
           >
             Play Again
@@ -54,7 +55,7 @@ const GameControls: React.FC<GameControlsProps> = ({
           <Button 
             colorScheme="gray" 
             onClick={onCloseGame}
-            size={{ base: "sm", md: "md" }}
+            size="sm" // Always use small size for compactness
             fontFamily="'Comic Neue', sans-serif"
           >
             Close Game

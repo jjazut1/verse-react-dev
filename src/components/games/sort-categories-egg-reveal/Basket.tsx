@@ -143,14 +143,19 @@ interface BasketProps {
 }
 
 const Basket: React.FC<BasketProps> = ({ category, items, onClick }) => {
-  // Responsive values
-  const titleSize = useBreakpointValue({ base: "sm", md: "md" });
-  const itemSize = useBreakpointValue({ base: "xs", md: "sm" });
-  const basketHeight = useBreakpointValue({ base: "80px", md: "90px", lg: "100px" });
+  // Enhanced responsive values for landscape support while maintaining drag/drop functionality
+  const titleSize = useBreakpointValue({ base: "xs", md: "sm", lg: "md" });
+  const itemSize = useBreakpointValue({ base: "2xs", md: "xs", lg: "sm" });
+  const basketHeight = useBreakpointValue({ 
+    base: "60px", 
+    md: "70px", 
+    lg: "80px",
+    xl: "90px"
+  });
   
   return (
     <VStack 
-      spacing={1} 
+      spacing={1} // Moderate spacing for functionality
       align="center" 
       className="basket" 
       data-basket-id={category.name}
@@ -163,11 +168,14 @@ const Basket: React.FC<BasketProps> = ({ category, items, onClick }) => {
         textAlign="center"
         mb={1}
         position="absolute"
-        top="-25px"
+        top="-22px" // Positioned above basket for space efficiency
         left="50%"
         transform="translateX(-50%)"
         whiteSpace="nowrap"
         fontFamily="'Comic Neue', sans-serif"
+        maxWidth="140px" // Limit text width
+        overflow="hidden"
+        textOverflow="ellipsis"
       >
         {category.name}
       </Text>
@@ -222,13 +230,25 @@ const Basket: React.FC<BasketProps> = ({ category, items, onClick }) => {
           align="center" 
           justify="center" 
           height="100%" 
-          pt={2}
-          pb={1}
-          px={2}
+          pt={1.5} // Adequate padding for readability
+          pb={0.5}
+          px={1.5}
+          maxHeight="100%"
+          overflow="hidden"
         >
-          {items.map((item, index) => (
+          {items.slice(0, 3).map((item, index) => ( // Limit to 3 items for space
             <RichText key={index} content={item} fontSize={itemSize} />
           ))}
+          {items.length > 3 && (
+            <Text 
+              fontSize="2xs" 
+              color="gray.600" 
+              fontStyle="italic"
+              fontFamily="'Comic Neue', sans-serif"
+            >
+              +{items.length - 3} more
+            </Text>
+          )}
         </VStack>
       </Box>
     </VStack>

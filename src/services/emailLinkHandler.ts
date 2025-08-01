@@ -1,23 +1,35 @@
 /**
  * Email Link Handler Service
- * Handles the three types of email links: PWA, Browser, and Install
- * Uses Service Worker + BroadcastChannel for PWA window coordination
+ * Handles routing between Native Apps, PWA, and Browser modes
+ * Priority: Native App → PWA → Browser
  */
 
 export interface EmailLinkParams {
   studentEmail?: string;
   source?: string;
-  mode?: 'pwa' | 'browser' | 'install';
+  mode?: 'native' | 'pwa' | 'browser' | 'install';
   target?: 'dashboard' | 'assignment';
   token?: string;
   focus?: boolean;
   install?: string;
 }
 
+interface NativeAppConfig {
+  iosScheme: string;
+  androidPackage: string;
+  fallbackDelay: number;
+}
+
 export class EmailLinkHandler {
   private static instance: EmailLinkHandler;
   private assignmentChannel: BroadcastChannel | null = null;
   private serviceWorkerReady = false;
+  
+  private nativeConfig: NativeAppConfig = {
+    iosScheme: 'luminatelearn://',
+    androidPackage: 'com.luminatelearn.student',
+    fallbackDelay: 2000 // 2 seconds to try native before PWA fallback
+  };
 
   private constructor() {
     // Check if we're in browser-only mode before initializing
@@ -59,6 +71,135 @@ export class EmailLinkHandler {
         console.warn('[EmailLink] ⚠️ Service Worker check failed:', error);
       }
     }
+  }
+
+  /**
+   * Smart routing: Native App → PWA → Browser
+   */
+  public async routeToStudent(params: EmailLinkParams): Promise<void> {
+    console.log('[EmailLink] 🎯 Smart routing started:', params);
+    
+    // 1. Try native app first (if not explicitly PWA/browser mode)
+    if (!params.mode || params.mode === 'native') {
+      const nativeSuccess = await this.tryNativeApp(params);
+      if (nativeSuccess) {
+        console.log('[EmailLink] ✅ Successfully routed to native app');
+        return;
+      }
+    }
+    
+    // 2. Fallback to PWA (existing logic)
+    if (params.mode !== 'browser') {
+      console.log('[EmailLink] 🔄 Falling back to PWA routing');
+      await this.handlePWALink(params);
+      return;
+    }
+    
+    // 3. Final fallback to browser
+    console.log('[EmailLink] 🌐 Routing to browser mode');
+    await this.handleBrowserLink(params);
+  }
+
+  /**
+   * Attempt to open native app with universal link
+   */
+  private async tryNativeApp(params: EmailLinkParams): Promise<boolean> {
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        console.log('[EmailLink] ⏰ Native app timeout - assuming not installed');
+        resolve(false);
+      }, this.nativeConfig.fallbackDelay);
+
+      try {
+        const nativeUrl = this.buildNativeUrl(params);
+        console.log('[EmailLink] 📱 Trying native app:', nativeUrl);
+        
+        // Create invisible iframe for iOS, direct location for Android
+        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = nativeUrl;
+          document.body.appendChild(iframe);
+          
+          // Clean up iframe
+          setTimeout(() => {
+            if (iframe.parentNode) {
+              iframe.parentNode.removeChild(iframe);
+            }
+          }, 1000);
+        } else {
+          // Android: Try intent URL first, fallback to custom scheme
+          const intentUrl = this.buildAndroidIntentUrl(params);
+          window.location.href = intentUrl;
+        }
+        
+        // If page is still visible after delay, native app didn't open
+        setTimeout(() => {
+          if (document.visibilityState === 'visible') {
+            clearTimeout(timeoutId);
+            resolve(false);
+          } else {
+            clearTimeout(timeoutId);
+            resolve(true);
+          }
+        }, 1000);
+        
+        // If page becomes hidden quickly, native app likely opened
+        const visibilityHandler = () => {
+          if (document.visibilityState === 'hidden') {
+            clearTimeout(timeoutId);
+            document.removeEventListener('visibilitychange', visibilityHandler);
+            resolve(true);
+          }
+        };
+        document.addEventListener('visibilitychange', visibilityHandler);
+        
+      } catch (error) {
+        console.error('[EmailLink] ❌ Native app launch failed:', error);
+        clearTimeout(timeoutId);
+        resolve(false);
+      }
+    });
+  }
+
+  /**
+   * Build native app URL for deep linking
+   */
+  private buildNativeUrl(params: EmailLinkParams): string {
+    const baseScheme = this.nativeConfig.iosScheme;
+    const path = params.target === 'assignment' ? 'play' : 'student';
+    
+    let url = `${baseScheme}${path}`;
+    const queryParams = new URLSearchParams();
+    
+    if (params.studentEmail) queryParams.set('studentEmail', params.studentEmail);
+    if (params.token) queryParams.set('token', params.token);
+    if (params.source) queryParams.set('source', params.source);
+    
+    const queryString = queryParams.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+    
+    return url;
+  }
+
+  /**
+   * Build Android intent URL for better app detection
+   */
+  private buildAndroidIntentUrl(params: EmailLinkParams): string {
+    const path = params.target === 'assignment' ? 'play' : 'student';
+    const baseUrl = `https://luminatelearn.com/${path}`;
+    
+    const queryParams = new URLSearchParams();
+    if (params.studentEmail) queryParams.set('studentEmail', params.studentEmail);
+    if (params.token) queryParams.set('token', params.token);
+    if (params.source) queryParams.set('source', params.source);
+    
+    const queryString = queryParams.toString();
+    const fullUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+    
+    return `intent://${path}?${queryString}#Intent;scheme=luminatelearn;package=${this.nativeConfig.androidPackage};S.browser_fallback_url=${encodeURIComponent(fullUrl)};end`;
   }
 
   /**

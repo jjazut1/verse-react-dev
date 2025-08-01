@@ -23,36 +23,42 @@ const Anagram: React.FC<AnagramProps> = ({
 
   if (!gameState.gameStarted) {
     return (
-      <Box w="100vw" h="100vh" overflow="hidden">
+      <Box w="100%" minH="100vh" display="flex" flexDirection="column">
         <PWAGameHeader gameTitle="Anagram" variant="compact" />
-        <StartScreen config={config} onStartGame={gameLogic.startGame} />
+        <Box flex={1} overflow="auto">
+          <StartScreen config={config} onStartGame={gameLogic.startGame} />
+        </Box>
       </Box>
     );
   }
 
   if (gameState.gameCompleted) {
     return (
-      <Box w="100vw" h="100vh" overflow="hidden">
+      <Box w="100%" minH="100vh" display="flex" flexDirection="column">
         <PWAGameHeader gameTitle="Anagram" variant="compact" />
-        <GameComplete
-          gameState={gameState} 
-          onResetGame={gameLogic.resetGame}
-          formatTime={gameLogic.formatTime}
-        />
+        <Box flex={1} overflow="auto">
+          <GameComplete
+            gameState={gameState} 
+            onResetGame={gameLogic.resetGame}
+            formatTime={gameLogic.formatTime}
+          />
+        </Box>
       </Box>
     );
   }
 
   return (
-    <Box w="100vw" h="100vh" overflow="hidden">
+    <Box w="100%" minH="100vh" display="flex" flexDirection="column">
       <PWAGameHeader gameTitle="Anagram" variant="compact" />
+      <Box flex={1} overflow="auto">
         <GameArea
-        gameState={gameState}
+          gameState={gameState}
           config={config}
           onLetterClick={gameLogic.handleLetterClick}
           onUseHint={gameLogic.useHint}
           onToggleDefinition={gameLogic.toggleDefinition}
-      />
+        />
+      </Box>
     </Box>
   );
 };

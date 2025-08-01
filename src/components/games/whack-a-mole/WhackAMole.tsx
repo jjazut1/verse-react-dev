@@ -8,7 +8,12 @@ import {
   Button,
   useToast,
   Heading,
-  Center
+  Center,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
+  Tooltip
 } from '@chakra-ui/react';
 import Scene from './Scene';
 import { WhackAMoleConfig } from '../../../types/game';
@@ -16,6 +21,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useHighScore } from '../../../hooks/useHighScore';
 import { HighScoreModal } from '../../common/HighScoreModal';
 import PWAGameHeader from '../PWAGameHeader';
+import { useWhackAMoleAudio } from './useWhackAMoleAudio';
 
 interface WhackAMoleProps {
   playerName: string;
@@ -171,6 +177,25 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
   // Check if device is in landscape orientation (moved after other state hooks)
   const isLandscape = useOrientation();
 
+  // Initialize audio system
+  const {
+    playMolePopUpSound,
+    playCorrectHitSound,
+    playWrongHitSound,
+    playBonusStreakSound,
+    playCountdownTickSound,
+    playGameStartSound,
+    playGameEndSound,
+    startBackgroundMusic,
+    stopBackgroundMusic,
+    isMuted,
+    toggleMute,
+    musicEnabled,
+    toggleMusic,
+    volume,
+    setVolume
+  } = useWhackAMoleAudio();
+
   // Initialize modularized high score system
   const {
     highScores,
@@ -208,6 +233,9 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
   // Countdown logic
   useEffect(() => {
     if (showCountdown && countdown > 0) {
+      // Play countdown tick sound
+      playCountdownTickSound();
+      
       countdownTimerRef.current = setTimeout(() => {
         setCountdown(countdown - 1);
       }, 1000);
@@ -215,6 +243,10 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
       setShowCountdown(false);
       setGameStarted(true);
       setGameOver(false);
+      
+      // Play game start sound and start background music
+      playGameStartSound();
+      startBackgroundMusic();
     }
 
     return () => {
@@ -222,7 +254,7 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         clearTimeout(countdownTimerRef.current);
       }
     };
-  }, [showCountdown, countdown]);
+  }, [showCountdown, countdown, playCountdownTickSound, playGameStartSound, startBackgroundMusic]);
 
   const startCountdown = () => {
     // Reset game state
@@ -246,6 +278,11 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
     if (sceneRef.current) {
       sceneRef.current.reset();
     }
+    
+    // Stop background music and play game end sound
+    stopBackgroundMusic();
+    playGameEndSound();
+    
     onGameComplete(score);
     
     // Save high score using modularized system
@@ -266,12 +303,19 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
     if (!gameStarted || gameOver) return;
 
     if (isCorrect) {
+      // Play correct hit sound
+      playCorrectHitSound();
+      
       // Calculate points including bonus if applicable
       const newConsecutiveHits = consecutiveHits + 1;
       let points = config.pointsPerHit;
       
       if (newConsecutiveHits >= config.bonusThreshold) {
         points += config.bonusPoints;
+        
+        // Play bonus streak sound for special achievements
+        playBonusStreakSound();
+        
         toast({
           title: 'Bonus!',
           description: `+${config.bonusPoints} bonus points!`,
@@ -283,6 +327,9 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
       setScore(prev => prev + points);
       setConsecutiveHits(newConsecutiveHits);
     } else {
+      // Play wrong hit sound
+      playWrongHitSound();
+      
       // Apply penalty
       setScore(prev => Math.max(0, prev - config.penaltyPoints));
       setConsecutiveHits(0);
@@ -333,6 +380,7 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         p={4}
         display="flex"
         justifyContent="space-between"
+        alignItems="flex-start"
         // Removed: bg, backdropFilter, borderRadius to eliminate banner effect
       >
         {/* Title Display */}
@@ -355,42 +403,167 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
           </Text>
         </Box>
 
-        {/* Score and Timer */}
-        <HStack 
-          justify="space-between" 
-          bg="transparent" // Remove background
-          p={2} 
-          borderRadius="md"
-          width="320px"
-          // Removed: boxShadow
-          spacing={4}
-        >
-          <Text 
-            fontSize="xl" 
-            fontWeight="bold" 
-            color="#001f3f" 
-            fontFamily="'Comic Neue', cursive" 
-            textShadow="3px 3px 6px rgba(255,255,255,0.95)" // Stronger shadow for readability
+        {/* Right Side: Score/Timer + Audio Controls */}
+        <VStack spacing={2} alignItems="flex-end">
+          {/* Score and Timer */}
+          <HStack 
+            justify="space-between" 
+            bg="transparent" // Remove background
+            p={2} 
+            borderRadius="md"
+            width="320px"
+            // Removed: boxShadow
+            spacing={4}
           >
-            Score: {score}
-          </Text>
-          <Text 
-            fontSize="xl" 
-            fontWeight="bold" 
-            color={timeLeft <= 10 ? "#dc2626" : "#001f3f"}
-            fontFamily="'Comic Neue', cursive" 
-            textShadow="3px 3px 6px rgba(255,255,255,0.95)" // Stronger shadow for readability
-            sx={{
-              animation: timeLeft <= 10 ? "pulse 1s ease-in-out infinite" : "none",
-              "@keyframes pulse": {
-                "0%, 100%": { transform: "scale(1)", opacity: 1 },
-                "50%": { transform: "scale(1.1)", opacity: 0.8 }
-              }
-            }}
-          >
-            Time: {timeLeft}s
-          </Text>
-        </HStack>
+            <Text 
+              fontSize="xl" 
+              fontWeight="bold" 
+              color="#001f3f" 
+              fontFamily="'Comic Neue', cursive" 
+              textShadow="3px 3px 6px rgba(255,255,255,0.95)" // Stronger shadow for readability
+            >
+              Score: {score}
+            </Text>
+            <Text 
+              fontSize="xl" 
+              fontWeight="bold" 
+              color={timeLeft <= 10 ? "#dc2626" : "#001f3f"}
+              fontFamily="'Comic Neue', cursive" 
+              textShadow="3px 3px 6px rgba(255,255,255,0.95)" // Stronger shadow for readability
+              sx={{
+                animation: timeLeft <= 10 ? "pulse 1s ease-in-out infinite" : "none",
+                "@keyframes pulse": {
+                  "0%, 100%": { transform: "scale(1)", opacity: 1 },
+                  "50%": { transform: "scale(1.1)", opacity: 0.8 }
+                }
+              }}
+            >
+              Time: {timeLeft}s
+            </Text>
+          </HStack>
+
+          {/* Audio Controls - positioned under timer */}
+          <HStack spacing={3} bg="rgba(255, 255, 255, 0.9)" borderRadius="xl" p={2}>
+            <Button
+              size="sm"
+              onClick={toggleMute}
+              color="#001f3f"
+              _hover={{ bg: "rgba(0, 31, 63, 0.1)" }}
+              bg="transparent"
+              borderRadius="full"
+              minW="32px"
+              h="32px"
+              p={0}
+              fontSize="md"
+            >
+              {isMuted ? '🔇' : '🔊'}
+            </Button>
+            
+            {/* Volume Slider */}
+            <Box width="60px">
+              <Tooltip label={`Volume: ${Math.round(volume * 100)}%`} placement="top">
+                <Slider
+                  aria-label="volume-slider"
+                  value={volume}
+                  onChange={(val) => setVolume(val)}
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  size="sm"
+                  isDisabled={isMuted}
+                >
+                  <SliderTrack bg="rgba(0, 31, 63, 0.2)">
+                    <SliderFilledTrack bg="#001f3f" />
+                  </SliderTrack>
+                  <SliderThumb />
+                </Slider>
+              </Tooltip>
+            </Box>
+            
+            {/* Music Toggle with Animated Bars */}
+            <Button
+              size="sm"
+              onClick={toggleMusic}
+              color="#001f3f"
+              _hover={{ bg: "rgba(0, 31, 63, 0.1)" }}
+              bg="transparent"
+              borderRadius="full"
+              minW="32px"
+              h="32px"
+              p={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Box display="flex" alignItems="end" gap="1px" height="16px">
+                {/* Music bars that animate based on music state */}
+                <Box
+                  width="3px"
+                  height="8px"
+                  bg={musicEnabled ? "#001f3f" : "#ccc"}
+                  borderRadius="1px"
+                  opacity={musicEnabled ? 1 : 0.5}
+                  transition="all 0.2s ease"
+                  sx={musicEnabled ? {
+                    animation: "musicBar1 1s ease-in-out infinite alternate",
+                    "@keyframes musicBar1": {
+                      "0%": { height: "8px" },
+                      "100%": { height: "12px" }
+                    }
+                  } : {}}
+                />
+                <Box
+                  width="3px"
+                  height="12px"
+                  bg={musicEnabled ? "#001f3f" : "#ccc"}
+                  borderRadius="1px"
+                  opacity={musicEnabled ? 1 : 0.5}
+                  transition="all 0.2s ease"
+                  sx={musicEnabled ? {
+                    animation: "musicBar2 1s ease-in-out infinite alternate",
+                    animationDelay: "0.2s",
+                    "@keyframes musicBar2": {
+                      "0%": { height: "12px" },
+                      "100%": { height: "16px" }
+                    }
+                  } : {}}
+                />
+                <Box
+                  width="3px"
+                  height="6px"
+                  bg={musicEnabled ? "#001f3f" : "#ccc"}
+                  borderRadius="1px"
+                  opacity={musicEnabled ? 1 : 0.5}
+                  transition="all 0.2s ease"
+                  sx={musicEnabled ? {
+                    animation: "musicBar3 1s ease-in-out infinite alternate",
+                    animationDelay: "0.4s",
+                    "@keyframes musicBar3": {
+                      "0%": { height: "6px" },
+                      "100%": { height: "10px" }
+                    }
+                  } : {}}
+                />
+                <Box
+                  width="3px"
+                  height="10px"
+                  bg={musicEnabled ? "#001f3f" : "#ccc"}
+                  borderRadius="1px"
+                  opacity={musicEnabled ? 1 : 0.5}
+                  transition="all 0.2s ease"
+                  sx={musicEnabled ? {
+                    animation: "musicBar4 1s ease-in-out infinite alternate",
+                    animationDelay: "0.6s",
+                    "@keyframes musicBar4": {
+                      "0%": { height: "10px" },
+                      "100%": { height: "14px" }
+                    }
+                  } : {}}
+                />
+              </Box>
+            </Button>
+          </HStack>
+        </VStack>
       </Box>
 
       {/* 3D Scene */}
@@ -399,6 +572,7 @@ const WhackAMole: React.FC<WhackAMoleProps> = ({
         onMoleHit={handleMoleHit}
         config={config}
         gameActive={gameStarted && !gameOver}
+        onMolePopUp={playMolePopUpSound}
       />
 
       {/* Countdown Display */}

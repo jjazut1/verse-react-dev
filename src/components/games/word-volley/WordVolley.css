@@ -421,8 +421,8 @@
   }
 
   .canvas-container {
-    padding: 10px;
-    min-height: 400px;
+    padding: 10px !important;
+    min-height: auto !important;
   }
 
   .game-canvas {
@@ -492,8 +492,7 @@
   }
 
   .canvas-container {
-    min-height: 350px;
-    padding: 8px;
+    padding: 8px !important;
   }
 
   .instruction-item {
@@ -535,6 +534,53 @@
     align-items: center !important;
     text-align: center !important;
   }
+}
+
+/* Enhanced responsive canvas container */
+.canvas-container {
+  position: relative;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  background: #f8f9fa !important;
+  border-radius: 0 0 12px 12px !important;
+  overflow: visible !important;
+  min-height: 300px;
+  max-width: 100%;
+}
+
+/* Responsive game canvas */
+.game-canvas {
+  display: block;
+  margin: 0 auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  touch-action: none;
+  user-select: none;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+  
+  /* Optimize text rendering for crisp, non-fuzzy text */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  backface-visibility: hidden;
+  
+  /* Ensure pixel-perfect rendering for moving elements */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  
+  /* Force hardware acceleration with GPU layer promotion */
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  transform-origin: center center;
+  
+  /* Responsive sizing */
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
 }
 
 /* Touch-specific enhancements */

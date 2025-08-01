@@ -78,41 +78,66 @@ export const PWAGameHeader: React.FC<PWAGameHeaderProps> = ({
 
   if (variant === 'compact') {
     return (
-      <HStack spacing={2} justify="space-between" w="full" p={1}>
-        <HStack spacing={2}>
-          {showBackButton && (
-            <Tooltip label="Go Back" placement="bottom">
-              <IconButton
-                aria-label="Go back"
-                icon={<ArrowBackIcon />}
-                size={buttonSize}
-                variant="ghost"
-                onClick={handleBack}
-                colorScheme="blue"
-              />
-            </Tooltip>
-          )}
-          <Text fontSize={titleSize} fontWeight="bold" color="blue.600">
-            {gameTitle}
-          </Text>
+      <Box 
+        w="full" 
+        bg="white" 
+        boxShadow="sm"
+        borderBottom="1px solid"
+        borderColor="gray.200"
+        px={{ base: 3, md: 4 }}
+        py={{ base: 2, md: 3 }}
+        position="sticky"
+        top={0}
+        zIndex={10}
+        // PWA safe area handling
+        paddingTop={isPWA ? 'max(8px, env(safe-area-inset-top))' : undefined}
+        paddingLeft={isPWA ? 'max(12px, env(safe-area-inset-left))' : undefined}
+        paddingRight={isPWA ? 'max(12px, env(safe-area-inset-right))' : undefined}
+      >
+        <HStack spacing={{ base: 2, md: 3 }} justify="space-between" w="full">
+          <HStack spacing={{ base: 1, md: 2 }} flex={1} minW={0}>
+            {showBackButton && (
+              <Tooltip label="Go Back" placement="bottom">
+                <IconButton
+                  aria-label="Go back"
+                  icon={<ArrowBackIcon />}
+                  size={buttonSize}
+                  variant="ghost"
+                  onClick={handleBack}
+                  colorScheme="blue"
+                  flexShrink={0}
+                />
+              </Tooltip>
+            )}
+            <Text 
+              fontSize={titleSize} 
+              fontWeight="bold" 
+              color="blue.600"
+              noOfLines={1}
+              flex={1}
+            >
+              {gameTitle}
+            </Text>
+          </HStack>
+          
+          <HStack spacing={{ base: 1, md: 2 }} flexShrink={0}>
+            {children}
+            {showHomeButton && (
+              <Tooltip label={getHomeTooltip()} placement="bottom">
+                <IconButton
+                  aria-label="Go to dashboard"
+                  icon={<span>🏠</span>}
+                  size={buttonSize}
+                  colorScheme="blue"
+                  variant="solid"
+                  onClick={handleHome}
+                  flexShrink={0}
+                />
+              </Tooltip>
+            )}
+          </HStack>
         </HStack>
-        
-        <HStack spacing={2}>
-          {children}
-          {showHomeButton && (
-            <Tooltip label={getHomeTooltip()} placement="bottom">
-              <IconButton
-                aria-label="Go to dashboard"
-                icon={<span>🏠</span>}
-                size={buttonSize}
-                colorScheme="blue"
-                variant="solid"
-                onClick={handleHome}
-              />
-            </Tooltip>
-          )}
-        </HStack>
-      </HStack>
+      </Box>
     );
   }
 
