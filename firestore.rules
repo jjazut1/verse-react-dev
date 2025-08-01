@@ -536,5 +536,36 @@ service cloud.firestore {
       // Allow cleanup - anyone can delete results after use
       allow delete: if true;
     }
+
+    // Game Sessions collection - for real-time session sync
+    match /gameSessions/{sessionId} {
+      // Allow teachers to create sessions
+      allow create: if isAuthenticated() && isTeacherOrAdmin();
+      
+      // Allow participants to read their sessions
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.session.teacherId ||
+         request.auth.uid == resource.data.session.studentId ||
+         isTeacherOrAdmin());
+      
+      // Allow participants to update sessions
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == resource.data.session.teacherId ||
+         request.auth.uid == resource.data.session.studentId) &&
+        // Ensure users can only update their own participation data
+        (request.auth.uid == resource.data.session.teacherId ? 
+          true : 
+          // Students can only update student-specific fields
+          !('session.teacherId' in request.resource.data) &&
+          !('session.isTeacherControlled' in request.resource.data));
+      
+      // Only teachers can delete sessions
+      allow delete: if isAuthenticated() && 
+        (request.auth.uid == resource.data.session.teacherId ||
+         isAdmin());
+      
+      // Allow listing sessions for teachers/admins
+      allow list: if isAuthenticated() && isTeacherOrAdmin();
+    }
   }
 } 
