@@ -115,9 +115,48 @@ const NameItComponent: React.FC<NameItProps> = ({
   
   const gameLogic = useGameLogic(gameLogicProps);
 
-  // ✅ SAFETY: Ensure gameLogic is valid before rendering
-  if (!gameLogic || !gameLogic.gameState) {
-    console.warn('⚠️ NAMEIT: gameLogic is incomplete, skipping render');
+  // ✅ SAFETY: Comprehensive validation before rendering
+  if (!gameLogic) {
+    console.warn('⚠️ NAMEIT: gameLogic is null/undefined, skipping render');
+    return null;
+  }
+  
+  if (!gameLogic.gameState) {
+    console.warn('⚠️ NAMEIT: gameLogic.gameState is missing, skipping render');
+    return null;
+  }
+  
+  // ✅ SAFETY: Check for required methods and properties
+  if (typeof gameLogic.handleIconClick !== 'function' ||
+      typeof gameLogic.startGame !== 'function' ||
+      typeof gameLogic.resetGame !== 'function' ||
+      typeof gameLogic.pauseGame !== 'function' ||
+      typeof gameLogic.resumeGame !== 'function' ||
+      typeof gameLogic.enableMultiplayer !== 'function' ||
+      typeof gameLogic.disableMultiplayer !== 'function' ||
+      typeof gameLogic.createRoom !== 'function' ||
+      typeof gameLogic.joinRoom !== 'function' ||
+      typeof gameLogic.setShowHighScoreModal !== 'function') {
+    console.warn('⚠️ NAMEIT: Missing required methods, skipping render');
+    return null;
+  }
+  
+  // ✅ SAFETY: Check for required properties 
+  if (typeof gameLogic.timeLeft !== 'number' || 
+      typeof gameLogic.formattedTimeLeft !== 'string' ||
+      typeof gameLogic.isGameActive !== 'boolean' ||
+      typeof gameLogic.isMultiplayerEnabled !== 'boolean' ||
+      typeof gameLogic.connectionStatus !== 'string' ||
+      typeof gameLogic.currentPlayerScore !== 'number') {
+    console.warn('⚠️ NAMEIT: gameLogic has invalid property types, skipping render');
+    console.warn('Debug info:', {
+      timeLeft: typeof gameLogic.timeLeft,
+      formattedTimeLeft: typeof gameLogic.formattedTimeLeft,
+      isGameActive: typeof gameLogic.isGameActive,
+      isMultiplayerEnabled: typeof gameLogic.isMultiplayerEnabled,
+      connectionStatus: typeof gameLogic.connectionStatus,
+      currentPlayerScore: typeof gameLogic.currentPlayerScore
+    });
     return null;
   }
 

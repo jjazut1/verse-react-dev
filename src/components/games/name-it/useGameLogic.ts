@@ -133,6 +133,12 @@ export const useGameLogic = ({
       console.log('🎮 Applied difficulty settings:', difficulty, '→', difficultySettings.gameTime, 'seconds');
     }
     
+    // ✅ SAFETY: Ensure iconSet is not empty
+    if (!mergedConfig.iconSet || mergedConfig.iconSet.length === 0) {
+      console.warn('⚠️ USEGAMELOGIC: IconSet is empty, using default icons');
+      mergedConfig.iconSet = DEFAULT_ICONS;
+    }
+    
     console.log('🎮 Initializing game config:');
     console.log('🔍 Final config gameTime:', mergedConfig.gameTime, 'seconds');
     console.log('🔍 Difficulty level:', mergedConfig.difficulty);
