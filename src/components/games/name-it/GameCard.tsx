@@ -89,6 +89,36 @@ export const GameCard: React.FC<GameCardProps> = ({
   matchedIconId,
   showAnimation = false
 }) => {
+  // ✅ SAFETY: Validate card and icons before rendering
+  if (!card || !card.icons || !Array.isArray(card.icons) || card.icons.length === 0) {
+    console.warn('⚠️ GAMECARD: Invalid card or empty icons, skipping render:', {
+      hasCard: !!card,
+      hasIcons: !!card?.icons,
+      isArray: Array.isArray(card?.icons),
+      length: card?.icons?.length || 0
+    });
+    return (
+      <Box
+        position="absolute"
+        top="50%"
+        left="50%"
+        transform="translate(-50%, -50%)"
+        width="200px"
+        height="200px"
+        borderRadius="50%"
+        border="2px dashed"
+        borderColor="gray.300"
+        backgroundColor="gray.50"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Text fontSize="sm" color="gray.500" textAlign="center">
+          Loading card...
+        </Text>
+      </Box>
+    );
+  }
 
   // Memoize icon positions to prevent constant recalculation with new random values
   const iconPositions = useMemo(() => {

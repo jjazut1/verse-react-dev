@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useEffect } from 'react';
-import { Box, VStack } from '@chakra-ui/react';
+import { Box, VStack, Text } from '@chakra-ui/react';
 import { PWAGameHeader } from '../PWAGameHeader';
 import { HighScoreModal } from '../../common/HighScoreModal';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -129,13 +129,21 @@ const NameItComponent: React.FC<NameItProps> = ({
   // ✅ SAFETY: Check if config exists and has iconSet
   if (!gameLogic.config) {
     console.warn('⚠️ NAMEIT: gameLogic.config is missing, skipping render');
-    return null;
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="400px">
+        <Text>Loading game configuration...</Text>
+      </Box>
+    );
   }
   
   if (!gameLogic.config.iconSet || gameLogic.config.iconSet.length === 0) {
     console.warn('⚠️ NAMEIT: gameLogic.config.iconSet is empty or missing, skipping render');
     console.warn('Debug config:', gameLogic.config);
-    return null;
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="400px">
+        <Text>Loading game icons...</Text>
+      </Box>
+    );
   }
   
   // ✅ SAFETY: Check for required methods and properties

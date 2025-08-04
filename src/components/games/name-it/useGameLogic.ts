@@ -136,9 +136,15 @@ export const useGameLogic = ({
   
   const { currentUser } = useAuth();
   
-  // ✅ STABILITY FIX: Use useRef for one-time config initialization
+  // ✅ ENHANCED SAFETY: Robust config initialization with multiple fallbacks
   const configRef = useRef<GameConfig>();
   if (!configRef.current) {
+    console.log('🔧 USEGAMELOGIC: Initial config setup with:', { 
+      hasInitialConfig: !!initialConfig,
+      initialConfigIconSetLength: initialConfig?.iconSet?.length || 0,
+      defaultIconsLength: DEFAULT_ICONS.length
+    });
+    
     const mergedConfig = {
       ...DEFAULT_CONFIG,
       ...initialConfig
@@ -152,16 +158,40 @@ export const useGameLogic = ({
       console.log('🎮 Applied difficulty settings:', difficulty, '→', difficultySettings.gameTime, 'seconds');
     }
     
-    // ✅ SAFETY: Ensure iconSet is not empty
-    if (!mergedConfig.iconSet || mergedConfig.iconSet.length === 0) {
-      console.warn('⚠️ USEGAMELOGIC: IconSet is empty, using default icons');
-      mergedConfig.iconSet = DEFAULT_ICONS;
+    // ✅ ENHANCED SAFETY: Multiple layers of iconSet validation
+    if (!mergedConfig.iconSet || !Array.isArray(mergedConfig.iconSet) || mergedConfig.iconSet.length === 0) {
+      console.warn('⚠️ USEGAMELOGIC: IconSet is invalid/empty, using default icons');
+      console.warn('📋 IconSet debug:', {
+        exists: !!mergedConfig.iconSet,
+        isArray: Array.isArray(mergedConfig.iconSet),
+        length: mergedConfig.iconSet?.length || 0
+      });
+      mergedConfig.iconSet = [...DEFAULT_ICONS]; // Use spread to create new array reference
+    }
+    
+    // ✅ SAFETY: Validate all icons in the set
+    const validIcons = mergedConfig.iconSet.filter(icon => 
+      icon && typeof icon === 'object' && icon.id && icon.html && icon.dataIcon
+    );
+    
+    if (validIcons.length !== mergedConfig.iconSet.length) {
+      console.warn('⚠️ USEGAMELOGIC: Some icons are invalid, filtered:', {
+        original: mergedConfig.iconSet.length,
+        valid: validIcons.length
+      });
+      mergedConfig.iconSet = validIcons;
+    }
+    
+    if (validIcons.length === 0) {
+      console.error('🚨 USEGAMELOGIC: No valid icons found, using DEFAULT_ICONS as final fallback');
+      mergedConfig.iconSet = [...DEFAULT_ICONS];
     }
     
     console.log('🎮 Initializing game config:');
     console.log('🔍 Final config gameTime:', mergedConfig.gameTime, 'seconds');
     console.log('🔍 Difficulty level:', mergedConfig.difficulty);
     console.log('🔍 IconSet length:', mergedConfig.iconSet?.length || 0);
+    console.log('🔍 First 3 icons:', mergedConfig.iconSet.slice(0, 3).map(i => i.id));
     configRef.current = mergedConfig;
   }
   const config = configRef.current;
