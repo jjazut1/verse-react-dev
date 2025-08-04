@@ -64,6 +64,24 @@ export const useGameLogic = ({
   configId = 'default'
 }: UseGameLogicProps): UseGameLogicReturn => {
   
+  // ✅ CRITICAL FIX: Validate and fix iconSet IMMEDIATELY before any other logic
+  const safeInitialConfig = useMemo(() => {
+    const config = { ...initialConfig };
+    
+    // Immediate iconSet validation and fallback
+    if (!config.iconSet || !Array.isArray(config.iconSet) || config.iconSet.length === 0) {
+      console.warn('🚨 CRITICAL: IconSet is invalid/empty, applying DEFAULT_ICONS immediately:', {
+        exists: !!config.iconSet,
+        isArray: Array.isArray(config.iconSet),
+        length: config.iconSet?.length || 0
+      });
+      config.iconSet = [...DEFAULT_ICONS];
+    }
+    
+    console.log('✅ SAFE CONFIG: IconSet validated with', config.iconSet.length, 'icons');
+    return config;
+  }, [initialConfig]);
+  
   // Track useGameLogic reinitializations
   const gameLogicInstanceId = useRef(Math.random().toString(36).substring(2, 8));
   const gameLogicInitCountRef = useRef(0);
@@ -82,26 +100,31 @@ export const useGameLogic = ({
   const currentDepsKey = JSON.stringify({
     configId,
     playerName,
-    initialConfigId: initialConfig?.id,
-    enableWebRTC: initialConfig?.enableWebRTC,
-    gameTime: initialConfig?.gameTime
+    initialConfigId: safeInitialConfig?.id,
+    enableWebRTC: safeInitialConfig?.enableWebRTC,
+    gameTime: safeInitialConfig?.gameTime
   });
   
   if (lastDepsRef.current === currentDepsKey && lastResultRef.current && gameLogicInitCountRef.current > 1) {
     // ✅ SAFETY: Validate cached result before returning it
     const cachedResult = lastResultRef.current;
-    if (cachedResult.config && 
+    const isValidCachedResult = cachedResult.config && 
         cachedResult.gameState && 
         cachedResult.config.iconSet && 
-        cachedResult.config.iconSet.length > 0 &&
+        Array.isArray(cachedResult.config.iconSet) &&
+        cachedResult.config.iconSet.length >= 57 && // Ensure we have the full DEFAULT_ICONS set
         typeof cachedResult.startGame === 'function' &&
-        typeof cachedResult.handleIconClick === 'function') {
-      console.log('⚡ STABILITY GUARD: Returning cached useGameLogic result (deps unchanged)');
+        typeof cachedResult.handleIconClick === 'function';
+        
+    if (isValidCachedResult) {
+      console.log('⚡ STABILITY GUARD: Returning cached useGameLogic result (deps unchanged, iconSet valid)');
       return cachedResult;
     } else {
       console.warn('⚠️ STABILITY GUARD: Cached result is incomplete, regenerating:', {
         hasConfig: !!cachedResult.config,
         hasGameState: !!cachedResult.gameState,
+        iconSetExists: !!cachedResult.config?.iconSet,
+        iconSetIsArray: Array.isArray(cachedResult.config?.iconSet),
         iconSetLength: cachedResult.config?.iconSet?.length || 0,
         hasStartGame: typeof cachedResult.startGame === 'function',
         hasHandleIconClick: typeof cachedResult.handleIconClick === 'function'
@@ -114,8 +137,9 @@ export const useGameLogic = ({
   // ✅ DEBUGGING: Track input props to see what's changing with detailed identity checks
   useEffect(() => {
     console.log('🧪 USEGAMELOGIC: Props changed - detailed analysis:', {
-      initialConfig,
-      initialConfigId: initialConfig?.id,
+      safeInitialConfig,
+      initialConfigId: safeInitialConfig?.id,
+      iconSetLength: safeInitialConfig?.iconSet?.length || 0,
       playerName,
       configId,
       onGameComplete: !!onGameComplete,
@@ -127,7 +151,7 @@ export const useGameLogic = ({
         onHighScoreProcessCompleteRef: onHighScoreProcessComplete?.toString().substring(0, 50)
       }
     });
-  }, [initialConfig, playerName, configId, onGameComplete, onHighScoreProcessStart, onHighScoreProcessComplete]);
+  }, [safeInitialConfig, playerName, configId, onGameComplete, onHighScoreProcessStart, onHighScoreProcessComplete]);
   
   // ✅ STABILITY FIX: Track hook stability
   useEffect(() => {
@@ -140,14 +164,14 @@ export const useGameLogic = ({
   const configRef = useRef<GameConfig>();
   if (!configRef.current) {
     console.log('🔧 USEGAMELOGIC: Initial config setup with:', { 
-      hasInitialConfig: !!initialConfig,
-      initialConfigIconSetLength: initialConfig?.iconSet?.length || 0,
+      hasSafeInitialConfig: !!safeInitialConfig,
+      safeInitialConfigIconSetLength: safeInitialConfig?.iconSet?.length || 0,
       defaultIconsLength: DEFAULT_ICONS.length
     });
     
     const mergedConfig = {
       ...DEFAULT_CONFIG,
-      ...initialConfig
+      ...safeInitialConfig
     };
     
     // Apply difficulty settings to game time
@@ -158,34 +182,13 @@ export const useGameLogic = ({
       console.log('🎮 Applied difficulty settings:', difficulty, '→', difficultySettings.gameTime, 'seconds');
     }
     
-    // ✅ ENHANCED SAFETY: Multiple layers of iconSet validation
-    if (!mergedConfig.iconSet || !Array.isArray(mergedConfig.iconSet) || mergedConfig.iconSet.length === 0) {
-      console.warn('⚠️ USEGAMELOGIC: IconSet is invalid/empty, using default icons');
-      console.warn('📋 IconSet debug:', {
-        exists: !!mergedConfig.iconSet,
-        isArray: Array.isArray(mergedConfig.iconSet),
-        length: mergedConfig.iconSet?.length || 0
-      });
-      mergedConfig.iconSet = [...DEFAULT_ICONS]; // Use spread to create new array reference
-    }
-    
-    // ✅ SAFETY: Validate all icons in the set
-    const validIcons = mergedConfig.iconSet.filter(icon => 
-      icon && typeof icon === 'object' && icon.id && icon.html && icon.dataIcon
-    );
-    
-    if (validIcons.length !== mergedConfig.iconSet.length) {
-      console.warn('⚠️ USEGAMELOGIC: Some icons are invalid, filtered:', {
-        original: mergedConfig.iconSet.length,
-        valid: validIcons.length
-      });
-      mergedConfig.iconSet = validIcons;
-    }
-    
-    if (validIcons.length === 0) {
-      console.error('🚨 USEGAMELOGIC: No valid icons found, using DEFAULT_ICONS as final fallback');
+    // ✅ IconSet should already be validated by safeInitialConfig, but double-check
+    if (!mergedConfig.iconSet || mergedConfig.iconSet.length === 0) {
+      console.error('🚨 CRITICAL: IconSet still empty after safeInitialConfig! Using DEFAULT_ICONS emergency fallback');
       mergedConfig.iconSet = [...DEFAULT_ICONS];
     }
+    
+    console.log('✅ CONFIG VALIDATED: IconSet has', mergedConfig.iconSet.length, 'icons');
     
     console.log('🎮 Initializing game config:');
     console.log('🔍 Final config gameTime:', mergedConfig.gameTime, 'seconds');
