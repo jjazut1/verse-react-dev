@@ -115,6 +115,12 @@ const NameItComponent: React.FC<NameItProps> = ({
   
   const gameLogic = useGameLogic(gameLogicProps);
 
+  // ✅ SAFETY: Ensure gameLogic is valid before rendering
+  if (!gameLogic || !gameLogic.gameState) {
+    console.warn('⚠️ NAMEIT: gameLogic is incomplete, skipping render');
+    return null;
+  }
+
   const localPlayerId = currentUser?.uid || 'local-player';
 
   return (
@@ -166,7 +172,7 @@ const NameItComponent: React.FC<NameItProps> = ({
         highScores={gameLogic.highScores}
         scoringSystem="points-based"
         gameTitle="Name It"
-        timeElapsed={gameLogic.config.gameTime - gameLogic.timeLeft}
+        timeElapsed={(gameLogic.config?.gameTime || 0) - gameLogic.timeLeft}
         additionalStats={[
           { 
             label: 'Matches Found', 
@@ -180,7 +186,7 @@ const NameItComponent: React.FC<NameItProps> = ({
           },
           { 
             label: 'Difficulty', 
-            value: gameLogic.config.difficulty, 
+            value: gameLogic.config?.difficulty || 'unknown', 
             colorScheme: 'purple' 
           }
         ]}
