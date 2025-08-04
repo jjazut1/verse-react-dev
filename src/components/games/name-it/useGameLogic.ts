@@ -88,8 +88,27 @@ export const useGameLogic = ({
   });
   
   if (lastDepsRef.current === currentDepsKey && lastResultRef.current && gameLogicInitCountRef.current > 1) {
-    console.log('⚡ STABILITY GUARD: Returning cached useGameLogic result (deps unchanged)');
-    return lastResultRef.current;
+    // ✅ SAFETY: Validate cached result before returning it
+    const cachedResult = lastResultRef.current;
+    if (cachedResult.config && 
+        cachedResult.gameState && 
+        cachedResult.config.iconSet && 
+        cachedResult.config.iconSet.length > 0 &&
+        typeof cachedResult.startGame === 'function' &&
+        typeof cachedResult.handleIconClick === 'function') {
+      console.log('⚡ STABILITY GUARD: Returning cached useGameLogic result (deps unchanged)');
+      return cachedResult;
+    } else {
+      console.warn('⚠️ STABILITY GUARD: Cached result is incomplete, regenerating:', {
+        hasConfig: !!cachedResult.config,
+        hasGameState: !!cachedResult.gameState,
+        iconSetLength: cachedResult.config?.iconSet?.length || 0,
+        hasStartGame: typeof cachedResult.startGame === 'function',
+        hasHandleIconClick: typeof cachedResult.handleIconClick === 'function'
+      });
+      // Clear invalid cached result and regenerate
+      lastResultRef.current = null;
+    }
   }
   
   // ✅ DEBUGGING: Track input props to see what's changing with detailed identity checks

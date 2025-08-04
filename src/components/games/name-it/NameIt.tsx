@@ -126,6 +126,18 @@ const NameItComponent: React.FC<NameItProps> = ({
     return null;
   }
   
+  // ✅ SAFETY: Check if config exists and has iconSet
+  if (!gameLogic.config) {
+    console.warn('⚠️ NAMEIT: gameLogic.config is missing, skipping render');
+    return null;
+  }
+  
+  if (!gameLogic.config.iconSet || gameLogic.config.iconSet.length === 0) {
+    console.warn('⚠️ NAMEIT: gameLogic.config.iconSet is empty or missing, skipping render');
+    console.warn('Debug config:', gameLogic.config);
+    return null;
+  }
+  
   // ✅ SAFETY: Check for required methods and properties
   if (typeof gameLogic.handleIconClick !== 'function' ||
       typeof gameLogic.startGame !== 'function' ||
