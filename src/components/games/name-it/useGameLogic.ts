@@ -117,8 +117,7 @@ export const useGameLogic = ({
         typeof cachedResult.handleIconClick === 'function';
         
     if (isValidCachedResult) {
-      console.log('⚡ STABILITY GUARD: Returning cached useGameLogic result (deps unchanged, iconSet valid)');
-      return cachedResult;
+      console.log('⚡ STABILITY GUARD: Deps unchanged and cached result valid, but continuing execution to maintain hook consistency');
     } else {
       console.warn('⚠️ STABILITY GUARD: Cached result is incomplete, regenerating:', {
         hasConfig: !!cachedResult.config,

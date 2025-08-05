@@ -89,9 +89,20 @@ export const GameCard: React.FC<GameCardProps> = ({
   matchedIconId,
   showAnimation = false
 }) => {
-  // ✅ SAFETY: Validate card and icons before rendering
+  // ✅ CRITICAL FIX: Call ALL hooks BEFORE any early returns
+  const iconPositions = useMemo(() => {
+    // Handle invalid card case in the memoization logic
+    if (!card || !card.icons || !Array.isArray(card.icons) || card.icons.length === 0) {
+      console.warn('⚠️ GAMECARD: Invalid card in useMemo, returning empty positions');
+      return [];
+    }
+    console.log(`🎴 Calculating stable positions for card ${card.id}`);
+    return calculateIconPositions(card.icons);
+  }, [card?.id, card?.icons]);
+
+  // ✅ SAFETY: After ALL hooks are called, now we can do conditional rendering
   if (!card || !card.icons || !Array.isArray(card.icons) || card.icons.length === 0) {
-    console.warn('⚠️ GAMECARD: Invalid card or empty icons, skipping render:', {
+    console.warn('⚠️ GAMECARD: Invalid card or empty icons, showing fallback:', {
       hasCard: !!card,
       hasIcons: !!card?.icons,
       isArray: Array.isArray(card?.icons),
@@ -119,12 +130,6 @@ export const GameCard: React.FC<GameCardProps> = ({
       </Box>
     );
   }
-
-  // Memoize icon positions to prevent constant recalculation with new random values
-  const iconPositions = useMemo(() => {
-    console.log(`🎴 Calculating stable positions for card ${card.id}`);
-    return calculateIconPositions(card.icons);
-  }, [card.id, card.icons]);
   
   const getCardPosition = () => {
     switch (card.position) {

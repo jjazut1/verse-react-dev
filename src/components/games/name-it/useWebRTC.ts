@@ -56,9 +56,11 @@ export const useWebRTC = ({
     hasGameState: !!gameState
   });
   
+  // ✅ CRITICAL FIX: Removed stability guard early return to prevent Rules of Hooks violation
+  // The early return was skipping 20+ hooks, causing "Rendered fewer hooks than expected"
+  // Stability is now handled by stable props from calling components
   if (lastWebRTCDepsRef.current === currentWebRTCDepsKey && lastWebRTCResultRef.current && initCountRef.current > 1) {
-    console.log('⚡ STABILITY GUARD: Returning cached useWebRTC result (deps unchanged)');
-    return lastWebRTCResultRef.current;
+    console.log('⚡ STABILITY GUARD: Deps unchanged, but continuing execution to maintain hook consistency');
   }
   
   // ✅ DEBUGGING: Track input props to see what's changing with detailed identity checks
