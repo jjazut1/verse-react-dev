@@ -116,7 +116,22 @@ export const GameArea: React.FC<GameAreaProps> = ({
     onIconClickType: typeof onIconClick
   });
 
-  // ✅ SAFETY: Ensure gameState and cards exist
+  // ✅ CRITICAL FIX: Call ALL hooks BEFORE any early returns
+  const localPlayer = useMemo(() => {
+    if (!localPlayerId || !gameState?.players || gameState.players.length === 0) {
+      return undefined;
+    }
+    return gameState.players.find(p => String(p.id) === String(localPlayerId));
+  }, [gameState?.players, localPlayerId]);
+  
+  const remotePlayer = useMemo(() => {
+    if (!gameState?.players) {
+      return undefined;
+    }
+    return gameState.players.find(p => String(p.id) !== String(localPlayerId));
+  }, [gameState?.players, localPlayerId]);
+
+  // ✅ SAFETY: After ALL hooks are called, now we can do conditional rendering
   if (!gameState || !gameState.cards || !Array.isArray(gameState.cards)) {
     console.error('🚨 GAMEAREA: Invalid gameState or cards array:', {
       hasGameState: !!gameState,
@@ -134,18 +149,6 @@ export const GameArea: React.FC<GameAreaProps> = ({
   const centerCard = gameState.cards.find(c => c.position === 'center');
   const player1Card = gameState.cards.find(c => c.position === 'player1');
   const player2Card = gameState.cards.find(c => c.position === 'player2');
-  
-  // Find local and remote players
-  const localPlayer = useMemo(() => {
-    if (!localPlayerId || gameState.players.length === 0) {
-      return undefined;
-    }
-    return gameState.players.find(p => String(p.id) === String(localPlayerId));
-  }, [gameState.players, localPlayerId]);
-  
-  const remotePlayer = useMemo(() => {
-    return gameState.players.find(p => String(p.id) !== String(localPlayerId));
-  }, [gameState.players, localPlayerId]);
   
   // Create separate handlers for each player card
   const handlePlayer1IconClick = (iconId: string) => {
