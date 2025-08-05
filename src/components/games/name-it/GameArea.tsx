@@ -96,6 +96,41 @@ export const GameArea: React.FC<GameAreaProps> = ({
   formattedTime,
   isGameActive
 }) => {
+  // ✅ CRITICAL: Validate GameArea props to catch React Error #300
+  console.log('🔍 GAMEAREA: Rendering with props:', {
+    hasGameState: !!gameState,
+    gameStateType: typeof gameState,
+    hasCards: !!gameState?.cards,
+    cardsLength: gameState?.cards?.length,
+    cardsIsArray: Array.isArray(gameState?.cards),
+    hasPlayers: !!gameState?.players,
+    playersLength: gameState?.players?.length,
+    playersIsArray: Array.isArray(gameState?.players),
+    localPlayerId,
+    timeLeft,
+    timeLeftType: typeof timeLeft,
+    formattedTime,
+    formattedTimeType: typeof formattedTime,
+    isGameActive,
+    isGameActiveType: typeof isGameActive,
+    onIconClickType: typeof onIconClick
+  });
+
+  // ✅ SAFETY: Ensure gameState and cards exist
+  if (!gameState || !gameState.cards || !Array.isArray(gameState.cards)) {
+    console.error('🚨 GAMEAREA: Invalid gameState or cards array:', {
+      hasGameState: !!gameState,
+      hasCards: !!gameState?.cards,
+      cardsType: typeof gameState?.cards,
+      cardsIsArray: Array.isArray(gameState?.cards)
+    });
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="400px">
+        <Text>Loading game area...</Text>
+      </Box>
+    );
+  }
+
   const centerCard = gameState.cards.find(c => c.position === 'center');
   const player1Card = gameState.cards.find(c => c.position === 'player1');
   const player2Card = gameState.cards.find(c => c.position === 'player2');

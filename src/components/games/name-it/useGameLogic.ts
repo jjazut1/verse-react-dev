@@ -951,43 +951,133 @@ export const useGameLogic = ({
   const isMultiplayerEnabled = config.enableWebRTC;
   const formattedTimeLeft = formatTime(gameState.timeLeft);
 
-  const result: UseGameLogicReturn = {
-    gameState,
-    config,
+  // ✅ CRITICAL: Validate result object before returning to catch React Error #300
+  try {
+    const result: UseGameLogicReturn = {
+      gameState,
+      config,
+      
+      // Game controls
+      startGame: () => startGame(false),
+      resetGame: () => resetGame(false), 
+      pauseGame: () => pauseGame(false),
+      resumeGame: () => resumeGame(false),
+      handleIconClick,
+      
+      // WebRTC controls
+      enableMultiplayer,
+      disableMultiplayer,
+      createRoom,
+      joinRoom,
+      
+      // High score integration
+      highScores,
+      isNewHighScore,
+      showHighScoreModal,
+      setShowHighScoreModal,
+      isSubmittingScore,
+      
+      // Game info
+      timeLeft: gameState.timeLeft,
+      formattedTimeLeft,
+      currentPlayerScore,
+      isGameActive,
+      isMultiplayerEnabled,
+      connectionStatus,
+      roomId: connectionId
+    };
     
-    // Game controls
-    startGame: () => startGame(false),
-    resetGame: () => resetGame(false), 
-    pauseGame: () => pauseGame(false),
-    resumeGame: () => resumeGame(false),
-    handleIconClick,
+    // Validate critical properties
+    console.log('🔍 USEGAMELOGIC RESULT VALIDATION:', {
+      hasGameState: !!result.gameState,
+      hasConfig: !!result.config,
+      gameStateType: typeof result.gameState,
+      configType: typeof result.config,
+      timeLeft: result.timeLeft,
+      timeLeftType: typeof result.timeLeft,
+      formattedTimeLeft: result.formattedTimeLeft,
+      formattedTimeLeftType: typeof result.formattedTimeLeft,
+      currentPlayerScore: result.currentPlayerScore,
+      currentPlayerScoreType: typeof result.currentPlayerScore,
+      isGameActive: result.isGameActive,
+      isGameActiveType: typeof result.isGameActive,
+      connectionStatus: result.connectionStatus,
+      connectionStatusType: typeof result.connectionStatus,
+      handleIconClickType: typeof result.handleIconClick,
+      startGameType: typeof result.startGame
+    });
     
-    // WebRTC controls
-    enableMultiplayer,
-    disableMultiplayer,
-    createRoom,
-    joinRoom,
+    // Check for undefined critical values
+    const criticalUndefinedValues = Object.entries({
+      gameState: result.gameState,
+      config: result.config,
+      handleIconClick: result.handleIconClick,
+      startGame: result.startGame,
+      timeLeft: result.timeLeft,
+      formattedTimeLeft: result.formattedTimeLeft,
+      isGameActive: result.isGameActive,
+      connectionStatus: result.connectionStatus
+    }).filter(([key, value]) => value === undefined || value === null);
     
-    // High score integration
-    highScores,
-    isNewHighScore,
-    showHighScoreModal,
-    setShowHighScoreModal,
-    isSubmittingScore,
-    
-    // Game info
-    timeLeft: gameState.timeLeft,
-    formattedTimeLeft,
-    currentPlayerScore,
-    isGameActive,
-    isMultiplayerEnabled,
-    connectionStatus,
-    roomId: connectionId
-  };
+    if (criticalUndefinedValues.length > 0) {
+      console.error('🚨 CRITICAL: useGameLogic returning undefined values:', criticalUndefinedValues);
+    }
 
-  // ✅ STABILITY GUARD: Cache result for future early returns
-  lastDepsRef.current = currentDepsKey;
-  lastResultRef.current = result;
+    // ✅ STABILITY GUARD: Cache result for future early returns
+    lastDepsRef.current = currentDepsKey;
+    lastResultRef.current = result;
 
-  return result;
+    return result;
+    
+  } catch (hookError) {
+    const error = hookError instanceof Error ? hookError : new Error(String(hookError));
+    console.error('🚨 CRITICAL: useGameLogic crashed during execution:', error);
+    console.error('🔍 HOOK CRASH CONTEXT:', {
+      hasGameState: !!gameState,
+      hasConfig: !!config,
+      gameStateType: typeof gameState,
+      configType: typeof config,
+      stack: error.stack
+    });
+    
+    // Return safe fallback result to prevent complete crash
+    return {
+      gameState: gameState || {
+        gameStarted: false,
+        gameCompleted: false,
+        gamePaused: false,
+        timeLeft: 0,
+        currentRound: 0,
+        cards: [],
+        players: [],
+        currentPlayerId: null,
+        winner: null,
+        showHighScoreModal: false,
+        isNewHighScore: false,
+        matchFound: null
+      },
+      config: config || DEFAULT_CONFIG,
+      startGame: () => console.warn('Game crashed - startGame disabled'),
+      resetGame: () => console.warn('Game crashed - resetGame disabled'),
+      pauseGame: () => console.warn('Game crashed - pauseGame disabled'),
+      resumeGame: () => console.warn('Game crashed - resumeGame disabled'),
+      handleIconClick: () => console.warn('Game crashed - handleIconClick disabled'),
+      enableMultiplayer: () => console.warn('Game crashed - enableMultiplayer disabled'),
+      disableMultiplayer: () => console.warn('Game crashed - disableMultiplayer disabled'),
+      createRoom: async () => { console.warn('Game crashed - createRoom disabled'); return ''; },
+      joinRoom: async () => console.warn('Game crashed - joinRoom disabled'),
+      highScores: [],
+      isNewHighScore: false,
+      showHighScoreModal: false,
+      setShowHighScoreModal: () => console.warn('Game crashed - setShowHighScoreModal disabled'),
+      isSubmittingScore: false,
+      timeLeft: 0,
+      formattedTimeLeft: '00:00',
+      currentPlayerScore: 0,
+      isGameActive: false,
+      isMultiplayerEnabled: false,
+      connectionStatus: 'disconnected',
+      roomId: null
+    };
+  }
 }; 

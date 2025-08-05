@@ -113,35 +113,69 @@ const NameItComponent: React.FC<NameItProps> = ({
     });
   }, [gameLogicProps]);
   
+  // ✅ CRITICAL FIX: Call useGameLogic hook ALWAYS (no conditional returns before this)
   const gameLogic = useGameLogic(gameLogicProps);
 
-  // ✅ SAFETY: Comprehensive validation before rendering
+  // ✅ SAFETY: After ALL hooks are called, now we can do conditional rendering
+  console.log('🔍 NAMEIT: Post-hook validation - gameLogic exists:', !!gameLogic);
+  
   if (!gameLogic) {
-    console.warn('⚠️ NAMEIT: gameLogic is null/undefined, skipping render');
-    return null;
+    console.warn('⚠️ NAMEIT: gameLogic is null/undefined, showing fallback');
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="orange.500" marginBottom={4}>
+          🔧 Game Logic Loading...
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center">
+          The game is initializing. If this persists, please refresh the page.
+        </Text>
+      </Box>
+    );
   }
   
   if (!gameLogic.gameState) {
-    console.warn('⚠️ NAMEIT: gameLogic.gameState is missing, skipping render');
-    return null;
+    console.warn('⚠️ NAMEIT: gameLogic.gameState is missing, showing fallback');
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="orange.500" marginBottom={4}>
+          🔧 Game State Loading...
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center">
+          The game state is initializing. If this persists, please refresh the page.
+        </Text>
+      </Box>
+    );
   }
   
   // ✅ SAFETY: Check if config exists and has iconSet
   if (!gameLogic.config) {
-    console.warn('⚠️ NAMEIT: gameLogic.config is missing, skipping render');
+    console.warn('⚠️ NAMEIT: gameLogic.config is missing, showing fallback');
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="400px">
-        <Text>Loading game configuration...</Text>
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="orange.500" marginBottom={4}>
+          🔧 Game Configuration Loading...
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center">
+          The game configuration is loading. If this persists, please refresh the page.
+        </Text>
       </Box>
     );
   }
   
   if (!gameLogic.config.iconSet || gameLogic.config.iconSet.length === 0) {
-    console.warn('⚠️ NAMEIT: gameLogic.config.iconSet is empty or missing, skipping render');
+    console.warn('⚠️ NAMEIT: gameLogic.config.iconSet is empty or missing, showing fallback');
     console.warn('Debug config:', gameLogic.config);
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="400px">
-        <Text>Loading game icons...</Text>
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="orange.500" marginBottom={4}>
+          🔧 Game Icons Loading...
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center" marginBottom={4}>
+          The game icons are loading. This might take a moment.
+        </Text>
+        <Text fontSize="sm" color="gray.500" textAlign="center">
+          Icons available: {gameLogic.config.iconSet?.length || 0}
+        </Text>
       </Box>
     );
   }
@@ -157,8 +191,17 @@ const NameItComponent: React.FC<NameItProps> = ({
       typeof gameLogic.createRoom !== 'function' ||
       typeof gameLogic.joinRoom !== 'function' ||
       typeof gameLogic.setShowHighScoreModal !== 'function') {
-    console.warn('⚠️ NAMEIT: Missing required methods, skipping render');
-    return null;
+    console.warn('⚠️ NAMEIT: Missing required methods, showing fallback');
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="red.500" marginBottom={4}>
+          🚨 Game Methods Missing
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center">
+          Essential game functions are not available. Please refresh the page.
+        </Text>
+      </Box>
+    );
   }
   
   // ✅ SAFETY: Check for required properties 
@@ -168,7 +211,7 @@ const NameItComponent: React.FC<NameItProps> = ({
       typeof gameLogic.isMultiplayerEnabled !== 'boolean' ||
       typeof gameLogic.connectionStatus !== 'string' ||
       typeof gameLogic.currentPlayerScore !== 'number') {
-    console.warn('⚠️ NAMEIT: gameLogic has invalid property types, skipping render');
+    console.warn('⚠️ NAMEIT: gameLogic has invalid property types, showing fallback');
     console.warn('Debug info:', {
       timeLeft: typeof gameLogic.timeLeft,
       formattedTimeLeft: typeof gameLogic.formattedTimeLeft,
@@ -177,13 +220,141 @@ const NameItComponent: React.FC<NameItProps> = ({
       connectionStatus: typeof gameLogic.connectionStatus,
       currentPlayerScore: typeof gameLogic.currentPlayerScore
     });
-    return null;
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="red.500" marginBottom={4}>
+          🚨 Game Properties Invalid
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center" marginBottom={4}>
+          Game data types are incorrect. Please refresh the page.
+        </Text>
+        <Text fontSize="sm" color="gray.500" textAlign="center">
+          Check console for detailed type information.
+        </Text>
+      </Box>
+    );
+  }
+  
+  // ✅ ENHANCED SAFETY: Check JSX-specific properties that could cause React Error #300
+  if (!gameLogic.gameState.cards || !Array.isArray(gameLogic.gameState.cards)) {
+    console.warn('⚠️ NAMEIT: gameState.cards is invalid:', {
+      exists: !!gameLogic.gameState.cards,
+      isArray: Array.isArray(gameLogic.gameState.cards),
+      cardsType: typeof gameLogic.gameState.cards
+    });
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="red.500" marginBottom={4}>
+          🚨 Game Cards Invalid
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center">
+          Game card data is malformed. Please refresh the page.
+        </Text>
+      </Box>
+    );
+  }
+  
+  if (!gameLogic.gameState.players || !Array.isArray(gameLogic.gameState.players)) {
+    console.warn('⚠️ NAMEIT: gameState.players is invalid:', {
+      exists: !!gameLogic.gameState.players,
+      isArray: Array.isArray(gameLogic.gameState.players),
+      playersType: typeof gameLogic.gameState.players
+    });
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="red.500" marginBottom={4}>
+          🚨 Game Players Invalid
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center">
+          Player data is malformed. Please refresh the page.
+        </Text>
+      </Box>
+    );
+  }
+  
+  // ✅ SAFETY: Check critical JSX properties explicitly
+  if (gameLogic.showHighScoreModal === undefined || gameLogic.currentPlayerScore === undefined ||
+      gameLogic.isNewHighScore === undefined || gameLogic.highScores === undefined ||
+      gameLogic.roomId === undefined || gameLogic.isSubmittingScore === undefined) {
+    console.warn('⚠️ NAMEIT: Critical JSX properties are undefined:', {
+      showHighScoreModal: typeof gameLogic.showHighScoreModal,
+      currentPlayerScore: typeof gameLogic.currentPlayerScore,
+      isNewHighScore: typeof gameLogic.isNewHighScore,
+      highScores: typeof gameLogic.highScores,
+      roomId: typeof gameLogic.roomId,
+      isSubmittingScore: typeof gameLogic.isSubmittingScore
+    });
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="red.500" marginBottom={4}>
+          🚨 Game Properties Undefined
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center" marginBottom={4}>
+          Critical game properties are missing. Please refresh the page.
+        </Text>
+        <Text fontSize="sm" color="gray.500" textAlign="center">
+          Check console for detailed property information.
+        </Text>
+      </Box>
+    );
   }
 
   const localPlayerId = currentUser?.uid || 'local-player';
 
-  return (
-    <Box width="100vw" maxWidth="100%" overflow="hidden" height="auto" minHeight="100vh">
+  // ✅ CRITICAL: Try/catch boundary to catch React Error #300 rendering crashes
+  try {
+    console.log('🔍 RENDER ATTEMPT: Starting NameIt JSX render with:', {
+      hasGameLogic: !!gameLogic,
+      hasGameState: !!gameLogic?.gameState,
+      hasConfig: !!gameLogic?.config,
+      localPlayerId,
+      gameLogicKeys: gameLogic ? Object.keys(gameLogic) : []
+    });
+
+    // ✅ CRITICAL: Validate all JSX properties to catch React Error #300 causes
+    const jsxValidation = {
+      gameState: gameLogic.gameState,
+      gameStateType: typeof gameLogic.gameState,
+      gameStateCards: gameLogic.gameState?.cards,
+      gameStateCardsLength: gameLogic.gameState?.cards?.length,
+      gameStateCardsIsArray: Array.isArray(gameLogic.gameState?.cards),
+      
+      onIconClick: gameLogic.handleIconClick,
+      onIconClickType: typeof gameLogic.handleIconClick,
+      
+      localPlayerId,
+      localPlayerIdType: typeof localPlayerId,
+      
+      timeLeft: gameLogic.timeLeft,
+      timeLeftType: typeof gameLogic.timeLeft,
+      
+      formattedTimeLeft: gameLogic.formattedTimeLeft,
+      formattedTimeLeftType: typeof gameLogic.formattedTimeLeft,
+      
+      isGameActive: gameLogic.isGameActive,
+      isGameActiveType: typeof gameLogic.isGameActive,
+      
+      showHighScoreModal: gameLogic.showHighScoreModal,
+      showHighScoreModalType: typeof gameLogic.showHighScoreModal,
+      
+      highScores: gameLogic.highScores,
+      highScoresType: typeof gameLogic.highScores,
+      highScoresIsArray: Array.isArray(gameLogic.highScores)
+    };
+    
+    console.log('🔍 JSX VALIDATION:', jsxValidation);
+    
+    // Check for undefined values that could crash render
+    const problematicValues = Object.entries(jsxValidation).filter(([key, value]) => 
+      value === undefined || value === null
+    );
+    
+    if (problematicValues.length > 0) {
+      console.error('🚨 POTENTIAL CRASH: Found undefined/null values for JSX:', problematicValues);
+    }
+
+    return (
+      <Box width="100vw" maxWidth="100%" overflow="hidden" height="auto" minHeight="100vh">
       {/* Game Header */}
       <PWAGameHeader 
         gameTitle="Name It" 
@@ -262,6 +433,35 @@ const NameItComponent: React.FC<NameItProps> = ({
       />
     </Box>
   );
+  
+  } catch (renderError) {
+    const error = renderError instanceof Error ? renderError : new Error(String(renderError));
+    console.error('🚨 CRITICAL: NameIt render crashed with React Error #300:', error);
+    console.error('🔍 CRASH CONTEXT:', {
+      hasGameLogic: !!gameLogic,
+      hasGameState: !!gameLogic?.gameState,
+      hasConfig: !!gameLogic?.config,
+      gameLogicType: typeof gameLogic,
+      localPlayerId,
+      gameLogicKeys: gameLogic ? Object.keys(gameLogic) : [],
+      stack: error.stack
+    });
+    
+    // Return fallback UI instead of crashing
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" padding={4}>
+        <Text fontSize="xl" color="red.500" marginBottom={4}>
+          🚨 Game Render Error
+        </Text>
+        <Text fontSize="md" color="gray.600" textAlign="center" marginBottom={4}>
+          The game encountered a rendering error. This has been logged for debugging.
+        </Text>
+        <Text fontSize="sm" color="gray.500" textAlign="center">
+          Error: {error.message}
+        </Text>
+      </Box>
+    );
+  }
 };
 
 // ✅ STABILITY FIX: Smart React.memo comparison for NameIt
