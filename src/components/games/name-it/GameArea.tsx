@@ -17,13 +17,15 @@ interface PlayerScoreDisplayProps {
   isLocal: boolean;
   position: 'left' | 'right';
   matchedIconId?: string;
+  score: number;
 }
 
 const PlayerScoreDisplay: React.FC<PlayerScoreDisplayProps> = ({
   player,
   isLocal,
   position,
-  matchedIconId
+  matchedIconId,
+  score
 }) => {
   const isConnected = player.connectionStatus === 'connected';
   
@@ -57,7 +59,7 @@ const PlayerScoreDisplay: React.FC<PlayerScoreDisplayProps> = ({
       {/* Score */}
       <Box textAlign="center">
         <Text fontSize="2xl" fontWeight="bold" color="blue.600">
-          {player.score}
+          {score}
         </Text>
         <Text fontSize="xs" color="gray.500">
           matches
@@ -150,9 +152,22 @@ export const GameArea: React.FC<GameAreaProps> = ({
   const player1Card = gameState.cards.find(c => c.position === 'player1');
   const player2Card = gameState.cards.find(c => c.position === 'player2');
   
+  // 🔧 FIX: Determine which card belongs to the local player
+  // Since we have position mismatch, make both cards clickable for the local player
+  // but the handler will determine which player ID to use based on the card position
+  const isLocalPlayerGame = gameState.players.some(p => p.id === localPlayerId && p.isLocal);
+  
   // Create separate handlers for each player card
   const handlePlayer1IconClick = (iconId: string) => {
-    if (isGameActive) {
+    console.log('🎯 GAMEAREA: Player 1 icon clicked:', {
+      iconId,
+      isGameActive,
+      player1Id: gameState.players[0]?.id,
+      localPlayerId,
+      isLocalPlayerOne
+    });
+    if (isGameActive && isLocalPlayerOne) {
+      // Use Player 1's actual ID (from players[0])
       const player1Id = gameState.players[0]?.id;
       if (player1Id) {
         onIconClick(iconId, player1Id);
@@ -161,7 +176,15 @@ export const GameArea: React.FC<GameAreaProps> = ({
   };
 
   const handlePlayer2IconClick = (iconId: string) => {
-    if (isGameActive) {
+    console.log('🎯 GAMEAREA: Player 2 icon clicked:', {
+      iconId,
+      isGameActive,
+      player2Id: gameState.players[1]?.id,
+      localPlayerId,
+      isLocalPlayerTwo
+    });
+    if (isGameActive && isLocalPlayerTwo) {
+      // Use Player 2's actual ID (from players[1])
       const player2Id = gameState.players[1]?.id;
       if (player2Id) {
         onIconClick(iconId, player2Id);
@@ -173,7 +196,25 @@ export const GameArea: React.FC<GameAreaProps> = ({
   const isLocalPlayerOne = String(localPlayerId) === String(gameState.players[0]?.id);
   const isLocalPlayerTwo = String(localPlayerId) === String(gameState.players[1]?.id);
   
-
+  // 🔍 DEBUG: Log player identification and clickability
+  console.log('🎯 GAMEAREA: Player identification debug:', {
+    localPlayerId,
+    player0Id: gameState.players[0]?.id,
+    player1Id: gameState.players[1]?.id,
+    player0Name: gameState.players[0]?.name,
+    player1Name: gameState.players[1]?.name,
+    isLocalPlayerOne,
+    isLocalPlayerTwo,
+    isGameActive,
+    player1CardClickable: isLocalPlayerOne && isGameActive,
+    player2CardClickable: isLocalPlayerTwo && isGameActive,
+    playersArray: gameState.players.map(p => ({
+      id: p.id,
+      name: p.name,
+      isLocal: p.isLocal,
+      connectionStatus: p.connectionStatus
+    }))
+  });
 
   const getTimeColor = () => {
     if (timeLeft > 60) return 'green';
@@ -321,6 +362,7 @@ export const GameArea: React.FC<GameAreaProps> = ({
           isLocal={gameState.players[0].isLocal}
           position="left"
           matchedIconId={gameState.matchFound?.playerId === gameState.players[0].id ? gameState.matchFound.iconId : undefined}
+          score={gameState.scoresByPlayerId[gameState.players[0].id] || 0}
         />
       )}
 
@@ -330,6 +372,7 @@ export const GameArea: React.FC<GameAreaProps> = ({
           isLocal={gameState.players[1].isLocal}
           position="right"
           matchedIconId={gameState.matchFound?.playerId === gameState.players[1].id ? gameState.matchFound.iconId : undefined}
+          score={gameState.scoresByPlayerId[gameState.players[1].id] || 0}
         />
       )}
       

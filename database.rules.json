@@ -1,0 +1,84 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    
+    "name-it-signaling": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        
+        "participants": {
+          "$participantId": {
+            ".read": "auth != null",
+            ".write": "auth != null && auth.uid == $participantId"
+          }
+        },
+        
+        "messages": {
+          "$messageId": {
+            ".read": "auth != null", 
+            ".write": "auth != null",
+            ".validate": "newData.hasChildren(['type', 'timestamp', 'playerId']) && newData.child('timestamp').isNumber()"
+          }
+        },
+        
+        "status": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    
+    "webrtc_rooms": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        
+        "offer": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['type', 'sdp']) && newData.child('type').val() == 'offer'"
+        },
+        
+        "answer": {
+          ".read": "auth != null", 
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['type', 'sdp']) && newData.child('type').val() == 'answer'"
+        },
+        
+        "ice_candidates_host": {
+          "$candidateId": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".validate": "newData.hasChildren(['candidate', 'sdpMLineIndex', 'sdpMid'])"
+          }
+        },
+        
+        "ice_candidates_joiner": {
+          "$candidateId": {
+            ".read": "auth != null",
+            ".write": "auth != null", 
+            ".validate": "newData.hasChildren(['candidate', 'sdpMLineIndex', 'sdpMid'])"
+          }
+        },
+        
+        "fallback_messages": {
+          "$messageId": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".validate": "newData.hasChildren(['playerId', 'data', 'timestamp']) && newData.child('timestamp').isNumber()"
+          }
+        },
+        
+        "messages": {
+          "$messageId": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".validate": "newData.hasChildren(['type', 'playerId']) && newData.child('type').isString()"
+          }
+        }
+      }
+    }
+  }
+} 

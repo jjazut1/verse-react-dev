@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useEffect } from 'react';
+import React, { useMemo, useCallback, useEffect, useRef } from 'react';
 import { Box, VStack, Text } from '@chakra-ui/react';
 import { PWAGameHeader } from '../PWAGameHeader';
 import { HighScoreModal } from '../../common/HighScoreModal';
@@ -52,6 +52,57 @@ const NameItComponent: React.FC<NameItProps> = ({
       console.trace();
     };
   }, []);
+  
+  // ✅ CRITICAL: Add detailed re-render analysis with timing
+  const renderCountRef = useRef(0);
+  const lastPropsRef = useRef<any>(null);
+  const lastRenderTimeRef = useRef(Date.now());
+  
+  renderCountRef.current += 1;
+  const currentTime = Date.now();
+  const timeSinceLastRender = currentTime - lastRenderTimeRef.current;
+  lastRenderTimeRef.current = currentTime;
+  
+  const currentProps = {
+    gameConfig,
+    enableWebRTC,
+    playerName,
+    configId,
+    currentUser: currentUser?.uid,
+    onGameComplete: !!onGameComplete,
+    onHighScoreProcessStart: !!onHighScoreProcessStart,
+    onHighScoreProcessComplete: !!onHighScoreProcessComplete,
+    onGameExit: !!onGameExit
+  };
+  
+  // Detect what changed
+  const changedProps = [];
+  if (lastPropsRef.current) {
+    for (const [key, value] of Object.entries(currentProps)) {
+      if (lastPropsRef.current[key] !== value) {
+        changedProps.push({
+          prop: key,
+          old: lastPropsRef.current[key],
+          new: value
+        });
+      }
+    }
+  }
+  
+  lastPropsRef.current = currentProps;
+  
+  console.log(`🔄 NAMEIT RENDER #${renderCountRef.current} (+${timeSinceLastRender}ms):`, {
+    timestamp: new Date().toISOString(),
+    timeSinceLastRender,
+    changedProps: changedProps.length > 0 ? changedProps : 'No prop changes detected',
+    totalProps: currentProps
+  });
+  
+  // Log stack trace for rapid re-renders (< 100ms)
+  if (timeSinceLastRender < 100 && renderCountRef.current > 1) {
+    console.warn(`⚡ RAPID RE-RENDER detected (${timeSinceLastRender}ms)! Render #${renderCountRef.current}`);
+    console.trace('Stack trace for rapid re-render:');
+  }
   
   // ✅ STABILITY FIX: Component-level debugging
   useEffect(() => {

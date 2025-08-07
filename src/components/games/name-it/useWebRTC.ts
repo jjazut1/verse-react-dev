@@ -6,7 +6,7 @@ import { WEBRTC_CONFIG } from './constants';
 
 interface UseWebRTCProps {
   enabled: boolean;
-  gameState: GameState;
+  gameState: Partial<GameState>; // ✅ Made partial since useWebRTC only needs specific properties
   onGameStateReceived: (gameState: Partial<GameState>) => void;
   onPlayerAction: (action: PlayerAction) => void;
   playerId: string;
@@ -107,6 +107,13 @@ export const useWebRTC = ({
   const pendingActionsRef = useRef<PlayerAction[]>([]);
   const processedMessagesRef = useRef<Set<string>>(new Set());
   
+  // ✅ CRITICAL: ICE candidate queue for candidates received before remote description
+  const candidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
+  
+  // ✅ CRITICAL: One-time initialization guards to prevent multiple peer connections
+  const isInitializedRef = useRef(false);
+  const initializationInProgressRef = useRef(false);
+  
   // Add refs for race condition protection and direct peer connection access
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const creatingConnectionRef = useRef(false);
@@ -129,6 +136,26 @@ export const useWebRTC = ({
   // Initialize peer connection with proper cleanup
   const createPeerConnection = useCallback(() => {
     if (!enabled) return null;
+
+    // ✅ CRITICAL: One-time initialization guard to prevent multiple peer connections
+    if (initializationInProgressRef.current) {
+      console.log('⚠️ Peer connection creation already in progress, skipping...');
+      return peerConnectionRef.current;
+    }
+    
+    if (isInitializedRef.current && peerConnectionRef.current && 
+        peerConnectionRef.current.connectionState !== 'failed' && 
+        peerConnectionRef.current.connectionState !== 'closed') {
+      console.log('✅ Reusing existing healthy peer connection:', {
+        connectionState: peerConnectionRef.current.connectionState,
+        iceConnectionState: peerConnectionRef.current.iceConnectionState,
+        signalingState: peerConnectionRef.current.signalingState
+      });
+      return peerConnectionRef.current;
+    }
+    
+    initializationInProgressRef.current = true;
+    console.log('🔧 Starting peer connection initialization...');
 
     // 🧹 Clean up any existing connection first
     const oldPc = peerConnectionRef.current;
@@ -347,10 +374,20 @@ export const useWebRTC = ({
       iceGatheringCompleteRef.current = false;
       console.log('📊 ICE gathering status: RESET for new connection');
       
+      // ✅ CRITICAL: Mark initialization as complete
+      isInitializedRef.current = true;
+      initializationInProgressRef.current = false;
+      console.log('✅ Peer connection initialization completed successfully');
+      
       return pc;
     } catch (error) {
       console.error('❌ Failed to create peer connection:', error);
       peerConnectionRef.current = null;
+      
+      // ✅ CRITICAL: Reset initialization flags on error
+      initializationInProgressRef.current = false;
+      isInitializedRef.current = false;
+      
       setWebrtcState(prev => ({
         ...prev,
         lastError: `Failed to create connection: ${error}`
@@ -379,25 +416,50 @@ export const useWebRTC = ({
       }
     }, 500);
 
-    // Add timeout to detect stuck connections
+    // Add timeout to detect stuck connections with retry logic
     setTimeout(() => {
       clearInterval(stateCheckInterval);
       if (channel.readyState === 'connecting') {
-        console.warn('⚠️ Data channel stuck in connecting state for 30 seconds - this may indicate connection issues');
+        console.warn('⚠️ Data channel stuck in connecting state for 30 seconds - attempting recovery');
         console.warn('📊 Current WebRTC states:', {
           dataChannelState: channel.readyState,
           connectionState: peerConnectionRef.current?.connectionState,
           iceConnectionState: peerConnectionRef.current?.iceConnectionState,
           signalingState: peerConnectionRef.current?.signalingState
         });
+        
+        // ✅ RECOVERY: Try ICE restart if peer connection exists
+        if (peerConnectionRef.current && peerConnectionRef.current.connectionState !== 'closed') {
+          console.log('🔄 Attempting ICE restart to recover stuck data channel...');
+          try {
+            peerConnectionRef.current.restartIce();
+          } catch (error) {
+            console.error('❌ ICE restart failed:', error);
+            
+            // ✅ LAST RESORT: Trigger connection reset
+            console.log('🔄 ICE restart failed, triggering full connection reset...');
+            if (onConnectionLost) {
+              onConnectionLost();
+            }
+          }
+        }
       }
     }, 30000);
 
-    channel.onopen = () => {
-      console.log('✅ Data channel opened - processing pending actions...');
-      setWebrtcState(prev => ({
-        ...prev,
-        connectionStatus: 'connected'
+          channel.onopen = () => {
+        console.log('✅ Data channel opened - processing pending actions...');
+        console.log('🔗 PLAYER JOIN STATUS: Data channel fully established');
+        console.log('📊 Connection Health Check:', {
+          dataChannelState: channel.readyState,
+          peerConnectionState: peerConnectionRef.current?.connectionState,
+          iceConnectionState: peerConnectionRef.current?.iceConnectionState,
+          signalingState: peerConnectionRef.current?.signalingState,
+          timestamp: new Date().toISOString()
+        });
+        
+        setWebrtcState(prev => ({
+          ...prev,
+          connectionStatus: 'connected'
       }));
 
       // Process any pending actions that were queued while channel was connecting
@@ -520,7 +582,36 @@ export const useWebRTC = ({
       });
   }, [playerId]);
 
-  // Handle incoming signaling messages
+  // ✅ CRITICAL HELPER: Flush queued ICE candidates after remote description is set
+  const flushCandidateQueue = async (pc: RTCPeerConnection) => {
+    if (candidateQueueRef.current.length === 0) {
+      console.log('📦 No queued ICE candidates to flush');
+      return;
+    }
+    
+    console.log(`📦 Flushing ${candidateQueueRef.current.length} queued ICE candidates`);
+    
+    for (const candidateData of candidateQueueRef.current) {
+      try {
+        console.log('🧊 Adding queued ICE candidate:', {
+          sdpMid: candidateData?.sdpMid || 'unknown',
+          sdpMLineIndex: candidateData?.sdpMLineIndex ?? 'unknown',
+          candidate: candidateData?.candidate?.substring(0, 50) + '...' || 'unknown'
+        });
+        await pc.addIceCandidate(new RTCIceCandidate(candidateData));
+        console.log('✅ Queued ICE candidate added successfully');
+      } catch (error) {
+        console.error('❌ Failed to add queued ICE candidate:', error);
+        console.error('❌ Candidate data was:', candidateData);
+      }
+    }
+    
+    // Clear the queue after processing
+    candidateQueueRef.current = [];
+    console.log('📦 ICE candidate queue cleared');
+  };
+
+  // Handle signaling messages from Firebase
   const handleSignalingMessage = useCallback(async (message: WebRTCMessage, messageKey: string) => {
     console.log('📥 Raw signaling message received:', { message, messageKey });
     
@@ -551,6 +642,10 @@ export const useWebRTC = ({
           if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
             console.log('Processing offer...');
             await pc.setRemoteDescription(new RTCSessionDescription(message.data));
+            
+            // ✅ CRITICAL FIX: Flush queued ICE candidates after setting remote description
+            await flushCandidateQueue(pc);
+            
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             
@@ -572,6 +667,10 @@ export const useWebRTC = ({
           if (pc.signalingState === 'have-local-offer') {
             console.log('Processing answer...');
             await pc.setRemoteDescription(new RTCSessionDescription(message.data));
+            
+            // ✅ CRITICAL FIX: Flush queued ICE candidates after setting remote description
+            await flushCandidateQueue(pc);
+            
             console.log('Answer processed successfully');
           } else {
             console.log('Ignoring answer - wrong signaling state:', pc.signalingState);
@@ -608,7 +707,8 @@ export const useWebRTC = ({
             break;
           }
           
-          if (pc.remoteDescription) {
+          // ✅ CRITICAL FIX: Implement ICE candidate queuing
+          if (pc.remoteDescription && pc.remoteDescription.type) {
             try {
               console.log('🧊 Adding validated ICE candidate to peer connection');
               await pc.addIceCandidate(new RTCIceCandidate(candidateData));
@@ -619,12 +719,17 @@ export const useWebRTC = ({
               console.error('❌ Error details:', error instanceof Error ? error.message : String(error));
             }
           } else {
-            console.warn('⏳ No remote description yet - cannot add ICE candidate');
-            console.warn('⏳ Current signaling state:', pc.signalingState);
-            console.warn('⏳ Connection state:', pc.connectionState);
-            console.warn('⏳ ICE connection state:', pc.iceConnectionState);
-            console.warn('⏳ Candidate will be lost - consider implementing candidate queuing');
-            // TODO: Could implement ICE candidate queuing here for early candidates
+            // ✅ QUEUE ICE candidates received before remote description
+            console.log('📦 Queueing ICE candidate (no remote description yet):', {
+              signalingState: pc.signalingState,
+              connectionState: pc.connectionState,
+              iceConnectionState: pc.iceConnectionState,
+              queueSize: candidateQueueRef.current.length,
+              candidateType: candidateData?.type || 'unknown'
+            });
+            
+            candidateQueueRef.current.push(candidateData);
+            console.log(`📦 ICE candidate queued. Queue size: ${candidateQueueRef.current.length}`);
           }
           break;
       }
@@ -777,11 +882,20 @@ export const useWebRTC = ({
       // 🎯 Create data channel BEFORE creating offer (critical for proper negotiation)
       console.log('📨 Creating data channel BEFORE offer (for proper SDP negotiation)');
       const dataChannel = currentPc.createDataChannel('gameData', {
-        ordered: true
+        ordered: true,
+        maxRetransmits: 3  // Add reliability
       });
       
       // Set up data channel immediately
       setupDataChannel(dataChannel);
+      
+      // ✅ Add enhanced logging for data channel negotiation
+      console.log('📨 Data channel created with config:', {
+        label: dataChannel.label,
+        ordered: dataChannel.ordered,
+        protocol: dataChannel.protocol,
+        readyState: dataChannel.readyState
+      });
       
       // 🎯 Create and send offer with maximum protection
       try {
@@ -894,10 +1008,23 @@ export const useWebRTC = ({
 
   // Send game state to remote peer
   const sendGameState = useCallback((partialGameState: Partial<GameState>) => {
-    if (!dataChannelRef.current || dataChannelRef.current.readyState !== 'open') {
-      console.warn('Data channel not open');
+    if (!dataChannelRef.current) {
+      console.warn('⚠️ STABILITY CHECK: Data channel not available for game state');
       return;
     }
+    
+    if (dataChannelRef.current.readyState !== 'open') {
+      console.warn('⚠️ STABILITY CHECK: Data channel not ready for game state transmission', {
+        currentState: dataChannelRef.current.readyState,
+        expected: 'open',
+        peerConnectionState: peerConnectionRef.current?.connectionState,
+        iceConnectionState: peerConnectionRef.current?.iceConnectionState,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    
+    console.log('✅ STABILITY CHECK: Data channel ready for game state transmission');
 
     const message: WebRTCMessage = {
       type: 'game_state',
@@ -915,19 +1042,32 @@ export const useWebRTC = ({
 
   // Send player action to remote peer
   const sendPlayerAction = useCallback((action: PlayerAction) => {
-    console.log(`📤 Attempting to send player action: ${action.type}`);
+    console.log(`📤 STABILITY CHECK: Attempting to send player action: ${action.type}`);
     
     if (!dataChannelRef.current) {
-      console.warn('❌ Data channel not available - queueing action');
+      console.warn('❌ STABILITY CHECK: Data channel not available - queueing action', {
+        actionType: action.type,
+        timestamp: new Date().toISOString()
+      });
       pendingActionsRef.current.push(action);
       return;
     }
     
     if (dataChannelRef.current.readyState !== 'open') {
-      console.warn(`⏳ Data channel not ready (${dataChannelRef.current.readyState}) - queueing action: ${action.type}`);
+      console.warn(`⏳ STABILITY CHECK: Data channel not ready - queueing action`, {
+        currentState: dataChannelRef.current.readyState,
+        expected: 'open',
+        actionType: action.type,
+        peerConnectionState: peerConnectionRef.current?.connectionState,
+        iceConnectionState: peerConnectionRef.current?.iceConnectionState,
+        queueLength: pendingActionsRef.current.length,
+        timestamp: new Date().toISOString()
+      });
       pendingActionsRef.current.push(action);
       return;
     }
+    
+    console.log(`✅ STABILITY CHECK: Data channel ready for action: ${action.type}`);
 
     const message: WebRTCMessage = {
       type: 'player_action',
@@ -1144,7 +1284,7 @@ export const useWebRTC = ({
     connectionStatus: webrtcState.connectionStatus
   };
   
-  // Log when return values change
+  // ✅ ENHANCED: Central WebRTC status monitor for Player Join events
   useEffect(() => {
     console.log('🔍 useWebRTC RETURN VALUES CHANGED (instance:', hookInstanceId.current + '):', {
       isHost: returnValues.isHost,
@@ -1152,7 +1292,45 @@ export const useWebRTC = ({
       connectionStatus: returnValues.connectionStatus,
       webrtcStateRef: webrtcStateRef.current
     });
-  }, [returnValues.isHost, returnValues.connectionId, returnValues.connectionStatus]);
+    
+    // Enhanced logging when Player 2 joins (connection transitions)
+    if (returnValues.connectionStatus === 'connecting' || returnValues.connectionStatus === 'connected') {
+      console.log('🔗 PLAYER JOIN MONITOR: WebRTC Connection Status Update', {
+        isHost: returnValues.isHost,
+        connectionId: returnValues.connectionId,
+        connectionStatus: returnValues.connectionStatus,
+        dataChannelState: dataChannelRef.current?.readyState || 'no-channel',
+        peerConnectionState: peerConnectionRef.current?.connectionState || 'no-peer',
+        iceConnectionState: peerConnectionRef.current?.iceConnectionState || 'no-ice',
+        signalingState: peerConnectionRef.current?.signalingState || 'no-signaling',
+        playerId,
+        timestamp: new Date().toISOString(),
+        gameStatePresent: !!gameState,
+        pendingActionsCount: pendingActionsRef.current.length
+      });
+      
+      // ✅ STABILITY CHECK: Detect inconsistent states
+      if (returnValues.connectionStatus === 'connected' && dataChannelRef.current?.readyState !== 'open') {
+        console.warn('⚠️ INCONSISTENT STATE: Connection reported as connected but data channel not open', {
+          connectionStatus: returnValues.connectionStatus,
+          dataChannelState: dataChannelRef.current?.readyState,
+          peerConnectionState: peerConnectionRef.current?.connectionState,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      // ✅ SUCCESS CONFIRMATION: Full connection established
+      if (returnValues.connectionStatus === 'connected' && dataChannelRef.current?.readyState === 'open') {
+        console.log('🎉 PLAYER JOIN SUCCESS: Full WebRTC connection established!', {
+          isHost: returnValues.isHost,
+          connectionId: returnValues.connectionId,
+          dataChannelReady: true,
+          peerConnectionState: peerConnectionRef.current?.connectionState,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  }, [returnValues.isHost, returnValues.connectionId, returnValues.connectionStatus, playerId, gameState]);
 
   // ✅ STABILITY GUARD: Cache result for future early returns
   lastWebRTCDepsRef.current = currentWebRTCDepsKey;

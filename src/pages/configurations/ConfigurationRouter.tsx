@@ -29,6 +29,7 @@ const ConfigurationRouter = () => {
     if (path.includes('sentence-sense')) return 'sentence-sense';
     if (path.includes('place-value-showdown')) return 'place-value-showdown';
     if (path.includes('word-volley')) return 'word-volley';
+    if (path.includes('name-it')) return 'name-it';
     return null;
   };
 
@@ -106,6 +107,7 @@ const ConfigurationRouter = () => {
     if (gameType === 'sentence-sense') return 4;
     if (gameType === 'place-value-showdown') return 5;
     if (gameType === 'word-volley') return 6;
+    if (gameType === 'name-it') return 7;
     return 0;
   };
 
@@ -118,6 +120,7 @@ const ConfigurationRouter = () => {
     if (index === 4) navigate('/configure/sentence-sense');
     if (index === 5) navigate('/configure/place-value-showdown');
     if (index === 6) navigate('/configure/word-volley');
+    if (index === 7) navigate('/configure/name-it');
   };
 
   // Display configuration page title and content
@@ -135,6 +138,7 @@ const ConfigurationRouter = () => {
             <Tab>Sentence Sense</Tab>
             <Tab>Place Value Showdown</Tab>
             <Tab>Pong</Tab>
+            <Tab>Name It</Tab>
           </TabList>
         </Tabs>
       </Box>

@@ -92,14 +92,23 @@ export const MATCH_FEEDBACK_DURATION = 1000; // milliseconds
 export const CARD_ANIMATION_DURATION = 500; // milliseconds
 export const COUNTDOWN_DURATION = 3; // seconds
 
-// WebRTC configuration with TURN servers for NAT traversal
+// WebRTC configuration with multiple TURN providers for maximum connectivity
 export const WEBRTC_CONFIG: RTCConfiguration = {
   iceServers: [
     // Google STUN servers for basic connectivity
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    // Free TURN servers for NAT/firewall traversal
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    
+    // Additional STUN servers for redundancy
+    { urls: 'stun:stun.nextcloud.com:443' },
+    { urls: 'stun:stun.sipnet.net:3478' },
+    { urls: 'stun:stun.ekiga.net' },
+    { urls: 'stun:stun.ideasip.com' },
+    
+    // Primary TURN servers - OpenRelay (free, reliable)
     {
       urls: 'turn:openrelay.metered.ca:80',
       username: 'openrelayproject',
@@ -114,10 +123,38 @@ export const WEBRTC_CONFIG: RTCConfiguration = {
       urls: 'turn:openrelay.metered.ca:443?transport=tcp',
       username: 'openrelayproject',
       credential: 'openrelayproject'
+    },
+    
+    // Secondary TURN servers - Metered (backup)
+    {
+      urls: 'turn:relay1.expressturn.com:3478',
+      username: 'expressturn',
+      credential: 'WmfDVWd3eKJ82Tko'
+    },
+    {
+      urls: 'turns:relay1.expressturn.com:5349',
+      username: 'expressturn',
+      credential: 'WmfDVWd3eKJ82Tko'
+    },
+    
+    // Third TURN provider - Numb (additional backup)
+    {
+      urls: 'turn:numb.viagenie.ca',
+      username: 'webrtc@live.com',
+      credential: 'muazkh'
+    },
+    {
+      urls: 'turns:numb.viagenie.ca',
+      username: 'webrtc@live.com',
+      credential: 'muazkh'
     }
   ],
-  // Additional configuration for better connectivity
-  iceCandidatePoolSize: 10
+  // Enhanced configuration for maximum connectivity (based on successful previous testing)
+  iceCandidatePoolSize: 20,  // Proven working value from extensive testing
+  bundlePolicy: 'max-bundle', // Reduce connection complexity
+  rtcpMuxPolicy: 'require',   // Force RTCP multiplexing
+  // Allow both direct and relay connections (more permissive than relay-only)
+  iceTransportPolicy: 'all' // ✅ Use successful 'all' policy from previous testing
 };
 
 // Card positioning for circular arrangement

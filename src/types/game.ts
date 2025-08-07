@@ -184,7 +184,17 @@ export interface WordVolleyConfig extends BaseGameConfig {
   winningScore: number; // Score needed to win
 }
 
-export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig | AnagramConfig | SentenceSenseConfig | PlaceValueShowdownConfig | WordVolleyConfig;
+export interface NameItConfig extends BaseGameConfig {
+  type: 'name-it';
+  gameTime: number; // in seconds
+  difficulty: 'easy' | 'medium' | 'hard';
+  enableSound: boolean;
+  enableWebRTC: boolean;
+  maxPlayers: 2;
+  iconSet?: any[]; // Icons for the game
+}
+
+export type GameConfig = WhackAMoleConfig | SortCategoriesConfig | SpinnerWheelConfig | AnagramConfig | SentenceSenseConfig | PlaceValueShowdownConfig | WordVolleyConfig | NameItConfig;
 
 export interface Word {
   text: string;

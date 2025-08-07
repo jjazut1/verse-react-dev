@@ -1,5 +1,7 @@
 import React, { useMemo, useEffect } from 'react';
 import NameIt from './NameIt';
+import NameItMinimal from './NameItMinimal';
+import { PlayerMappingProvider } from './contexts/PlayerMappingContext';
 import { GameConfig } from './types';
 
 interface NameItAdapterProps {
@@ -30,6 +32,63 @@ const NameItAdapterComponent: React.FC<NameItAdapterProps> = ({
       onGameExit: !!onGameExit
     }
   });
+  
+  // ✅ CRITICAL: Add detailed re-render analysis for Adapter
+  const renderCountRef = React.useRef(0);
+  const lastPropsRef = React.useRef<any>(null);
+  const lastRenderTimeRef = React.useRef(Date.now());
+  
+  renderCountRef.current += 1;
+  const currentTime = Date.now();
+  const timeSinceLastRender = currentTime - lastRenderTimeRef.current;
+  lastRenderTimeRef.current = currentTime;
+  
+  const currentProps = {
+    configId: config?.id,
+    configTitle: config?.title,
+    configEnableWebRTC: config?.enableWebRTC,
+    configReference: config, // Object reference
+    playerName,
+    onGameComplete: !!onGameComplete,
+    onGameCompleteRef: onGameComplete, // Function reference
+    onHighScoreProcessStart: !!onHighScoreProcessStart,
+    onHighScoreProcessStartRef: onHighScoreProcessStart,
+    onHighScoreProcessComplete: !!onHighScoreProcessComplete,
+    onHighScoreProcessCompleteRef: onHighScoreProcessComplete,
+    onGameExit: !!onGameExit,
+    onGameExitRef: onGameExit
+  };
+  
+  // Detect what changed
+  const changedProps = [];
+  if (lastPropsRef.current) {
+    for (const [key, value] of Object.entries(currentProps)) {
+      if (lastPropsRef.current[key] !== value) {
+        changedProps.push({
+          prop: key,
+          old: lastPropsRef.current[key],
+          new: value,
+          typeOld: typeof lastPropsRef.current[key],
+          typeNew: typeof value
+        });
+      }
+    }
+  }
+  
+  lastPropsRef.current = currentProps;
+  
+  console.log(`🔄 ADAPTER RENDER #${renderCountRef.current} (+${timeSinceLastRender}ms):`, {
+    timestamp: new Date().toISOString(),
+    timeSinceLastRender,
+    changedProps: changedProps.length > 0 ? changedProps : 'No prop changes detected',
+    configObjectReference: `config@${config ? Object.prototype.toString.call(config) : 'null'}`
+  });
+  
+  // Log stack trace for rapid re-renders (< 100ms)  
+  if (timeSinceLastRender < 100 && renderCountRef.current > 1) {
+    console.warn(`⚡ ADAPTER RAPID RE-RENDER detected (${timeSinceLastRender}ms)! Render #${renderCountRef.current}`);
+    console.trace('Adapter stack trace for rapid re-render:');
+  }
   
   // ✅ COMPONENT LIFECYCLE: Track adapter mounting/unmounting
   useEffect(() => {
@@ -62,6 +121,27 @@ const NameItAdapterComponent: React.FC<NameItAdapterProps> = ({
     playerName,
     enableWebRTC: config?.enableWebRTC
   }), [config, onGameComplete, onHighScoreProcessStart, onHighScoreProcessComplete, onGameExit, playerName]);
+  // ✅ TESTING: Use minimal version to isolate Player 1 disconnect issue
+  const useMinimalVersion = true; // Set to false to use full version
+
+  if (useMinimalVersion) {
+    console.log('🧪 ADAPTER: Using NameItMinimal for testing');
+    return (
+      <PlayerMappingProvider>
+        <NameItMinimal
+          gameConfig={memoizedProps.gameConfig}
+          onGameComplete={memoizedProps.onGameComplete}
+          onHighScoreProcessStart={memoizedProps.onHighScoreProcessStart}
+          onHighScoreProcessComplete={memoizedProps.onHighScoreProcessComplete}
+          onGameExit={memoizedProps.onGameExit}
+          configId={memoizedProps.configId}
+          playerName={memoizedProps.playerName}
+          enableWebRTC={memoizedProps.enableWebRTC}
+        />
+      </PlayerMappingProvider>
+    );
+  }
+
   return (
     <NameIt
       gameConfig={memoizedProps.gameConfig}

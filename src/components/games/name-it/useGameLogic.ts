@@ -159,6 +159,13 @@ export const useGameLogic = ({
   
   const { currentUser } = useAuth();
   
+  // ✅ STABILITY FIX: Memoize currentUser.uid to prevent constant recreations
+  const stablePlayerId = useMemo(() => {
+    const playerId = currentUser?.uid || 'local-player';
+    console.log('🔄 USEGAMELOGIC: Player ID stabilized:', playerId);
+    return playerId;
+  }, [currentUser?.uid]);
+  
   // ✅ ENHANCED SAFETY: Robust config initialization with multiple fallbacks
   const configRef = useRef<GameConfig>();
   if (!configRef.current) {
@@ -203,7 +210,7 @@ export const useGameLogic = ({
   if (!initializePlayersRef.current) {
     initializePlayersRef.current = (forceAsPlayer2 = false): Player[] => {
       const localPlayer: Player = {
-        id: currentUser?.uid || 'local-player',
+        id: stablePlayerId,
         name: playerName,
         score: 0,
         isLocal: true,
@@ -268,36 +275,37 @@ export const useGameLogic = ({
     onHighScoreProcessComplete
   });
 
-  // ✅ STABILITY FIX: Memoize gameState to prevent dependency loops
+  // ✅ CRITICAL FIX: Ultra-minimal WebRTC state - only game actions, not connection-time changes
   const stableGameState = useMemo(() => {
-    // Only recreate when meaningful properties change
+    // ONLY include properties that need WebRTC synchronization AFTER connection is established
+    // Completely exclude players array and other connection-time state changes
     return {
       gameStarted: gameState.gameStarted,
       gameCompleted: gameState.gameCompleted,
       gamePaused: gameState.gamePaused,
-      timeLeft: gameState.timeLeft,
       currentRound: gameState.currentRound,
       cards: gameState.cards,
-      players: gameState.players,
-      currentPlayerId: gameState.currentPlayerId,
-      winner: gameState.winner,
-      showHighScoreModal: gameState.showHighScoreModal,
-      isNewHighScore: gameState.isNewHighScore,
-      matchFound: gameState.matchFound
+      matchFound: gameState.matchFound,
+      // ✅ CRITICAL: Exclude players array to prevent WebRTC reinit during Player 2 join
+      // Players are managed separately via WebRTC player actions, not state sync
+      // This prevents connection destruction during handshake
+      
+      // All excluded properties that were causing WebRTC instability:
+      // - players (changes when Player 2 joins, destroying connection)
+      // - timeLeft (changes every second, managed locally)
+      // - showHighScoreModal (UI state only)
+      // - isNewHighScore (UI state only) 
+      // - winner (derived from scores)
+      // - currentPlayerId (managed locally)
     };
   }, [
     gameState.gameStarted,
     gameState.gameCompleted, 
     gameState.gamePaused,
-    gameState.timeLeft,
     gameState.currentRound,
     gameState.cards,
-    gameState.players,
-    gameState.currentPlayerId,
-    gameState.winner,
-    gameState.showHighScoreModal,
-    gameState.isNewHighScore,
     gameState.matchFound
+    // ✅ CRITICAL REMOVAL: players array excluded to prevent connection destruction
   ]);
 
   // ✅ STABILITY FIX: Memoize ALL callback functions to prevent WebRTC reinitializations
@@ -309,7 +317,7 @@ export const useGameLogic = ({
       
       // If players array is being synced, preserve local player identity
       if (partialState.players) {
-        const currentLocalPlayerId = currentUser?.uid || 'local-player';
+        const currentLocalPlayerId = stablePlayerId;
         const remotePlayersArray = partialState.players;
         
         // Find which player should be local based on current user (normalized comparison)
@@ -351,7 +359,7 @@ export const useGameLogic = ({
       
       return updatedState;
     });
-  }, [currentUser?.uid, playerName]);
+  }, [stablePlayerId, playerName]);
 
   const stableOnPlayerAction = useCallback((action: PlayerAction) => {
     // Forward to handlePlayerAction which will be defined later
@@ -374,18 +382,46 @@ export const useGameLogic = ({
     }));
   }, []);
 
-  // ✅ STABILITY FIX: Memoize WebRTC props object
+  // ✅ ENHANCED DEBUGGING: Track what's causing webrtcProps to recreate
+  const webrtcPropsRef = useRef<any>(null);
   const webrtcProps = useMemo(() => {
-    console.log('🔧 USEGAMELOGIC: Creating webrtcProps object (should be rare)');
-    return {
+    const newProps = {
       enabled: config.enableWebRTC,
       gameState: stableGameState,
       onGameStateReceived: stableOnGameStateReceived,
       onPlayerAction: stableOnPlayerAction,
-      playerId: currentUser?.uid || 'local-player',
+      playerId: stablePlayerId,
       onConnectionLost: stableOnConnectionLost
     };
-  }, [config.enableWebRTC, stableGameState, stableOnGameStateReceived, stableOnPlayerAction, currentUser?.uid, stableOnConnectionLost]);
+    
+    // Enhanced debugging to identify what changed
+    if (webrtcPropsRef.current) {
+      const changes = [];
+      if (webrtcPropsRef.current.enabled !== newProps.enabled) changes.push('enabled');
+      if (webrtcPropsRef.current.gameState !== newProps.gameState) changes.push('gameState');
+      if (webrtcPropsRef.current.onGameStateReceived !== newProps.onGameStateReceived) changes.push('onGameStateReceived');
+      if (webrtcPropsRef.current.onPlayerAction !== newProps.onPlayerAction) changes.push('onPlayerAction');
+      if (webrtcPropsRef.current.playerId !== newProps.playerId) changes.push('playerId');
+      if (webrtcPropsRef.current.onConnectionLost !== newProps.onConnectionLost) changes.push('onConnectionLost');
+      
+      console.warn('🚨 USEGAMELOGIC: webrtcProps recreated! Changed dependencies:', changes);
+      console.log('🔍 USEGAMELOGIC: Detailed comparison:', {
+        enabled: { old: webrtcPropsRef.current.enabled, new: newProps.enabled },
+        playerId: { old: webrtcPropsRef.current.playerId, new: newProps.playerId },
+        gameStateChanged: webrtcPropsRef.current.gameState !== newProps.gameState,
+        callbacksChanged: {
+          onGameStateReceived: webrtcPropsRef.current.onGameStateReceived !== newProps.onGameStateReceived,
+          onPlayerAction: webrtcPropsRef.current.onPlayerAction !== newProps.onPlayerAction,
+          onConnectionLost: webrtcPropsRef.current.onConnectionLost !== newProps.onConnectionLost
+        }
+      });
+    } else {
+      console.log('🔧 USEGAMELOGIC: Initial webrtcProps creation');
+    }
+    
+    webrtcPropsRef.current = newProps;
+    return newProps;
+  }, [config.enableWebRTC, stableGameState, stableOnGameStateReceived, stableOnPlayerAction, stablePlayerId, stableOnConnectionLost]);
 
   // WebRTC integration with stable callbacks
   const webrtcReturn = useWebRTC(webrtcProps);
@@ -491,7 +527,7 @@ export const useGameLogic = ({
             sendPlayerAction({
               type: 'player_join',
               playerInfo: {
-                id: currentUser?.uid || 'local-player',
+                id: stablePlayerId,
                 name: playerName
               },
               timestamp: Date.now()
@@ -559,7 +595,7 @@ export const useGameLogic = ({
         }
         break;
     }
-  }, [webrtcReturn, isHost, sendPlayerAction, currentUser?.uid, playerName, connectionStatus, connectionId, setGameState]);
+  }, [webrtcReturn, isHost, sendPlayerAction, stablePlayerId, playerName, connectionStatus, connectionId, setGameState]);
 
   // ✅ STABILITY FIX: Store handlePlayerAction in ref for stable callback access
   useEffect(() => {
@@ -898,7 +934,7 @@ export const useGameLogic = ({
     sendPlayerAction({
       type: 'player_join',
       playerInfo: {
-        id: currentUser?.uid || 'local-player',
+        id: stablePlayerId,
         name: playerName
       },
       timestamp: Date.now()
@@ -909,28 +945,82 @@ export const useGameLogic = ({
       ...prev,
       players: initializePlayers(true) // Force this joiner as Player 2
     }));
-  }, [webrtcJoinRoom, sendPlayerAction, currentUser?.uid, playerName, initializePlayers]);
+  }, [webrtcJoinRoom, sendPlayerAction, stablePlayerId, playerName, initializePlayers]);
 
-  // Update ALL players' connection status based on WebRTC status
+  // ✅ STABILITY FIX: Debounced player connection status updates to prevent thrashing
+  const playerStatusUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
     if (config.enableWebRTC) {
       console.log(`🔄 WebRTC connection status changed: ${connectionStatus}`);
-      setGameState(prev => ({
-        ...prev,
-        players: prev.players.map(p => {
-          // Local player is always connected (they're the current user)
-          if (p.isLocal) {
-            return { ...p, connectionStatus: 'connected' };
-          }
-          // Remote players use WebRTC connection status
-          return { 
-            ...p, 
-            connectionStatus: connectionStatus === 'connected' ? 'connected' : 'disconnected' 
+      console.log('🔍 GAME LOGIC DEBUG:', {
+        connectionStatus,
+        connectionStatusType: typeof connectionStatus,
+        enableWebRTC: config.enableWebRTC,
+        currentPlayers: gameState.players.map(p => ({
+          name: p.name,
+          isLocal: p.isLocal,
+          connectionStatus: p.connectionStatus
+        }))
+      });
+      
+      // Clear any pending update
+      if (playerStatusUpdateTimeoutRef.current) {
+        clearTimeout(playerStatusUpdateTimeoutRef.current);
+      }
+      
+      // Debounce player status updates to prevent re-render thrashing
+      playerStatusUpdateTimeoutRef.current = setTimeout(() => {
+        console.log(`✅ DEBOUNCED UPDATE: Applying player connection status: ${connectionStatus}`);
+        console.log('🔍 PLAYERS BEFORE UPDATE:', gameState.players);
+        setGameState(prev => {
+          const updatedPlayers: Player[] = prev.players.map(p => {
+            // Local player is always connected (they're the current user)
+            if (p.isLocal) {
+              return { ...p, connectionStatus: 'connected' as const };
+            }
+            // Remote players use WebRTC connection status
+            const newStatus = connectionStatus === 'connected' ? 'connected' as const : 'disconnected' as const;
+            console.log(`🔍 UPDATING REMOTE PLAYER: ${p.name} from ${p.connectionStatus} to ${newStatus}`);
+            return { 
+              ...p, 
+              connectionStatus: newStatus
+            };
+          });
+          
+          console.log('🔍 PLAYERS AFTER UPDATE:', updatedPlayers);
+          return {
+            ...prev,
+            players: updatedPlayers
           };
-        })
-      }));
+        });
+      }, 250); // 250ms debounce to prevent thrashing during connection establishment
     }
-  }, [config.enableWebRTC, connectionStatus]);
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (playerStatusUpdateTimeoutRef.current) {
+        clearTimeout(playerStatusUpdateTimeoutRef.current);
+      }
+    };
+  }, [config.enableWebRTC, connectionStatus, gameState.players]);
+
+  // ✅ CRITICAL: Debounce rapid state changes to prevent re-render thrashing
+  const gameStateUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingGameStateUpdateRef = useRef<Partial<GameState> | null>(null);
+  
+  const debouncedSetGameState = useCallback((updater: (prev: GameState) => GameState) => {
+    if (gameStateUpdateTimeoutRef.current) {
+      clearTimeout(gameStateUpdateTimeoutRef.current);
+    }
+    
+    gameStateUpdateTimeoutRef.current = setTimeout(() => {
+      setGameState(updater);
+      pendingGameStateUpdateRef.current = null;
+    }, 50); // 50ms debounce to allow rapid updates to batch
+  }, []);
+
+
 
   // Cleanup on unmount
   useEffect(() => {
@@ -941,6 +1031,7 @@ export const useGameLogic = ({
       if (matchFeedbackTimerRef.current) {
         clearTimeout(matchFeedbackTimerRef.current);
       }
+      
     };
   }, []);
 

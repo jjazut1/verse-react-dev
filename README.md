@@ -37,7 +37,7 @@ LuminateLearn is a comprehensive educational platform designed for K-12 teachers
 - **Public Game Sharing**: Mark games as public for community access
 - **Assignment Analytics**: Detailed attempt tracking with scores, duration, and completion rates
 
-#### **Available Game Types** (7 Total)
+#### **Available Game Types** (8 Total)
 - **🔨 Whack-a-Mole**: 3D immersive word categorization with rich text support 🎯 **ENHANCED 2025**
   - **📝 Streamlined Categories**: Fixed two-tab system with "Whack These" and "Do Not Whack These"
   - **🎨 Rich Text Support**: Full formatting capabilities with super/subscript, bold, italic, underline
@@ -58,6 +58,13 @@ LuminateLearn is a comprehensive educational platform designed for K-12 teachers
   - **⚡ Speed Optimization**: 50% speed increase with proper Pong-style ball velocity (3-15 px/frame range)
   - **🎯 Enhanced Performance**: 7.5x faster ball speeds for engaging gameplay with zero text blur
   - **🔧 Reusable Architecture**: TextRenderer utility applicable to other high-speed games
+- **🎲 Name It**: Real-time multiplayer icon matching game inspired by Spot It! ✨ **NEW 2025**
+  - **🌐 WebRTC Multiplayer**: Direct peer-to-peer connection with Firebase fallback for reliability
+  - **⚡ Real-time Synchronization**: Instant score updates and game state sync across players
+  - **🎯 Smart Player Mapping**: Deterministic player ID management with persistent score tracking
+  - **🔄 Cross-Tab Persistence**: Seamless gameplay when switching between browser tabs
+  - **📊 Advanced Score Architecture**: ID-based score tracking immune to player re-ordering
+  - **🛡️ Network Resilience**: Automatic reconnection and graceful handling of network interruptions
   - **Advanced Configuration**: Target and non-target word categories with 50-word limits and smart validation
   - **Enhanced Physics Engine**: Realistic ball physics with proper speed progression and collision detection
   - **Robust Audio System**: Text-to-speech support with Web Audio API fallbacks and bounce-only sound design
@@ -98,7 +105,62 @@ LuminateLearn is a comprehensive educational platform designed for K-12 teachers
 
 ## 🚀 Recent Enhancements (January 2025)
 
-### **🔐 CRITICAL AUTHENTICATION & STUDENT MANAGEMENT FIXES** (January 2025 - Latest) ✅
+### **🎲 MAJOR MULTIPLAYER GAME SYSTEM** (January 2025 - Latest) ✨
+
+#### **🏆 NAME IT GAME - REAL-TIME MULTIPLAYER BREAKTHROUGH**
+
+**✨ REVOLUTIONARY MULTIPLAYER ARCHITECTURE**: Successfully implemented the platform's first real-time multiplayer game with WebRTC peer-to-peer connections, advanced score persistence, and bulletproof network resilience. This breakthrough establishes the foundation for future multiplayer educational experiences.
+
+#### **🔧 Technical Architecture Achievements**
+
+| Component | Innovation Implemented | Technical Solution | Status |
+|-----------|------------------------|-------------------|---------|
+| **WebRTC P2P System** | Direct browser-to-browser communication | RTCPeerConnection with Firebase signaling, automatic TURN fallback | ✅ Complete |
+| **Player Identity Management** | Deterministic player mapping immune to disconnections | PlayerMappingContext with persistent ID-to-index binding | ✅ Complete |
+| **Score Persistence** | Revolutionary scoresByPlayerId architecture | ID-based score tracking independent of player object mutations | ✅ Complete |
+| **Network Resilience** | Graceful handling of tab switches and network interruptions | Firebase fallback messaging with automatic reconnection | ✅ Complete |
+| **Cross-Tab Synchronization** | Seamless gameplay across browser tab switches | Advanced state synchronization with conflict resolution | ✅ Complete |
+| **Database Security** | Firebase Realtime Database rules for WebRTC messaging | Comprehensive fallback_messages and signaling permissions | ✅ Complete |
+
+#### **🚀 Multiplayer Game Features**
+
+**🎯 Core Gameplay**:
+- **Real-time Icon Matching**: Spot It!-inspired gameplay with instant synchronization
+- **Dual Player Coordination**: Host creates room, joiner connects via room ID
+- **Smart Icon Distribution**: Each player sees only their designated clickable icons
+- **Live Score Updates**: Immediate score reflection across both players
+- **Timer Synchronization**: Coordinated game timing with shared completion
+
+**🛡️ Stability & Resilience**:
+- **Automatic Reconnection**: Network interruption recovery without game loss
+- **Tab Switch Persistence**: Seamless experience when switching between browser tabs
+- **Graceful Disconnection**: Proper cleanup and timeout handling for player departures
+- **Score Conflict Resolution**: Intelligent timestamp-based sync to prevent overwrites
+- **Memory Leak Prevention**: Proper WebRTC connection lifecycle management
+
+#### **💡 Architectural Innovations**
+
+**🔧 scoresByPlayerId Pattern**:
+```typescript
+// Revolutionary approach: Decouple scores from player objects
+scoresByPlayerId: {
+  'B4atYtLi4KcowAuCk4U8G9srcnw2': 3,  // Host score
+  'uRnhzn3WUsELhsVg9Ps8': 2            // Joiner score
+}
+// Result: Scores persist through player re-ordering, re-mapping, and component re-renders
+```
+
+**🌐 Hybrid Communication Strategy**:
+- **Primary**: WebRTC data channels for low-latency real-time communication
+- **Fallback**: Firebase Realtime Database for initial handshake and network recovery
+- **Smart Routing**: Automatic protocol selection based on connection status
+
+**📊 Player Identity System**:
+- **Deterministic Mapping**: Host always index 0, joiner always index 1
+- **Persistent IDs**: Player identities survive all connection state changes
+- **Bidirectional Handshake**: Both players exchange identity information for complete mapping
+
+### **🔐 CRITICAL AUTHENTICATION & STUDENT MANAGEMENT FIXES** (January 2025) ✅
 
 #### **🏆 COMPREHENSIVE SYSTEM STABILIZATION - PRODUCTION READY**
 

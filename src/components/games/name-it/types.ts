@@ -44,6 +44,7 @@ export interface GameState {
   showHighScoreModal: boolean;
   isNewHighScore: boolean;
   matchFound: { playerId: string; iconId: string } | null;
+  scoresByPlayerId: Record<string, number>;
 }
 
 export interface WebRTCState {
