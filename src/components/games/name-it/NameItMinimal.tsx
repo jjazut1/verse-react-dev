@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useEffect, useRef } from 'react';
-import { Box, VStack, Text, Button, HStack, Input, useToast, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, ModalFooter, Center } from '@chakra-ui/react';
+import { Box, VStack, Text, Button, HStack, Input, useToast, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, ModalFooter, Center, Image } from '@chakra-ui/react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePlayerMapping } from './contexts/PlayerMappingContext';
 import { useGameState } from './hooks/useGameState';
@@ -999,6 +999,10 @@ const NameItMinimal: React.FC<NameItProps> = ({
   const [isInviteModalOpen, setInviteModalOpen] = React.useState(false);
   const [showQR, setShowQR] = React.useState(true);
   const qrImageUrl = () => (buildInviteLink() ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(buildInviteLink())}` : '');
+  const shortInputRef = React.useRef<HTMLInputElement | null>(null);
+  const selectShortLink = () => {
+    try { shortInputRef.current?.select(); } catch {}
+  };
 
   return (
     <Box width="100%" padding={4}>
@@ -1086,19 +1090,24 @@ const NameItMinimal: React.FC<NameItProps> = ({
       </VStack>
 
       {/* Invite Modal */}
-      <Modal isOpen={isInviteModalOpen} onClose={() => setInviteModalOpen(false)} size="md">
+      <Modal isOpen={isInviteModalOpen} onClose={() => setInviteModalOpen(false)} size="md" isCentered>
         <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Share Invite</ModalHeader>
+        <ModalContent bg="blue.50" borderRadius="lg" boxShadow="xl">
+          <ModalHeader>
+            <HStack spacing={3} align="center">
+              <Image src="/pwa-icon-192.png" alt="Lumino" boxSize="28px" borderRadius="md" />
+              <Text>Share Invite</Text>
+            </HStack>
+          </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <VStack spacing={3} align="stretch">
+            <VStack spacing={4} align="stretch">
               <Box>
-                <Text fontSize="sm" color="gray.600">Short link</Text>
-                <Input value={shortInviteText()} isReadOnly fontFamily="mono" title={buildInviteLink()} />
-                <HStack mt={2}>
-                  <Button size="sm" onClick={copyInviteLink}>Copy</Button>
-                  <Button size="sm" variant="outline" onClick={shareInvite}>Share</Button>
+                <Text fontSize="sm" color="blue.700" fontWeight="semibold">Short link</Text>
+                <Input value={shortInviteText()} ref={shortInputRef} onClick={selectShortLink} isReadOnly fontFamily="mono" title={buildInviteLink()} bg="white" borderColor="blue.200" />
+                <HStack mt={3}>
+                  <Button size="sm" colorScheme="blue" onClick={copyInviteLink}>Copy</Button>
+                  <Button size="sm" variant="outline" colorScheme="blue" onClick={shareInvite}>Share</Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowQR(!showQR)}>
                     {showQR ? 'Hide QR' : 'Show QR'}
                   </Button>
@@ -1106,13 +1115,15 @@ const NameItMinimal: React.FC<NameItProps> = ({
               </Box>
               {showQR && webrtc.roomId && (
                 <Center>
-                  <img src={qrImageUrl()} alt="Invite QR" style={{ width: 220, height: 220 }} />
+                  <Box bg="white" p={3} borderRadius="md" boxShadow="md">
+                    <img src={qrImageUrl()} alt="Invite QR" style={{ width: 220, height: 220 }} />
+                  </Box>
                 </Center>
               )}
             </VStack>
           </ModalBody>
           <ModalFooter>
-            <Button onClick={() => setInviteModalOpen(false)}>Close</Button>
+            <Button colorScheme="blue" onClick={() => setInviteModalOpen(false)}>Close</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
