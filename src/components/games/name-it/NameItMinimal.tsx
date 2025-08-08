@@ -42,6 +42,8 @@ const NameItMinimal: React.FC<NameItProps> = ({
   const consecutiveMissesRef = useRef<Record<string, number>>({});
   const penaltyUntilRef = useRef<Record<string, number>>({});
   const [penaltyPlayerId, setPenaltyPlayerId] = React.useState<string | null>(null);
+  const [isReady, setIsReady] = React.useState(false);
+  const [remoteReady, setRemoteReady] = React.useState(false);
 
   // Merge config with defaults - memoize more aggressively
   const config = useMemo(() => ({
@@ -169,6 +171,10 @@ const NameItMinimal: React.FC<NameItProps> = ({
               console.warn('⚠️ NameItMinimal: WebRTC not enabled');
             }
           }
+          break;
+        case 'player_ready':
+          console.log('✅ NameItMinimal: Received player_ready');
+          setRemoteReady(true);
           break;
         case 'player_join_response':
           console.log('🤝 NameItMinimal: Received host player info:', message.data.playerInfo);
@@ -1040,10 +1046,29 @@ const NameItMinimal: React.FC<NameItProps> = ({
                       <Box mt={3} bg="yellow.50" border="1px solid" borderColor="yellow.200" px={3} py={2} borderRadius="md">
                         <Text fontSize="sm" color="yellow.700" fontWeight="medium">Waiting for Host to start</Text>
                         <HStack spacing={2} justify="center" mt={2}>
-                          <Button size="xs" colorScheme="blue" onClick={() => webrtc.sendMessage({ type: 'player_action', data: { type: 'player_ready', timestamp: Date.now() }, timestamp: Date.now(), playerId })}>I’m Ready</Button>
+                          <Button
+                            size="xs"
+                            colorScheme={isReady ? 'green' : 'blue'}
+                            variant={isReady ? 'solid' : 'solid'}
+                            onClick={() => {
+                              if (isReady) return;
+                              setIsReady(true);
+                              webrtc.sendMessage({
+                                type: 'player_action',
+                                data: { type: 'player_ready', timestamp: Date.now() },
+                                timestamp: Date.now(),
+                                playerId
+                              });
+                            }}
+                          >
+                            {isReady ? 'Ready ✓' : 'I’m Ready'}
+                          </Button>
                           <Button size="xs" variant="outline" onClick={() => { try { new Audio('/sounds/pop.mp3').play(); } catch {} }}>Sound test</Button>
                           <Button size="xs" variant="ghost" onClick={() => { webrtc.disconnect(); window.location.href = window.location.pathname; }}>Leave room</Button>
                         </HStack>
+                        {remoteReady && (
+                          <Text mt={2} fontSize="xs" color="green.700">Host is ready</Text>
+                        )}
                       </Box>
                     </Box>
                   )
