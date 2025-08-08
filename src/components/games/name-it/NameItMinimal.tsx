@@ -43,7 +43,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
   const penaltyUntilRef = useRef<Record<string, number>>({});
   const [penaltyPlayerId, setPenaltyPlayerId] = React.useState<string | null>(null);
   const [isReady, setIsReady] = React.useState(false);
-  const [remoteReady, setRemoteReady] = React.useState(false);
+  const [remoteReady, setRemoteReady] = React.useState(false); // "other" side ready
 
   // Merge config with defaults - memoize more aggressively
   const config = useMemo(() => ({
@@ -175,6 +175,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
         case 'player_ready':
           console.log('✅ NameItMinimal: Received player_ready');
           setRemoteReady(true);
+          toast({ title: 'Player 2 is ready', status: 'success', duration: 2000 });
           break;
         case 'player_join_response':
           console.log('🤝 NameItMinimal: Received host player info:', message.data.playerInfo);
@@ -1076,6 +1077,11 @@ const NameItMinimal: React.FC<NameItProps> = ({
               </Box>
             </>
           )}
+          {!isGuestPlayer && remoteReady && (
+            <Box mt={2} display="inline-block" bg="green.50" border="1px solid" borderColor="green.200" px={3} py={1} borderRadius="md">
+              <Text fontSize="sm" color="green.700">Player 2 Ready ✓</Text>
+            </Box>
+          )}
           {enableWebRTC && webrtc.roomId && !isGuestPlayer && (
             <VStack spacing={2} mt={1}>
               <Text fontSize="sm" color="blue.600" fontFamily="monospace" cursor="pointer" 
@@ -1099,7 +1105,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
 
         {/* Controls */}
         <HStack spacing={4}>
-          <Button colorScheme="green" onClick={startGame} disabled={gameState.gameStarted || isGuestPlayer}>
+          <Button colorScheme="green" onClick={startGame} disabled={gameState.gameStarted || (enableWebRTC && !isGuestPlayer && !remoteReady) || isGuestPlayer}>
             Start Game
           </Button>
           {!gameState.gamePaused ? (
