@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Container, Center, Spinner, Text } from '@chakra-ui/react';
 import { doc, getDoc } from 'firebase/firestore';
@@ -10,6 +10,8 @@ import AnagramAdapter from './games/anagram/AnagramAdapter';
 import SentenceSenseAdapter from './games/sentence-sense/SentenceSenseAdapter';
 import PlaceValueShowdownAdapter from './games/place-value-showdown/PlaceValueShowdownAdapter';
 import WordVolleyAdapter from './games/word-volley/WordVolleyAdapter';
+import NameItAdapter from './games/name-it/NameItAdapter';
+import AuthStableWrapper from './games/name-it/AuthStableWrapper';
 import { useCustomToast } from '../hooks/useCustomToast';
 import { GameConfig } from '../types/game';
 
@@ -18,6 +20,17 @@ const GamePlayer = () => {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useCustomToast();
+  
+  // ✅ DEBUGGING: Track state changes that could cause unmount/remount
+  useEffect(() => {
+    console.log('🎮 GAMEPLAYER: State changed - could cause unmount:', {
+      configId,
+      hasGameConfig: !!gameConfig,
+      gameConfigType: gameConfig?.type,
+      isLoading,
+      timestamp: new Date().toISOString()
+    });
+  }, [configId, gameConfig, isLoading]);
 
   useEffect(() => {
     const loadGameConfig = async () => {
@@ -145,6 +158,16 @@ const GamePlayer = () => {
             playerName="Player"
             onGameComplete={handleGameComplete}
           />
+        );
+      case 'name-it':
+        return (
+          <AuthStableWrapper>
+            <NameItAdapter
+              config={gameConfig}
+              playerName="Player"
+              onGameComplete={handleGameComplete}
+            />
+          </AuthStableWrapper>
         );
       default:
         const _exhaustiveCheck: never = gameConfig;

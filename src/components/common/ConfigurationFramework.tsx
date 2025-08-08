@@ -32,6 +32,10 @@ import {
   NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
 } from '@chakra-ui/react';
 
 // Common configuration interface
@@ -237,6 +241,28 @@ const FieldRenderer: React.FC<{
           onChange={(e) => onChange(e.target.checked)}
           colorScheme="blue"
         />
+      );
+    
+    case 'slider':
+      return (
+        <Box width={field.width || '300px'}>
+          <Slider
+            value={value || field.defaultValue || field.min || 0}
+            onChange={onChange}
+            min={field.min || 0}
+            max={field.max || 100}
+            step={field.step || 1}
+            colorScheme="blue"
+          >
+            <SliderTrack>
+              <SliderFilledTrack />
+            </SliderTrack>
+            <SliderThumb />
+          </Slider>
+          <Text fontSize="sm" color="gray.600" mt={1}>
+            {value || field.defaultValue || field.min || 0} {field.label?.includes('seconds') ? 'seconds' : ''}
+          </Text>
+        </Box>
       );
     
     case 'custom':

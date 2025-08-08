@@ -598,7 +598,8 @@ const Home = () => {
               'anagram', 
               'sentence-sense', 
               'place-value-showdown',
-              'word-volley'
+              'word-volley',
+              'name-it'
             ];
             
             // Make sure the type is one of our supported game types
@@ -713,7 +714,8 @@ const Home = () => {
       'anagram', 
       'sentence-sense', 
       'place-value-showdown',
-      'word-volley'
+      'word-volley',
+      'name-it'
     ];
 
     console.log('🔍 Supported game types:', supportedGameTypes);
@@ -1065,6 +1067,17 @@ const Home = () => {
                       onClick={() => {
                         console.log('🔍 Clicking hard-coded Sentence Sense template');
                         navigate('/configure/sentence-sense');
+                      }}
+                    />
+                    
+                    {/* Hard-coded Name It Template */}
+                    <GameItemDisplay
+                      title="Name It - Pattern Recognition"
+                      type="name-it"
+                      isPlayable={false}
+                      onClick={() => {
+                        console.log('🔍 Clicking hard-coded Name It template');
+                        navigate('/configure/name-it');
                       }}
                     />
                     

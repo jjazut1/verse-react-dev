@@ -810,6 +810,16 @@ const TeacherDashboard = () => {
         console.log('🎯 Navigating without template ID');
         navigate('/configure/word-volley');
       }
+    } else if (template.type === 'name-it') {
+      console.log('🎯 Navigating to name-it configuration');
+      // If there's a template ID for editing, include it in the path
+      if (template.id) {
+        console.log('🎯 Navigating with template ID:', template.id);
+        navigate(`/configure/name-it/${template.id}`);
+      } else {
+        console.log('🎯 Navigating without template ID');
+        navigate('/configure/name-it');
+      }
     } else {
       console.log('🎯 Unknown template type, navigating to default /configure');
       // Default to the configuration router for unknown types
@@ -1359,6 +1369,8 @@ const TeacherDashboard = () => {
       configRoute = '/configure/place-value-showdown';
     } else if (gameType === 'word-volley') {
       configRoute = '/configure/word-volley';
+    } else if (gameType === 'name-it') {
+      configRoute = '/configure/name-it';
     }
     
     return {
@@ -1826,6 +1838,7 @@ const TeacherDashboard = () => {
                         >
                           <option value="all">✅ All Types</option>
                           <option value="anagram">🧩 Anagram</option>
+                          <option value="name-it">🎯 Name It</option>
                           <option value="place-value-showdown">🎯 Place Value Showdown</option>
                           <option value="word-volley">🏓 Pong</option>
                           <option value="sentence-sense">📝 Sentence Sense</option>
@@ -2291,6 +2304,7 @@ const TeacherDashboard = () => {
                     <option value="spinner-wheel">🎡 Spinner Wheel</option>
                     <option value="sort-categories-egg">🥚 Sort Categories</option>
                     <option value="anagram">🧩 Anagram</option>
+                    <option value="name-it">🎯 Name It</option>
                     <option value="sentence-sense">📝 Sentence Sense</option>
                     <option value="place-value-showdown">🎯 Place Value Showdown</option>
                     <option value="word-volley">🏓 Pong</option>

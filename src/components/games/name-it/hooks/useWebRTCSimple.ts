@@ -348,6 +348,16 @@ export function useWebRTCSimple({
     } catch (err) {
       console.error('❌ Error handling signaling message:', err);
       setConnectionStatus('failed');
+      
+      // ✅ FIX: Reactivate Firebase fallback when WebRTC fails
+      if (roomIdRef.current && onMessage) {
+        console.log('🔄 WebRTC signaling failed - reactivating Firebase fallback');
+        const fallbackActivated = activateFirebaseFallback(roomIdRef.current, playerId, onMessage);
+        if (fallbackActivated) {
+          console.log('🔄 Firebase fallback reactivated after signaling failure');
+          setConnectionStatus('connected'); // Set back to connected since fallback is working
+        }
+      }
     }
   }, [playerId, sendSignalingMessage]);
 
@@ -436,10 +446,20 @@ export function useWebRTCSimple({
         try {
           console.log('🔄 Attempting ICE restart to recover connection...');
           pc.restartIce();
-        } catch (error) {
-          console.error('❌ ICE restart failed:', error);
-          setConnectionStatus('failed');
+              } catch (error) {
+        console.error('❌ ICE restart failed:', error);
+        setConnectionStatus('failed');
+        
+        // ✅ FIX: Reactivate Firebase fallback when WebRTC fails
+        if (roomIdRef.current && onMessage) {
+          console.log('🔄 WebRTC failed - reactivating Firebase fallback');
+          const fallbackActivated = activateFirebaseFallback(roomIdRef.current, playerId, onMessage);
+          if (fallbackActivated) {
+            console.log('🔄 Firebase fallback reactivated after WebRTC failure');
+            setConnectionStatus('connected'); // Set back to connected since fallback is working
+          }
         }
+      }
       }
     };
 
@@ -532,21 +552,22 @@ export function useWebRTCSimple({
       const channel = event.channel;
       dataChannelRef.current = channel;
 
+      // ✅ FIX: Set up message handler IMMEDIATELY, not waiting for onopen
+      if (onMessage) {
+        channel.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            console.log('📨 [JOINER] Received message:', message.type, message);
+            onMessage(message);
+          } catch (error) {
+            console.error('❌ [JOINER] Failed to parse incoming message:', error);
+          }
+        };
+      }
+
       channel.onopen = () => {
         console.log('🎉 [JOINER] Data channel opened successfully!');
         setConnectionStatus('connected');
-        
-        // Set up message handler
-        if (onMessage) {
-          channel.onmessage = (event) => {
-            try {
-              const message = JSON.parse(event.data);
-              onMessage(message);
-            } catch (error) {
-              console.error('❌ Failed to parse incoming message:', error);
-            }
-          };
-        }
         
         // Flush pending messages
         if (pendingActionsRef.current.length > 0) {
@@ -566,6 +587,16 @@ export function useWebRTCSimple({
       channel.onerror = (error) => {
         console.error('❌ [JOINER] Data channel error:', error);
         setConnectionStatus('failed');
+        
+        // ✅ FIX: Reactivate Firebase fallback when WebRTC fails
+        if (roomIdRef.current && onMessage) {
+          console.log('🔄 [JOINER] Data channel failed - reactivating Firebase fallback');
+          const fallbackActivated = activateFirebaseFallback(roomIdRef.current, playerId, onMessage);
+          if (fallbackActivated) {
+            console.log('🔄 [JOINER] Firebase fallback reactivated after data channel failure');
+            setConnectionStatus('connected'); // Set back to connected since fallback is working
+          }
+        }
       };
 
       channel.onclose = () => {
@@ -637,22 +668,23 @@ export function useWebRTCSimple({
       ordered: dc.ordered
     });
 
+    // ✅ FIX: Set up message handler IMMEDIATELY, not waiting for onopen
+    if (onMessage) {
+      dc.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          console.log('📨 [HOST] Received message:', message.type, message);
+          onMessage(message);
+        } catch (error) {
+          console.error('❌ [HOST] Failed to parse incoming message:', error);
+        }
+      };
+    }
+
     // Set up data channel handlers
     dc.onopen = () => {
       console.log('🎉 [HOST] Data channel opened successfully!');
       setConnectionStatus('connected');
-      
-      // Set up message handler
-      if (onMessage) {
-        dc.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            onMessage(message);
-          } catch (error) {
-            console.error('❌ Failed to parse incoming message:', error);
-          }
-        };
-      }
       
       // Flush pending messages
       if (pendingActionsRef.current.length > 0) {
@@ -672,6 +704,16 @@ export function useWebRTCSimple({
     dc.onerror = (error) => {
       console.error('❌ [HOST] Data channel error:', error);
       setConnectionStatus('failed');
+      
+      // ✅ FIX: Reactivate Firebase fallback when WebRTC fails
+      if (roomIdRef.current && onMessage) {
+        console.log('🔄 [HOST] Data channel failed - reactivating Firebase fallback');
+        const fallbackActivated = activateFirebaseFallback(roomIdRef.current, playerId, onMessage);
+        if (fallbackActivated) {
+          console.log('🔄 [HOST] Firebase fallback reactivated after data channel failure');
+          setConnectionStatus('connected'); // Set back to connected since fallback is working
+        }
+      }
     };
 
     dc.onclose = () => {

@@ -1,0 +1,38 @@
+{
+	"appId": "com.luminatelearn.student",
+	"appName": "LuminateLearn Student",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 2000,
+			"backgroundColor": "#4299E1",
+			"showSpinner": false,
+			"androidSplashResourceName": "splash",
+			"androidScaleType": "CENTER_CROP",
+			"iosSpinnerStyle": "small"
+		},
+		"StatusBar": {
+			"style": "light",
+			"backgroundColor": "#4299E1"
+		},
+		"Keyboard": {
+			"resize": "body"
+		},
+		"App": {
+			"deepLinkMatch": "exact"
+		}
+	},
+	"ios": {
+		"contentInset": "automatic",
+		"scrollEnabled": true,
+		"backgroundColor": "#ffffff",
+		"scheme": "luminatelearn"
+	},
+	"android": {
+		"allowMixedContent": true,
+		"backgroundColor": "#ffffff"
+	}
+}

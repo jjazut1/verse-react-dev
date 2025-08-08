@@ -10,6 +10,7 @@ interface GameAreaProps {
   timeLeft: number;
   formattedTime: string;
   isGameActive: boolean;
+  penaltyPlayerId?: string | null;
 }
 
 interface PlayerScoreDisplayProps {
@@ -96,7 +97,8 @@ export const GameArea: React.FC<GameAreaProps> = ({
   localPlayerId,
   timeLeft,
   formattedTime,
-  isGameActive
+  isGameActive,
+  penaltyPlayerId = null
 }) => {
   // ✅ CRITICAL: Validate GameArea props to catch React Error #300
   console.log('🔍 GAMEAREA: Rendering with props:', {
@@ -203,17 +205,30 @@ export const GameArea: React.FC<GameAreaProps> = ({
     player1Id: gameState.players[1]?.id,
     player0Name: gameState.players[0]?.name,
     player1Name: gameState.players[1]?.name,
+    player0Score: gameState.scoresByPlayerId[gameState.players[0]?.id] || 0,
+    player1Score: gameState.scoresByPlayerId[gameState.players[1]?.id] || 0,
     isLocalPlayerOne,
     isLocalPlayerTwo,
     isGameActive,
     player1CardClickable: isLocalPlayerOne && isGameActive,
     player2CardClickable: isLocalPlayerTwo && isGameActive,
+    leftSideDisplays: `Player 1 (${gameState.players[0]?.id?.slice(-8)}) score: ${gameState.scoresByPlayerId[gameState.players[0]?.id] || 0}`,
+    rightSideDisplays: `Player 2 (${gameState.players[1]?.id?.slice(-8)}) score: ${gameState.scoresByPlayerId[gameState.players[1]?.id] || 0}`,
+    scoresByPlayerId: gameState.scoresByPlayerId,
+    allScoreKeys: Object.keys(gameState.scoresByPlayerId),
     playersArray: gameState.players.map(p => ({
       id: p.id,
       name: p.name,
       isLocal: p.isLocal,
       connectionStatus: p.connectionStatus
     }))
+  });
+  
+  // 🔍 CRITICAL DEBUG: Verify score mapping
+  console.log('🔍 GAMEAREA: Score mapping verification:');
+  gameState.players.forEach((player, index) => {
+    const score = gameState.scoresByPlayerId[player.id] || 0;
+    console.log(`  Position ${index}: ${player.name}(${player.id.slice(-8)}, ${player.isLocal ? 'local' : 'remote'}) → Score: ${score}`);
   });
 
   const getTimeColor = () => {
@@ -344,6 +359,14 @@ export const GameArea: React.FC<GameAreaProps> = ({
         />
       )}
 
+      {/* Penalty overlay for Player 1 */}
+      {penaltyPlayerId && penaltyPlayerId === gameState.players[0]?.id && (
+        <Box position="absolute" top="38%" left="15%" transform="translate(-50%, -50%)" zIndex={3}
+             fontSize="32px" color="red.500" textShadow="0 0 6px rgba(0,0,0,0.2)">
+          ⛔
+        </Box>
+      )}
+
       {player2Card && (
         <GameCard
           card={player2Card}
@@ -353,6 +376,14 @@ export const GameArea: React.FC<GameAreaProps> = ({
           matchedIconId={gameState.matchFound?.playerId === gameState.players[1]?.id ? gameState.matchFound.iconId : undefined}
           showAnimation={gameState.gameStarted}
         />
+      )}
+
+      {/* Penalty overlay for Player 2 */}
+      {penaltyPlayerId && penaltyPlayerId === gameState.players[1]?.id && (
+        <Box position="absolute" top="38%" right="15%" transform="translate(50%, -50%)" zIndex={3}
+             fontSize="32px" color="red.500" textShadow="0 0 6px rgba(0,0,0,0.2)">
+          ⛔
+        </Box>
       )}
 
       {/* Player Scores - Position based on player array index, not local/remote */}

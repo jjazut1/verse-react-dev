@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { updateAssignment, createAttempt, getAssignmentByToken } from '../services/assignmentService';
 import { getDoc, doc, Timestamp, collection, query, where, limit, getDocs } from 'firebase/firestore';
@@ -21,6 +21,8 @@ import SpinnerWheel from '../components/games/spinner-wheel/SpinnerWheel';
 import SortCategoriesEggRevealAdapter from '../components/games/sort-categories-egg-reveal/SortCategoriesEggRevealAdapter';
 import AnagramAdapter from '../components/games/anagram/AnagramAdapter';
 import WordVolleyAdapter from '../components/games/word-volley/WordVolleyAdapter';
+import NameItAdapter from '../components/games/name-it/NameItAdapter';
+import AuthStableWrapper from '../components/games/name-it/AuthStableWrapper';
 
 
 interface Props {}
@@ -61,10 +63,29 @@ const GameByToken: React.FC<Props> = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showAuthForm, setShowAuthForm] = useState(false);
   
+  // ✅ AUTH STABILITY: Prevent auth changes from unmounting game during play
+  const [stableUserForGame, setStableUserForGame] = useState<any>(null);
+  const [authLocked, setAuthLocked] = useState(false);
+  
   // Add a state to track if reload is needed after high score modal
   const [pendingReload, setPendingReload] = useState(false);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
   const [isHighScoreProcessing, setIsHighScoreProcessing] = useState(false);
+  
+  // ✅ DEBUGGING: Track state changes that could cause unmount/remount
+  useEffect(() => {
+    console.log('🎯 GAMEBYTOKEN: Critical state changed - could cause unmount:', {
+      isPlaying,
+      hasAssignment: !!assignment,
+      hasGameConfig: !!gameConfig,
+      gameConfigType: gameConfig?.type,
+      hasCurrentUser: !!currentUser,
+      currentUserId: currentUser?.uid,
+      isAuthenticated,
+      loading,
+      timestamp: new Date().toISOString()
+    });
+  }, [isPlaying, assignment, gameConfig, currentUser, isAuthenticated, loading]);
   
   // Single PWA window enforcement for game windows
   useSinglePWAWindow({
@@ -81,6 +102,12 @@ const GameByToken: React.FC<Props> = () => {
   // Check authentication status on component mount
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // ✅ AUTH STABILITY: If auth is locked during gameplay, prevent changes
+      if (authLocked && isPlaying) {
+        console.log('🔒 AUTH LOCKED: Ignoring auth state change during gameplay:', user?.uid);
+        return;
+      }
+      
       // Check for direct access mode
       const isDirectAccess = isEmailLinkAccess || 
                             sessionStorage.getItem('direct_token_access') === 'true' || 
@@ -106,7 +133,7 @@ const GameByToken: React.FC<Props> = () => {
         // Normal authentication flow
         setIsAuthenticated(!!user);
         setCurrentUser(user);
-        console.log('Authentication state changed:', { authenticated: !!user, email: user?.email });
+        console.log('Authentication state changed:', { authenticated: !!user, email: user?.email, authLocked, isPlaying });
       }
       
       // Close the auth form if the user is now authenticated
@@ -116,7 +143,7 @@ const GameByToken: React.FC<Props> = () => {
     });
     
     return () => unsubscribe();
-  }, [isEmailLinkAccess, assignment, searchParams]);
+  }, [isEmailLinkAccess, assignment, searchParams, authLocked, isPlaying]);
   
   // Enhanced email link and PWA launcher parameter detection
   useEffect(() => {
@@ -518,6 +545,13 @@ const GameByToken: React.FC<Props> = () => {
   
   // Update handleStartGame to skip authentication for email links
   const handleStartGame = () => {
+    // ✅ AUTH STABILITY: Lock auth state when game starts to prevent unmount/remount
+    if (currentUser && isAuthenticated) {
+      setStableUserForGame(currentUser);
+      setAuthLocked(true);
+      console.log('🔒 AUTH LOCKED for gameplay - user stabilized:', currentUser.uid || currentUser.email);
+    }
+    
     setIsPlaying(true);
     setStartTime(new Date());
     
@@ -716,8 +750,12 @@ const GameByToken: React.FC<Props> = () => {
   
 
   
-  // Update handleGameComplete to NOT reload immediately after attempt save
-  const handleGameComplete = async (score: number) => {
+  // ✅ STABILITY FIX: Wrap in useCallback to prevent hook reinitializations
+  const handleGameComplete = useCallback(async (score: number) => {
+    // ✅ AUTH STABILITY: Unlock auth state when game completes
+    console.log('🔓 AUTH UNLOCKED: Game completed, auth changes allowed again');
+    setAuthLocked(false);
+    setStableUserForGame(null);
     // Clear any previous save errors
     setSaveError(null);
     
@@ -842,7 +880,7 @@ const GameByToken: React.FC<Props> = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [setAuthLocked, setStableUserForGame, setSaveError, assignment, startTime, gameConfig, isAuthenticated, currentUser, setAuthEmail, setIsPlaying, setShowAuthForm, setIsSubmitting]);
   
   // Check if pending game data exists and resume after authentication
   useEffect(() => {
@@ -869,13 +907,13 @@ const GameByToken: React.FC<Props> = () => {
     }
   }, [isAuthenticated, currentUser]);
   
-  // New handlers for high score process
-  const handleHighScoreProcessStart = () => {
+  // ✅ STABILITY FIX: Wrap high score handlers in useCallback  
+  const handleHighScoreProcessStart = useCallback(() => {
     console.log('GameByToken: High score process started');
     setIsHighScoreProcessing(true);
-  };
+  }, [setIsHighScoreProcessing]);
 
-  const handleHighScoreProcessComplete = () => {
+  const handleHighScoreProcessComplete = useCallback(() => {
     console.log('GameByToken: High score process completed');
     setIsHighScoreProcessing(false);
     
@@ -893,7 +931,7 @@ const GameByToken: React.FC<Props> = () => {
         loadGameAndAssignment(token);
       }
     }, 1000);
-  };
+  }, [setIsHighScoreProcessing, setIsPlaying, setStartTime, setPendingReload, setHasAutoStarted, token]);
   
   // Check if assignment is past due
   const isPastDue = () => {
@@ -1080,6 +1118,18 @@ const GameByToken: React.FC<Props> = () => {
               onHighScoreProcessStart={handleHighScoreProcessStart}
               onHighScoreProcessComplete={handleHighScoreProcessComplete}
             />
+          );
+        case 'name-it':
+          return (
+            <AuthStableWrapper>
+              <NameItAdapter
+                config={gameConfig}
+                onGameComplete={handleGameComplete}
+                playerName={studentName}
+                onHighScoreProcessStart={handleHighScoreProcessStart}
+                onHighScoreProcessComplete={handleHighScoreProcessComplete}
+              />
+            </AuthStableWrapper>
           );
 
         default:

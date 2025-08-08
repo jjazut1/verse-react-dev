@@ -251,7 +251,8 @@ export const useGameLogic = ({
     winner: null,
     showHighScoreModal: false,
     isNewHighScore: false,
-    matchFound: null
+    matchFound: null,
+    scoresByPlayerId: {} // ✅ FIX: Add missing scoresByPlayerId property
   });
 
   // Game timers
@@ -286,6 +287,7 @@ export const useGameLogic = ({
       currentRound: gameState.currentRound,
       cards: gameState.cards,
       matchFound: gameState.matchFound,
+      scoresByPlayerId: gameState.scoresByPlayerId, // ✅ ADD: Include scores in shared state
       // ✅ CRITICAL: Exclude players array to prevent WebRTC reinit during Player 2 join
       // Players are managed separately via WebRTC player actions, not state sync
       // This prevents connection destruction during handshake
@@ -304,7 +306,8 @@ export const useGameLogic = ({
     gameState.gamePaused,
     gameState.currentRound,
     gameState.cards,
-    gameState.matchFound
+    gameState.matchFound,
+    gameState.scoresByPlayerId // ✅ ADD: Include scores in dependency array
     // ✅ CRITICAL REMOVAL: players array excluded to prevent connection destruction
   ]);
 
@@ -475,18 +478,8 @@ export const useGameLogic = ({
         resetGame(true); // Pass fromRemote = true to prevent infinite loop
         break;
       case 'score_update':
-        if (action.playerId && typeof action.score === 'number') {
-          console.log('📊 Updating remote player score:', action.playerId, action.score);
-          setGameState(prev => ({
-            ...prev,
-            players: prev.players.map(p => 
-              // Map any remote player ID to our local "remote-player" entry
-              !p.isLocal 
-                ? { ...p, score: action.score as number }
-                : p
-            )
-          }));
-        }
+        // ✅ Score updates now handled via automatic game state sync
+        console.log('📊 useGameLogic: Received deprecated score_update action - ignoring (scores sync via game state)');
         break;
       case 'new_cards':
         console.log('📥 RECEIVED new_cards action with cards:', action.cards?.length || 0);
@@ -801,16 +794,8 @@ export const useGameLogic = ({
         matchFound: { playerId, iconId }
       }));
 
-      // Send score update to remote player if multiplayer
-      if (config.enableWebRTC && player.isLocal) {
-        console.log(`📤 Sending score update to remote player: ${newScore}`);
-        sendPlayerAction({
-          type: 'score_update',
-          playerId,
-          score: newScore,
-          timestamp: Date.now()
-        });
-      }
+      // ✅ Score updates now handled via automatic game state sync
+      // No need to send individual score_update actions
 
       // Show match feedback briefly, then generate new cards
       if (matchFeedbackTimerRef.current) {

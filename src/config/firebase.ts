@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFunctions } from 'firebase/functions';
+import { getDatabase } from 'firebase/database';
 
 // Safely get environment variables
 const getRequiredEnvVar = (key: string): string => {
@@ -22,6 +23,7 @@ const getRequiredEnvVar = (key: string): string => {
 const firebaseConfig = {
   apiKey: getRequiredEnvVar('VITE_FIREBASE_API_KEY'),
   authDomain: getRequiredEnvVar('VITE_FIREBASE_AUTH_DOMAIN'),
+  databaseURL: getRequiredEnvVar('VITE_FIREBASE_DATABASE_URL'),
   projectId: getRequiredEnvVar('VITE_FIREBASE_PROJECT_ID'),
   storageBucket: getRequiredEnvVar('VITE_FIREBASE_STORAGE_BUCKET'),
   messagingSenderId: getRequiredEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID'),
@@ -38,6 +40,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app);
+const rtdb = getDatabase(app);
 
 // Set auth persistence to LOCAL (instead of default SESSION)
 // This will keep the user logged in even if they close the browser
@@ -47,4 +50,4 @@ setPersistence(auth, browserLocalPersistence)
     console.error('Error setting auth persistence:', error);
   });
 
-export { db, auth, functions }; 
+export { db, auth, functions, rtdb }; 
