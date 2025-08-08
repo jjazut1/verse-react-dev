@@ -11,6 +11,7 @@ import {
   InputRightElement,
   Text,
   Box,
+  Center,
   useToast,
   Modal,
   ModalOverlay,
@@ -72,6 +73,8 @@ export const GameControls: React.FC<GameControlsProps> = ({
   const [joinRoomId, setJoinRoomId] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
+  const [isInviteModalOpen, setInviteModalOpen] = useState(false);
+  const [showQR, setShowQR] = useState(true);
   
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
@@ -194,6 +197,22 @@ export const GameControls: React.FC<GameControlsProps> = ({
     }
   };
 
+  const shareInvite = async () => {
+    const link = buildInviteLink();
+    const data = { title: 'Join Name It', text: 'Tap to join my game:', url: link } as ShareData;
+    // @ts-ignore - navigator.share may be undefined in some environments
+    if (navigator.share) {
+      try { await navigator.share(data); return; } catch (e) { /* user canceled or error */ }
+    }
+    copyInviteLink();
+  };
+
+  const shortInviteText = () => roomId ? `?guest=1&room=${roomId}` : '';
+  const qrImageUrl = () => {
+    const link = buildInviteLink();
+    return link ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(link)}` : '';
+  };
+
   const getConnectionStatusColor = () => {
     switch (connectionStatus) {
       case 'connected': return 'green';
@@ -287,6 +306,24 @@ export const GameControls: React.FC<GameControlsProps> = ({
                           onClick={copyInviteLink}
                         />
                       </Tooltip>
+                      <Tooltip label="Share Invite">
+                        <IconButton
+                          icon={<LinkIcon />}
+                          size="xs"
+                          variant="ghost"
+                          aria-label="Share Invite"
+                          onClick={shareInvite}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Show QR">
+                        <IconButton
+                          icon={<CopyIcon />}
+                          size="xs"
+                          variant="ghost"
+                          aria-label="Show QR"
+                          onClick={() => setInviteModalOpen(true)}
+                        />
+                      </Tooltip>
                 </HStack>
               )}
             </HStack>
@@ -297,6 +334,28 @@ export const GameControls: React.FC<GameControlsProps> = ({
               </Text>
             )}
           </VStack>
+        )}
+
+        {/* Waiting banner */}
+        {isMultiplayerEnabled && roomId && (
+          <Box
+            width="100%"
+            backgroundColor={gameState.players.length > 1 ? 'green.50' : 'yellow.50'}
+            border="1px solid"
+            borderColor={gameState.players.length > 1 ? 'green.200' : 'yellow.200'}
+            padding={2}
+            borderRadius="md"
+            textAlign="center"
+          >
+            <HStack justify="center" spacing={3} wrap="wrap">
+              <Text fontSize="sm" color={gameState.players.length > 1 ? 'green.700' : 'yellow.700'} fontWeight="medium">
+                {gameState.players.length > 1 ? 'Player 2 connected ✔' : 'Waiting for Player 2…'}
+              </Text>
+              <Button size="xs" onClick={copyInviteLink}>Copy</Button>
+              <Button size="xs" onClick={shareInvite} variant="outline">Share</Button>
+              <Button size="xs" onClick={() => setInviteModalOpen(true)} variant="ghost">QR</Button>
+            </HStack>
+          </Box>
         )}
 
         {/* Game Instructions */}
@@ -323,6 +382,39 @@ export const GameControls: React.FC<GameControlsProps> = ({
           </Box>
         )}
       </VStack>
+
+      {/* Invite Modal (auto after create room) */}
+      <Modal isOpen={isInviteModalOpen} onClose={() => setInviteModalOpen(false)} size="md">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Share Invite</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={3} align="stretch">
+              <Box>
+                <Text fontSize="sm" color="gray.600">Short link</Text>
+                <Input value={shortInviteText()} isReadOnly fontFamily="mono" title={buildInviteLink()} />
+                <HStack mt={2}>
+                  <Button size="sm" onClick={copyInviteLink}>Copy</Button>
+                  <Button size="sm" variant="outline" onClick={shareInvite}>Share</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowQR(!showQR)}>
+                    {showQR ? 'Hide QR' : 'Show QR'}
+                  </Button>
+                </HStack>
+              </Box>
+              {showQR && roomId && (
+                <Center>
+                  {/* External QR service for simplicity */}
+                  <img src={qrImageUrl()} alt="Invite QR" style={{ width: 220, height: 220 }} />
+                </Center>
+              )}
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={() => setInviteModalOpen(false)}>Close</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       {/* Multiplayer Setup Modal */}
       <Modal isOpen={isOpen} onClose={onClose} size="md">
