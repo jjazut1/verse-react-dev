@@ -1,5 +1,7 @@
 import React, { ReactNode, useEffect, useState, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { signInAnonymously } from 'firebase/auth';
+import { auth as firebaseAuth } from '../../../config/firebase';
 import { Center, Spinner, Box } from '@chakra-ui/react';
 
 interface AuthStableWrapperProps {
@@ -36,6 +38,26 @@ const AuthStableWrapperComponent: React.FC<AuthStableWrapperProps> = ({
       setIsAuthInitialized(true);
       console.log('🔒 AUTH STABILIZED: User locked for game session:', auth.currentUser.uid);
     }
+  }, [auth.currentUser, isAuthInitialized]);
+
+  // ✅ GUEST FLOW: If invite link (?guest=1) and no user, sign in anonymously
+  useEffect(() => {
+    if (isAuthInitialized || auth.currentUser) return;
+    const params = new URLSearchParams(window.location.search);
+    const isGuest = params.get('guest') === '1';
+    if (!isGuest) return;
+    (async () => {
+      try {
+        console.log('👤 GUEST: Attempting anonymous sign-in...');
+        const cred = await signInAnonymously(firebaseAuth);
+        stableUserRef.current = cred.user;
+        console.log('✅ GUEST: Anonymous sign-in complete:', cred.user.uid);
+      } catch (err) {
+        console.warn('⚠️ GUEST: Anonymous sign-in failed, proceeding without auth', err);
+      } finally {
+        setIsAuthInitialized(true);
+      }
+    })();
   }, [auth.currentUser, isAuthInitialized]);
   
   // ✅ DEBUGGING: Track auth changes during stabilized session
