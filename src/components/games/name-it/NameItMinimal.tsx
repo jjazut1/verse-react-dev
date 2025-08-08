@@ -951,6 +951,25 @@ const NameItMinimal: React.FC<NameItProps> = ({
     }
   }, [webrtc, playerId, playerName]);
 
+  // Auto-join when arriving via invite link (?guest=1&room=ROOM)
+  useEffect(() => {
+    if (!enableWebRTC) return;
+    const params = new URLSearchParams(window.location.search);
+    const inviteRoom = params.get('room');
+    if (inviteRoom && webrtc.connectionStatus === 'disconnected') {
+      console.log('🔗 Auto-joining room from invite link:', inviteRoom);
+      webrtc.joinRoom(inviteRoom).then(() => {
+        // Announce presence to host
+        webrtc.sendMessage({
+          type: 'player_action',
+          data: { type: 'player_join', playerInfo: { id: playerId, name: playerName }, timestamp: Date.now() },
+          timestamp: Date.now(),
+          playerId
+        });
+      }).catch((e: any) => console.error('❌ Auto-join failed:', e));
+    }
+  }, [enableWebRTC, webrtc.connectionStatus, webrtc, playerId, playerName]);
+
   return (
     <Box width="100%" padding={4}>
       <VStack spacing={4}>
