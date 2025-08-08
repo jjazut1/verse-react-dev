@@ -174,6 +174,26 @@ export const GameControls: React.FC<GameControlsProps> = ({
     }
   };
 
+  const buildInviteLink = () => {
+    if (!roomId) return '';
+    const origin = window.location.origin;
+    const path = window.location.pathname;
+    return `${origin}${path}?guest=1&room=${roomId}`;
+  };
+
+  const copyInviteLink = () => {
+    const link = buildInviteLink();
+    if (link) {
+      navigator.clipboard.writeText(link);
+      toast({
+        title: 'Invite link copied!',
+        description: 'Share this link with your guest player',
+        status: 'success',
+        duration: 3000,
+      });
+    }
+  };
+
   const getConnectionStatusColor = () => {
     switch (connectionStatus) {
       case 'connected': return 'green';
@@ -258,6 +278,15 @@ export const GameControls: React.FC<GameControlsProps> = ({
                       onClick={copyRoomId}
                     />
                   </Tooltip>
+                      <Tooltip label="Copy Invite Link (guest)">
+                        <IconButton
+                          icon={<LinkIcon />}
+                          size="xs"
+                          variant="ghost"
+                          aria-label="Copy Invite Link"
+                          onClick={copyInviteLink}
+                        />
+                      </Tooltip>
                 </HStack>
               )}
             </HStack>
@@ -396,6 +425,15 @@ export const GameControls: React.FC<GameControlsProps> = ({
                         </HStack>
                         <Text fontSize="xs" color="gray.500" mt={1}>
                           Share this ID with friends to play together
+                        </Text>
+                        <HStack mt={3}>
+                          <Input value={buildInviteLink()} isReadOnly />
+                          <Button size="sm" leftIcon={<LinkIcon />} onClick={copyInviteLink}>
+                            Copy Invite Link
+                          </Button>
+                        </HStack>
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                          Invite link opens guest mode and auto-fills the room
                         </Text>
                       </Box>
                     </>

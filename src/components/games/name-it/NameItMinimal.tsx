@@ -925,7 +925,10 @@ const NameItMinimal: React.FC<NameItProps> = ({
   }, [webrtc, playerId, playerName, playerMapping, stableUpdatePlayersFromMapping, isGuestSession]);
 
   const handleJoinRoom = useCallback(async () => {
-    const roomId = prompt('Enter room ID:');
+    // Prefer URL param if present (invite link)
+    const urlParams = new URLSearchParams(window.location.search);
+    const prefilled = urlParams.get('room') || '';
+    const roomId = prefilled || prompt('Enter room ID:');
     if (roomId) {
       try {
         await webrtc.joinRoom(roomId);
@@ -961,11 +964,18 @@ const NameItMinimal: React.FC<NameItProps> = ({
             </Text>
           )}
           {enableWebRTC && webrtc.roomId && (
-            <Text fontSize="sm" color="blue.600" fontFamily="monospace" cursor="pointer" 
-                  onClick={() => navigator.clipboard?.writeText(webrtc.roomId || '')}
-                  title="Click to copy room ID">
-              📋 Copy Room ID: {webrtc.roomId}
-            </Text>
+            <VStack spacing={1} mt={1}>
+              <Text fontSize="sm" color="blue.600" fontFamily="monospace" cursor="pointer" 
+                    onClick={() => navigator.clipboard?.writeText(webrtc.roomId || '')}
+                    title="Click to copy room ID">
+                📋 Copy Room ID: {webrtc.roomId}
+              </Text>
+              <Text fontSize="sm" color="blue.600" fontFamily="monospace" cursor="pointer"
+                    onClick={() => navigator.clipboard?.writeText(`${window.location.origin}${window.location.pathname}?guest=1&room=${webrtc.roomId}`)}
+                    title="Click to copy guest invite link">
+                🔗 Copy Invite Link: ?guest=1&room={webrtc.roomId}
+              </Text>
+            </VStack>
           )}
         </Box>
 
