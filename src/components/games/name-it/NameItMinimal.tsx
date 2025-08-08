@@ -427,6 +427,8 @@ const NameItMinimal: React.FC<NameItProps> = ({
     onMessage: handleWebRTCMessage
   });
 
+  const isGuestPlayer = enableWebRTC && isGuestSession && !webrtc.isHost;
+
   // Prevent WebRTC disconnection when switching tabs and sync game state
   useEffect(() => {
     if (!enableWebRTC || webrtc.connectionStatus !== 'connected') return;
@@ -1016,6 +1018,11 @@ const NameItMinimal: React.FC<NameItProps> = ({
               Connection: {webrtc.connectionStatus} | Room: {webrtc.roomId || 'None'}
             </Text>
           )}
+          {isGuestPlayer && (
+            <Box mt={2} display="inline-block" bg="yellow.50" border="1px solid" borderColor="yellow.200" px={3} py={1} borderRadius="md">
+              <Text fontSize="sm" color="yellow.700">Guest mode • Host controls start</Text>
+            </Box>
+          )}
           {enableWebRTC && webrtc.roomId && (
             <VStack spacing={2} mt={1}>
               <Text fontSize="sm" color="blue.600" fontFamily="monospace" cursor="pointer" 
@@ -1039,7 +1046,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
 
         {/* Controls */}
         <HStack spacing={4}>
-          <Button colorScheme="green" onClick={startGame} disabled={gameState.gameStarted}>
+          <Button colorScheme="green" onClick={startGame} disabled={gameState.gameStarted || isGuestPlayer}>
             Start Game
           </Button>
           {!gameState.gamePaused ? (
@@ -1075,6 +1082,38 @@ const NameItMinimal: React.FC<NameItProps> = ({
           formattedTime={formatTime(gameState.timeLeft)}
           isGameActive={gameState.gameStarted && !gameState.gameCompleted}
         />
+
+        {/* Guest waiting/connection overlay */}
+        {isGuestPlayer && (
+          <Box mt={2} width="100%" textAlign="center">
+            {webrtc.connectionStatus !== 'connected' ? (
+              <Box display="inline-block" bg="blue.50" border="1px solid" borderColor="blue.200" px={3} py={2} borderRadius="md">
+                <Text fontSize="sm" color="blue.700">
+                  {webrtc.connectionStatus === 'connecting' ? 'Connecting to Host…' : 'Disconnected'}
+                  {webrtc.roomId ? ` • Room ${webrtc.roomId}` : ''}
+                </Text>
+                <HStack spacing={2} justify="center" mt={2}>
+                  <Button size="xs" onClick={() => webrtc.roomId && webrtc.joinRoom(webrtc.roomId!)}>Reconnect</Button>
+                  <Button size="xs" variant="outline" onClick={() => { webrtc.disconnect(); window.location.href = window.location.pathname; }}>Leave room</Button>
+                </HStack>
+              </Box>
+            ) : (
+              !gameState.gameStarted && (
+                <Box display="inline-block" bg="green.50" border="1px solid" borderColor="green.200" px={3} py={2} borderRadius="md">
+                  <Text fontSize="sm" color="green.700">Connected • Room {webrtc.roomId}</Text>
+                  <Box mt={3} bg="yellow.50" border="1px solid" borderColor="yellow.200" px={3} py={2} borderRadius="md">
+                    <Text fontSize="sm" color="yellow.700" fontWeight="medium">Waiting for Host to start</Text>
+                    <HStack spacing={2} justify="center" mt={2}>
+                      <Button size="xs" colorScheme="blue" onClick={() => webrtc.sendMessage({ type: 'player_action', data: { type: 'player_ready', timestamp: Date.now() }, timestamp: Date.now(), playerId })}>I’m Ready</Button>
+                      <Button size="xs" variant="outline" onClick={() => { try { new Audio('/sounds/pop.mp3').play(); } catch {} }}>Sound test</Button>
+                      <Button size="xs" variant="ghost" onClick={() => { webrtc.disconnect(); window.location.href = window.location.pathname; }}>Leave room</Button>
+                    </HStack>
+                  </Box>
+                </Box>
+              )
+            )}
+          </Box>
+        )}
 
         {/* Debug Info */}
         <Box fontSize="sm" color="gray.600" textAlign="center">
