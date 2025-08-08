@@ -19,6 +19,8 @@ interface UseGameLogicProps {
   onHighScoreProcessStart?: () => void;
   onHighScoreProcessComplete?: () => void;
   configId?: string;
+  // When true, treat this client as a guest session regardless of auth state
+  forceGuestSession?: boolean;
 }
 
 interface UseGameLogicReturn {
@@ -61,7 +63,8 @@ export const useGameLogic = ({
   onGameComplete,
   onHighScoreProcessStart,
   onHighScoreProcessComplete,
-  configId = 'default'
+  configId = 'default',
+  forceGuestSession = false
 }: UseGameLogicProps): UseGameLogicReturn => {
   
   // ✅ CRITICAL FIX: Validate and fix iconSet IMMEDIATELY before any other logic
@@ -161,10 +164,17 @@ export const useGameLogic = ({
   
   // ✅ STABILITY FIX: Memoize currentUser.uid to prevent constant recreations
   const stablePlayerId = useMemo(() => {
+    if (forceGuestSession) {
+      // Generate a stable guest ID per session; if signed-in, mask with guest prefix
+      const base = currentUser?.uid || 'anon';
+      const guestId = `guest-${base}`;
+      console.log('🔄 USEGAMELOGIC: Guest session active. Using guest player ID:', guestId);
+      return guestId;
+    }
     const playerId = currentUser?.uid || 'local-player';
     console.log('🔄 USEGAMELOGIC: Player ID stabilized:', playerId);
     return playerId;
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, forceGuestSession]);
   
   // ✅ ENHANCED SAFETY: Robust config initialization with multiple fallbacks
   const configRef = useRef<GameConfig>();
@@ -876,8 +886,9 @@ export const useGameLogic = ({
       winner
     }));
 
-    // Save high score and show modal
-    if (localPlayer) {
+    // Save high score and show modal only for single-player, non-guest sessions
+    const isSinglePlayer = !config.enableWebRTC;
+    if (localPlayer && isSinglePlayer && !forceGuestSession) {
       saveHighScore(finalScore, localPlayer.name);
       setShowHighScoreModal(true);
     }
@@ -886,7 +897,7 @@ export const useGameLogic = ({
     if (onGameComplete) {
       onGameComplete(finalScore, timeElapsed);
     }
-  }, [gameState.players, gameState.timeLeft, config.gameTime, config.difficulty, saveHighScore, setShowHighScoreModal, onGameComplete]);
+  }, [gameState.players, gameState.timeLeft, config.gameTime, config.difficulty, saveHighScore, setShowHighScoreModal, onGameComplete, forceGuestSession, config.enableWebRTC]);
 
   // WebRTC controls
   const enableMultiplayer = useCallback(() => {
@@ -905,11 +916,15 @@ export const useGameLogic = ({
   }, [webrtcDisconnect]);
 
   const createRoom = useCallback(async (): Promise<string> => {
+    if (forceGuestSession) {
+      console.warn('🚫 Guest sessions cannot create rooms');
+      throw new Error('Guest sessions cannot create rooms');
+    }
     console.log('🏠 CREATING ROOM in useGameLogic...');
     const roomId = await webrtcCreateRoom();
     console.log('🏠 ROOM CREATED in useGameLogic:', roomId);
     return roomId;
-  }, [webrtcCreateRoom]);
+  }, [webrtcCreateRoom, forceGuestSession]);
 
   const joinRoom = useCallback(async (roomId: string): Promise<void> => {
     await webrtcJoinRoom(roomId);

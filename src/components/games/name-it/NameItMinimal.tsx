@@ -21,6 +21,14 @@ const NameItMinimal: React.FC<NameItProps> = ({
   const { currentUser } = useAuth();
   const playerId = currentUser?.uid || 'local-player';
   const playerMapping = usePlayerMapping();
+  const isGuestSession = useMemo(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('guest') === '1';
+    } catch {
+      return false;
+    }
+  }, []);
   
   // Refs to track if player order has been set
   const hasReorderedPlayersRef = useRef(false);
@@ -886,6 +894,10 @@ const NameItMinimal: React.FC<NameItProps> = ({
 
   // Create/Join room handlers
   const handleCreateRoom = useCallback(async () => {
+    if (isGuestSession) {
+      console.warn('🚫 Guest sessions cannot create rooms');
+      return;
+    }
     try {
       const roomId = await webrtc.createRoom();
       console.log('🏠 NameItMinimal: Room created:', roomId);
@@ -910,7 +922,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
     } catch (error) {
       console.error('❌ NameItMinimal: Failed to create room:', error);
     }
-  }, [webrtc, playerId, playerName, playerMapping, stableUpdatePlayersFromMapping]);
+  }, [webrtc, playerId, playerName, playerMapping, stableUpdatePlayersFromMapping, isGuestSession]);
 
   const handleJoinRoom = useCallback(async () => {
     const roomId = prompt('Enter room ID:');
@@ -976,7 +988,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
           </Button>
           {enableWebRTC && (
             <>
-              <Button colorScheme="blue" onClick={handleCreateRoom} disabled={webrtc.connectionStatus !== 'disconnected'}>
+              <Button colorScheme="blue" onClick={handleCreateRoom} disabled={webrtc.connectionStatus !== 'disconnected' || isGuestSession}>
                 Create Room
               </Button>
               <Button colorScheme="purple" onClick={handleJoinRoom} disabled={webrtc.connectionStatus !== 'disconnected'}>

@@ -165,7 +165,17 @@ const NameItComponent: React.FC<NameItProps> = ({
   }, [gameLogicProps]);
   
   // ✅ CRITICAL FIX: Call useGameLogic hook ALWAYS (no conditional returns before this)
-  const gameLogic = useGameLogic(gameLogicProps);
+  // Detect guest mode via URL query (?guest=1) and pass through
+  const isGuestSession = useMemo(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('guest') === '1';
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const gameLogic = useGameLogic({ ...gameLogicProps, forceGuestSession: isGuestSession });
 
   // ✅ SAFETY: After ALL hooks are called, now we can do conditional rendering
   console.log('🔍 NAMEIT: Post-hook validation - gameLogic exists:', !!gameLogic);
@@ -441,6 +451,7 @@ const NameItComponent: React.FC<NameItProps> = ({
           onDisableMultiplayer={gameLogic.disableMultiplayer}
           onCreateRoom={gameLogic.createRoom}
           onJoinRoom={gameLogic.joinRoom}
+          isGuestSession={isGuestSession}
         />
       </VStack>
 

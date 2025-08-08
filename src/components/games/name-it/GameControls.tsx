@@ -38,6 +38,7 @@ interface GameControlsProps {
   isMultiplayerEnabled: boolean;
   connectionStatus: string;
   roomId: string | null;
+  isGuestSession?: boolean;
   
   // Game controls
   onStartGame: () => void;
@@ -58,6 +59,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
   isMultiplayerEnabled,
   connectionStatus,
   roomId,
+  isGuestSession = false,
   onStartGame,
   onResetGame,
   onPauseGame,
@@ -236,7 +238,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
         </HStack>
 
         {/* Multiplayer Status */}
-        {isMultiplayerEnabled && (
+            {isMultiplayerEnabled && (
           <VStack spacing={2}>
             <HStack spacing={2}>
               <Badge colorScheme={getConnectionStatusColor()}>
@@ -311,15 +313,17 @@ export const GameControls: React.FC<GameControlsProps> = ({
                     colorScheme={isMultiplayerEnabled ? 'red' : 'green'}
                     variant="outline"
                     onClick={isMultiplayerEnabled ? onDisableMultiplayer : onEnableMultiplayer}
+                    isDisabled={isGuestSession}
                   >
                     {isMultiplayerEnabled ? 'Disable' : 'Enable'}
                   </Button>
                 </HStack>
                 <Text fontSize="sm" color="gray.600">
-                  {isMultiplayerEnabled 
-                    ? 'Multiplayer is enabled. You can create or join rooms.'
-                    : 'Enable multiplayer to play with friends in real-time.'
-                  }
+                  {isGuestSession
+                    ? 'Guest session: you can join a room shared by Host. Creating rooms is disabled.'
+                    : isMultiplayerEnabled 
+                      ? 'Multiplayer is enabled. You can create or join rooms.'
+                      : 'Enable multiplayer to play with friends in real-time.'}
                 </Text>
               </Box>
 
@@ -337,11 +341,14 @@ export const GameControls: React.FC<GameControlsProps> = ({
                       onClick={handleCreateRoom}
                       isLoading={isCreatingRoom}
                       loadingText="Creating..."
+                      isDisabled={isGuestSession}
                     >
                       Create Room & Copy ID
                     </Button>
                     <Text fontSize="xs" color="gray.500" mt={1}>
-                      Creates a new room and copies the ID to your clipboard
+                      {isGuestSession
+                        ? 'Guests cannot create rooms. Ask the Host to share a room ID.'
+                        : 'Creates a new room and copies the ID to your clipboard'}
                     </Text>
                   </Box>
 
