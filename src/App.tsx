@@ -24,6 +24,8 @@ import AnagramConfig from './pages/configurations/AnagramConfig'
 import SentenceSenseConfig from './pages/configurations/SentenceSenseConfig'
 import PlaceValueShowdownConfig from './pages/configurations/PlaceValueShowdownConfig'
 import WordVolleyConfig from './pages/configurations/WordVolleyConfig'
+import NameItConfig from './pages/configurations/NameItConfig'
+import IsolationTest from './components/games/name-it/IsolationTest'
 import LinkInterceptor from './components/LinkInterceptor'
 import SmartRouter from './pages/SmartRouter'
 import EmailLinkRouter from './pages/EmailLinkRouter'
@@ -528,6 +530,14 @@ const router = createBrowserRouter([
       {
         path: "word-volley/:templateId",
         element: <WordVolleyConfig />
+      },
+      {
+        path: "name-it",
+        element: <NameItConfig />
+      },
+      {
+        path: "name-it/:templateId",
+        element: <NameItConfig />
       }
       // Additional game configuration routes will be added here
     ]
@@ -563,6 +573,11 @@ const router = createBrowserRouter([
   {
     path: "*",
     element: <Navigate to="/" replace />,
+    errorElement: <ErrorBoundary />,
+  },
+  {
+    path: "/isolation-test",
+    element: <IsolationTest />,
     errorElement: <ErrorBoundary />,
   }
 ]);

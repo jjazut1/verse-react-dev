@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launching LuminateLearn...</title>
+    
+    <!-- Cache busting for immediate updates -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Version: Auto-Complete v2.0 - No Alert Dialog -->
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        
+        .status {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 20px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        .fallback-button {
+            display: none;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .fallback-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .ios-notice {
+            display: none;
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid rgba(255, 193, 7, 0.5);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📱</div>
+                  <div class="title">Launching LuminateLearn</div>
+        <div class="subtitle">Detecting the best way to open your content...</div>
+        <div class="spinner"></div>
+        <div class="status" id="status">Checking for installed app...</div>
+        
+        <a href="#" class="fallback-button" id="fallbackButton">
+            Continue in Browser
+        </a>
+        
+        <div class="ios-notice" id="iosNotice">
+            <strong>📱 iOS Users:</strong> If you have the LuminateLearn app installed, 
+            you may need to manually switch to it after this page loads.
+        </div>
+    </div>
+
+    <script>
+        // Immediate logging to confirm script execution
+        console.log('🚀 Launcher v2.0 - Auto-Complete (No Alert Dialog)');
+        console.log('🚀 Launch script executing immediately!');
+        console.log('🚀 Location:', window.location.href);
+        // alert('🚀 Launch script started! URL: ' + window.location.href); // Removed for seamless UX
+        
+        // Launch interceptor with improved logic
+        (function () {
+            console.log('🚀 IIFE starting...');
+            
+            const CONFIG = {
+                fallbackDelay: 3000,
+                pwaDetectionDelay: 1000,
+                telemetryEndpoint: null, // Optional: Set to your logging server
+            };
+
+            function debugLog(message, level = 'info') {
+                const tag = '[Launch]';
+                console[level](`${tag} ${message}`);
+
+                if (CONFIG.telemetryEndpoint) {
+                    fetch(CONFIG.telemetryEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ level, message, timestamp: Date.now() }),
+                    }).catch(() => {});
+                }
+            }
+
+            function updateStatus(message) {
+                const statusEl = document.getElementById('status');
+                if (statusEl) statusEl.textContent = message;
+                debugLog(message);
+            }
+
+            function isIOS() {
+                return /iPad|iPhone|iPod/.test(navigator.userAgent);
+            }
+
+            function isInStandaloneMode() {
+                const displayMode = window.matchMedia('(display-mode: standalone)').matches;
+                const navStandalone = window.navigator.standalone === true;
+                const androidAppRef = document.referrer.includes('android-app://');
+                return displayMode || navStandalone || androidAppRef;
+            }
+
+            async function isPWAInstalled() {
+                try {
+                    if ('getInstalledRelatedApps' in navigator) {
+                        const apps = await navigator.getInstalledRelatedApps();
+                        return apps.length > 0;
+                    }
+                } catch (e) {
+                    debugLog(`Error checking related apps: ${e.message}`, 'warn');
+                }
+                return false;
+            }
+
+            function getUrlParams() {
+                const params = new URLSearchParams(window.location.search);
+                return {
+                    target: params.get('target'),
+                    token: params.get('token'),
+                    pwa: params.get('pwa'),
+                    action: params.get('action'),
+                };
+            }
+
+            function buildTargetUrl({ target, token, pwa }) {
+                let url = window.location.origin;
+
+                if (target) {
+                    target = decodeURIComponent(target);
+                    if (!target.startsWith('/')) target = '/' + target;
+                    url += target;
+                    debugLog(`Using target parameter: ${target}`);
+                } else if (token) {
+                    url += `/play`;
+                    debugLog(`Using token fallback route: /play`);
+                } else if (pwa === 'install') {
+                    url += `/student`;
+                    debugLog(`Using PWA install route: /student`);
+                } else {
+                    url += `/student`;
+                    debugLog(`Using default route: /student`);
+                }
+
+                // Add query parameters
+                const separator = url.includes('?') ? '&' : '?';
+                if (token && !url.includes('token=')) {
+                    url += `${separator}token=${token}`;
+                    debugLog(`Added token parameter: ${token}`);
+                }
+                if (pwa && !url.includes('pwa=')) {
+                    const sep = url.includes('?') ? '&' : '?';
+                    url += `${sep}pwa=${pwa}`;
+                    debugLog(`Added PWA parameter: ${pwa}`);
+                }
+                if (isInStandaloneMode()) {
+                    const sep = url.includes('?') ? '&' : '?';
+                    url += `${sep}pwa=true`;
+                    debugLog(`Added standalone mode parameter`);
+                }
+
+                debugLog(`Built target URL: ${url}`);
+                return url;
+            }
+
+            function attemptCustomProtocol(token) {
+                if (!token) return;
+
+                const protocolUrl = `web+lumino://play?token=${token}`;
+                debugLog(`Attempting custom protocol: ${protocolUrl}`);
+
+                try {
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = protocolUrl;
+                    document.body.appendChild(iframe);
+
+                    setTimeout(() => {
+                        if (iframe.parentNode) {
+                            iframe.parentNode.removeChild(iframe);
+                        }
+                    }, 1000);
+                } catch (e) {
+                    debugLog(`Custom protocol error: ${e.message}`, 'warn');
+                }
+            }
+
+            function setupVisibilityListener(callback) {
+                const listener = () => {
+                    if (document.visibilityState === 'hidden') {
+                        debugLog('User likely switched to app.');
+                        callback();
+                    }
+                };
+                document.addEventListener('visibilitychange', listener);
+                return () => document.removeEventListener('visibilitychange', listener);
+            }
+
+            async function redirectFlow() {
+                const params = getUrlParams();
+                debugLog(`URL parameters: ${JSON.stringify(params)}`);
+                
+                const targetUrl = buildTargetUrl(params);
+                const fallbackBtn = document.getElementById('fallbackButton');
+                const iosNotice = document.getElementById('iosNotice');
+
+                if (!params.target && !params.token && !params.pwa) {
+                    updateStatus('No target specified');
+                    if (fallbackBtn) {
+                        fallbackBtn.style.display = 'inline-block';
+                        fallbackBtn.href = window.location.origin + '/student';
+                    }
+                    return;
+                }
+
+                if (isIOS() && iosNotice) {
+                    iosNotice.style.display = 'block';
+                }
+
+                if (isInStandaloneMode()) {
+                    updateStatus('Opening in app...');
+                    return setTimeout(() => {
+                        debugLog(`Redirecting to: ${targetUrl}`);
+                        window.location.href = targetUrl;
+                    }, 500);
+                }
+
+                updateStatus('Checking for installed app...');
+                const installed = await isPWAInstalled();
+
+                const cleanupVisibility = setupVisibilityListener(() => {
+                    debugLog('Cancelling fallback due to app switch.');
+                    if (fallbackTimeout) clearTimeout(fallbackTimeout);
+                });
+
+                const fallbackTimeout = setTimeout(() => {
+                    updateStatus('Opening in browser...');
+                    debugLog(`Redirecting to: ${targetUrl}`);
+                    window.location.href = targetUrl;
+                }, CONFIG.pwaDetectionDelay);
+
+                if (installed) {
+                    updateStatus('App detected! Attempting launch...');
+                    attemptCustomProtocol(params.token);
+                }
+
+                // Show fallback button after delay
+                setTimeout(() => {
+                    if (fallbackBtn) {
+                        fallbackBtn.style.display = 'inline-block';
+                        fallbackBtn.href = targetUrl;
+                    }
+                    updateStatus('Taking longer than expected...');
+                }, CONFIG.fallbackDelay);
+            }
+
+            window.addEventListener('load', () => {
+                debugLog('Launch flow starting...');
+                setTimeout(redirectFlow, 100);
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -29,6 +29,10 @@ const NameItMinimal: React.FC<NameItProps> = ({
   const mappingInitializedRef = useRef(false);
   const disconnectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastScoreUpdateRef = useRef<number>(0);
+  // Escalation: track consecutive misses per player and penalty locks
+  const consecutiveMissesRef = useRef<Record<string, number>>({});
+  const penaltyUntilRef = useRef<Record<string, number>>({});
+  const [penaltyPlayerId, setPenaltyPlayerId] = React.useState<string | null>(null);
 
   // Merge config with defaults - memoize more aggressively
   const config = useMemo(() => ({
@@ -84,6 +88,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
     updatePlayerScore,
     setMatchFound,
     setGameStarted,
+    setGamePaused,
     setGameCompleted,
     setTimeLeft,
     resetGameState
@@ -103,7 +108,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
 
   // Handle WebRTC messages
   const handleWebRTCMessage = useCallback((message: any) => {
-    console.log('📨 NameItMinimal: Received WebRTC message:', message.type);
+    console.log('📨 NameItMinimal: Received WebRTC message:', message.type, 'Full message:', message);
     
     if (message.data) {
       // Handle structured message format
@@ -236,6 +241,16 @@ const NameItMinimal: React.FC<NameItProps> = ({
           console.log('🚀 NameItMinimal: Remote start game (direct format)');
           startGame();
           break;
+        case 'pause_game':
+          console.log('⏸️ NameItMinimal: Received pause from remote');
+          setGamePaused(true);
+          timer.pauseTimer();
+          break;
+        case 'resume_game':
+          console.log('▶️ NameItMinimal: Received resume from remote');
+          setGamePaused(false);
+          timer.resumeTimer();
+          break;
         case 'icon_click':
           console.log('🎯 NameItMinimal: Remote icon click (direct format):', message.iconId);
           if (message.playerId && message.iconId) {
@@ -243,49 +258,93 @@ const NameItMinimal: React.FC<NameItProps> = ({
           }
           break;
         case 'score_update':
-          console.log('📊 NameItMinimal: Remote score update (direct format):', message.score);
-          if (message.playerId && typeof message.score === 'number') {
-            // ✅ FIX: Track remote score updates too
-            lastScoreUpdateRef.current = Date.now();
-            console.log('📊 NameItMinimal: Updated lastScoreUpdateRef for remote update to', lastScoreUpdateRef.current);
-            
-            updatePlayerScore(message.playerId, message.score);
-          }
+          // ✅ Score updates now handled via automatic game state sync
+          // Individual score_update messages no longer needed
+          console.log('📊 NameItMinimal: Received deprecated score_update message - ignoring (scores sync via game state)');
           break;
         case 'game_state_sync':
           console.log('🔄 NameItMinimal: Remote game state sync (direct format):', message);
-          if (message.players && Array.isArray(message.players)) {
-            // ✅ FIX: Only sync scores if remote timestamp is newer
+          if (message.scoresByPlayerId) {
+            // ✅ FIX: Sync scores directly from scoresByPlayerId
             const remoteTimestamp = message.timestamp || 0;
             const timeSinceLastUpdate = Date.now() - (lastScoreUpdateRef.current || 0);
             
             console.log(`🔄 NameItMinimal: Sync timestamp check: remote=${remoteTimestamp}, lastUpdate=${lastScoreUpdateRef.current}, timeSince=${timeSinceLastUpdate}ms`);
+            console.log('🔄 NameItMinimal: Remote scores to sync:', message.scoresByPlayerId);
             
             // Only apply sync if no recent local score updates (within last 2 seconds)
             if (timeSinceLastUpdate > 2000) {
-              console.log('✅ NameItMinimal: Applying score sync (no recent local updates)');
+              console.log('✅ NameItMinimal: Applying scoresByPlayerId sync (no recent local updates)');
+              
+              // Update each player's score from the received scoresByPlayerId
+              Object.entries(message.scoresByPlayerId).forEach(([playerId, score]) => {
+                if (typeof score === 'number') {
+                  console.log(`📊 NameItMinimal: Syncing score for player ${playerId.slice(-8)}: ${score}`);
+                  updatePlayerScore(playerId, score);
+                }
+              });
+            } else {
+              console.log('⏭️ NameItMinimal: Skipping score sync (recent local update detected)');
+            }
+          } else if (message.players && Array.isArray(message.players)) {
+            // ✅ Legacy: Handle old format for backward compatibility
+            const remoteTimestamp = message.timestamp || 0;
+            const timeSinceLastUpdate = Date.now() - (lastScoreUpdateRef.current || 0);
+            
+            if (timeSinceLastUpdate > 2000) {
+              console.log('✅ NameItMinimal: Applying legacy player score sync');
               setPlayers((currentPlayers: Player[]): Player[] => {
                 return currentPlayers.map((localPlayer: Player) => {
                   const remotePlayerData = message.players.find((p: any) => p.id === localPlayer.id);
                   if (remotePlayerData && typeof remotePlayerData.score === 'number') {
-                    console.log(`📊 NameItMinimal: Syncing score for ${localPlayer.name}: ${remotePlayerData.score}`);
-                    
-                    // ✅ FIX: Use scoresByPlayerId instead of persistent ref
+                    console.log(`📊 NameItMinimal: Syncing legacy score for ${localPlayer.name}: ${remotePlayerData.score}`);
                     updatePlayerScore(localPlayer.id, remotePlayerData.score);
-                    
-                    return localPlayer; // Don't modify player.score anymore
+                    return localPlayer;
                   }
                   return localPlayer;
                 });
               });
-            } else {
-              console.log('⏭️ NameItMinimal: Skipping score sync (recent local update detected)');
+            }
+          }
+          break;
+        case 'reset_game':
+          console.log('🔁 NameItMinimal: Received reset game from remote player');
+          console.log('🔁 NameItMinimal: About to reset - timer exists:', !!timer, 'resetGameState exists:', !!resetGameState);
+          timer.stopTimer();
+          resetGameState();
+          console.log('🔁 NameItMinimal: Reset completed successfully');
+          break;
+        case 'match_found':
+          console.log('🎯 NameItMinimal: Received match_found from remote');
+          // Lock local clicks to prevent double counting until cards advance
+          if (message.playerId && message.iconId) {
+            setMatchFound({ playerId: message.playerId, iconId: message.iconId });
+            // Mirror local behavior: advance cards after brief delay and clear lock
+            setTimeout(() => {
+              const newCards = generateGameCards();
+              setCards(newCards);
+              setMatchFound(null);
+            }, 1000);
+          }
+          break;
+        case 'penalty_lock':
+          // Mirror penalty on peer
+          if (message.playerId && typeof message.until === 'number') {
+            penaltyUntilRef.current[message.playerId] = message.until;
+            if (message.playerId === playerId) {
+              setPenaltyPlayerId(playerId);
+              setTimeout(() => {
+                if (penaltyUntilRef.current[playerId] <= Date.now()) {
+                  setPenaltyPlayerId(null);
+                  consecutiveMissesRef.current[playerId] = 0;
+                }
+              }, Math.max(0, message.until - Date.now()) + 100);
             }
           }
           break;
       }
     }
-  }, [setPlayers, updatePlayerScore]);
+  }, [setPlayers, updatePlayerScore, timer, resetGameState, gameState.players]);
 
   // ✅ PROPER FIX: Stable update function with derived values only
   const stableUpdatePlayersFromMapping = useCallback(() => {
@@ -301,15 +360,29 @@ const NameItMinimal: React.FC<NameItProps> = ({
     }
 
     setPlayers((currentPlayers: Player[]): Player[] => {
-      const newPlayers = [...currentPlayers];
+      // ✅ Order players by explicit playerIndex (host = 0 left, joiner = 1 right)
+      const orderedMappings = [...mappings].sort((a, b) => a.playerIndex - b.playerIndex);
+      const allPlayerIds = orderedMappings.map(m => m.playerId);
+      console.log('🗺️ NameItMinimal: Creating host/joiner player order:', allPlayerIds);
+      const newPlayers: Player[] = [];
 
-      // Update players based on mappings
-      mappings.forEach((mapping) => {
-        if (mapping.playerIndex < newPlayers.length) {
+      // ✅ FIX: Migrate scores from placeholder IDs to real IDs
+      const scoreMigrationMap: Record<string, string> = {};
+
+      // Create players in deterministic order (by host/joiner index)
+      orderedMappings.forEach((mapping, deterministicIndex) => {
+        const playerIdSorted = mapping.playerId;
+        if (mapping) {
           const isLocal = mapping.playerId === playerId;
+          const oldPlayer = currentPlayers[deterministicIndex];
           
-          // ✅ FIX: Don't modify player.score - use scoresByPlayerId instead
-          newPlayers[mapping.playerIndex] = {
+          // Track score migration: old placeholder ID → new real ID
+          if (oldPlayer && oldPlayer.id !== mapping.playerId) {
+            scoreMigrationMap[oldPlayer.id] = mapping.playerId;
+            console.log(`🔄 NameItMinimal: Score migration mapping: ${oldPlayer.id} → ${mapping.playerId}`);
+          }
+          
+          newPlayers[deterministicIndex] = {
             id: mapping.playerId,
             name: mapping.playerName,
             score: 0, // This field is now unused - scores are in gameState.scoresByPlayerId
@@ -318,16 +391,21 @@ const NameItMinimal: React.FC<NameItProps> = ({
           };
 
           if (isLocal) {
-            localPlayerIndexRef.current = mapping.playerIndex;
-            console.log(`🏠 NameItMinimal: Local player mapped to index ${mapping.playerIndex}`);
+            localPlayerIndexRef.current = deterministicIndex;
+            console.log(`🏠 NameItMinimal: Local player mapped to deterministic index ${deterministicIndex}`);
           }
         }
       });
 
+      // Note: Score migration moved to separate useEffect to prevent dependency cycles
+
       console.log('🗺️ NameItMinimal: Updated players:', newPlayers.map(p => `${p.name}(${p.id}, index: ${newPlayers.indexOf(p)})`));
       return newPlayers;
     });
-  }, []); // ✅ NO DEPS - completely stable
+  }, [playerId]); // ✅ FIX: Removed cyclic dependencies to prevent infinite loop
+
+  // ✅ FIX: Score migration is now handled automatically in useGameState.setPlayers()
+  // This effect is simplified since remapping happens in the setPlayers callback
 
   // ✅ Derived values for safe dependency tracking
   const mappingCount = playerMapping.getAllMappings().length;
@@ -635,6 +713,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
     const cards = generateGameCards();
     setCards(cards);
     setGameStarted(true);
+    setGamePaused(false);
     setGameCompleted(false);
     timer.startTimer(config.gameTime);
 
@@ -647,18 +726,72 @@ const NameItMinimal: React.FC<NameItProps> = ({
     }
   }, [generateGameCards, setCards, setGameStarted, setGameCompleted, timer, config.gameTime, enableWebRTC, webrtc]);
 
+  // Pause/Resume handlers with WebRTC sync
+  const pauseGame = useCallback(() => {
+    console.log('⏸️ NameItMinimal: Pausing game');
+    setGamePaused(true);
+    timer.pauseTimer();
+    if (enableWebRTC && webrtc.connectionStatus === 'connected') {
+      webrtc.sendMessage({ type: 'pause_game', timestamp: Date.now() });
+    }
+  }, [enableWebRTC, webrtc.connectionStatus, setGamePaused, timer, webrtc]);
+
+  const resumeGame = useCallback(() => {
+    console.log('▶️ NameItMinimal: Resuming game');
+    setGamePaused(false);
+    timer.resumeTimer();
+    if (enableWebRTC && webrtc.connectionStatus === 'connected') {
+      webrtc.sendMessage({ type: 'resume_game', timestamp: Date.now() });
+    }
+  }, [enableWebRTC, webrtc.connectionStatus, setGamePaused, timer, webrtc]);
+
   // Reset game
   const resetGame = useCallback(() => {
     console.log('🔄 NameItMinimal: Resetting game');
     timer.stopTimer();
     resetGameState();
-  }, [timer, resetGameState]);
+    
+    // Send reset message to remote player via WebRTC
+    if (enableWebRTC && webrtc.connectionStatus === 'connected') {
+      console.log('📤 NameItMinimal: Sending reset game message to remote player');
+      console.log('📤 NameItMinimal: WebRTC status - enabled:', enableWebRTC, 'connection:', webrtc.connectionStatus);
+      console.log('📤 NameItMinimal: WebRTC object details:', {
+        isHost: webrtc.isHost,
+        roomId: webrtc.roomId,
+        sendMessageType: typeof webrtc.sendMessage
+      });
+      const resetMessage = {
+        type: 'reset_game',
+        playerId: playerId,
+        timestamp: Date.now()
+      };
+      console.log('📤 NameItMinimal: Reset message being sent:', resetMessage);
+      
+      try {
+        webrtc.sendMessage(resetMessage);
+        console.log('📤 NameItMinimal: Reset message sent successfully');
+      } catch (error) {
+        console.error('❌ NameItMinimal: Error sending reset message:', error);
+      }
+    } else {
+      console.warn('⚠️ NameItMinimal: Cannot send reset - WebRTC not ready. Enabled:', enableWebRTC, 'Status:', webrtc.connectionStatus);
+      console.warn('⚠️ NameItMinimal: WebRTC details:', {
+        enabled: enableWebRTC,
+        status: webrtc?.connectionStatus,
+        isHost: webrtc?.isHost,
+        roomId: webrtc?.roomId
+      });
+    }
+  }, [timer, resetGameState, enableWebRTC, webrtc]);
 
   // Handle icon click
   const handleIconClick = useCallback((iconId: string, playerId: string) => {
     console.log('🎯 NameItMinimal: Icon clicked:', iconId, 'by player:', playerId);
     
-    if (!gameState.gameStarted || gameState.gameCompleted) {
+    // Block if game not active, a match is being processed, or the player is locked by penalty
+    const now = Date.now();
+    const isPenalized = penaltyUntilRef.current[playerId] && penaltyUntilRef.current[playerId] > now;
+    if (!gameState.gameStarted || gameState.gameCompleted || gameState.matchFound || isPenalized) {
       return;
     }
 
@@ -685,16 +818,35 @@ const NameItMinimal: React.FC<NameItProps> = ({
       }
       
       updatePlayerScore(playerId, newScore);
+      // Reset miss counter on success
+      consecutiveMissesRef.current[playerId] = 0;
       setMatchFound({ playerId, iconId });
 
-      // Send score update to remote player
+      // Notify remote so they temporarily lock clicks and advance cards too
+      if (enableWebRTC && webrtc.connectionStatus === 'connected') {
+        try {
+          webrtc.sendMessage({ type: 'match_found', playerId, iconId, timestamp: Date.now() });
+        } catch {}
+      }
+
+      // ✅ FIX: Send game state with updated scores via WebRTC
       if (enableWebRTC && player.isLocal && webrtc.connectionStatus === 'connected') {
-        webrtc.sendMessage({
-          type: 'score_update',
-          playerId,
-          score: newScore,
+        // Send the updated game state including scores
+        const gameStateMessage = {
+          type: 'game_state_sync',
+          scoresByPlayerId: {
+            ...gameState.scoresByPlayerId,
+            [playerId]: newScore
+          },
+          players: gameState.players,
           timestamp: Date.now()
-        });
+        };
+        console.log('📤 NameItMinimal: Sending game state sync with scores:', gameStateMessage);
+        try {
+          webrtc.sendMessage(gameStateMessage);
+        } catch (error) {
+          console.error('❌ NameItMinimal: Failed to send game state sync:', error);
+        }
       }
 
       // Generate new cards after a brief delay
@@ -705,6 +857,30 @@ const NameItMinimal: React.FC<NameItProps> = ({
       }, 1000);
     } else {
       console.log('❌ NameItMinimal: No match found');
+      // Increment miss counter
+      const prevMiss = consecutiveMissesRef.current[playerId] || 0;
+      const nextMiss = prevMiss + 1;
+      consecutiveMissesRef.current[playerId] = nextMiss;
+
+      // On 3 consecutive misses, apply 4s penalty lock with red icon
+      if (nextMiss >= 3) {
+        const until = Date.now() + 4000;
+        penaltyUntilRef.current[playerId] = until;
+        setPenaltyPlayerId(playerId);
+        // Broadcast penalty so peer shows the same overlay/lock window
+        if (enableWebRTC && webrtc.connectionStatus === 'connected') {
+          try {
+            webrtc.sendMessage({ type: 'penalty_lock', playerId, until, timestamp: Date.now() });
+          } catch {}
+        }
+        // Clear overlay when penalty ends
+        setTimeout(() => {
+          if (penaltyUntilRef.current[playerId] <= Date.now()) {
+            setPenaltyPlayerId(null);
+            consecutiveMissesRef.current[playerId] = 0;
+          }
+        }, 4100);
+      }
     }
   }, [gameState, updatePlayerScore, setMatchFound, enableWebRTC, webrtc, generateGameCards, setCards]);
 
@@ -786,6 +962,15 @@ const NameItMinimal: React.FC<NameItProps> = ({
           <Button colorScheme="green" onClick={startGame} disabled={gameState.gameStarted}>
             Start Game
           </Button>
+          {!gameState.gamePaused ? (
+            <Button colorScheme="yellow" onClick={pauseGame} disabled={!gameState.gameStarted}>
+              Pause
+            </Button>
+          ) : (
+            <Button colorScheme="green" variant="outline" onClick={resumeGame} disabled={!gameState.gameStarted}>
+              Resume
+            </Button>
+          )}
           <Button colorScheme="red" onClick={resetGame}>
             Reset Game
           </Button>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-result {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .success { border-color: #28a745; }
+        .warning { border-color: #ffc107; }
+        .error { border-color: #dc3545; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Simple Test Page</h1>
+    <p>This page tests basic functionality without PWA interference.</p>
+    
+    <div id="results"></div>
+    
+    <script>
+        function addResult(title, content, type = 'test-result') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<h3>${title}</h3><div>${content}</div>`;
+            document.getElementById('results').appendChild(div);
+        }
+        
+        // Test 1: Basic page load
+        addResult('✅ Test 1: Page Load', 'Simple test page loaded successfully!', 'success');
+        
+        // Test 2: URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        const target = params.get('target');
+        
+        addResult('📋 Test 2: URL Parameters', `
+            <strong>Token:</strong> ${token || 'Not found'}<br>
+            <strong>Target:</strong> ${target || 'Not found'}<br>
+            <strong>Full URL:</strong> ${window.location.href}
+        `);
+        
+        // Test 3: Service Worker Status
+        const swAvailable = 'serviceWorker' in navigator;
+        const swController = swAvailable ? navigator.serviceWorker.controller : null;
+        
+        addResult('🔧 Test 3: Service Worker Status', `
+            <strong>Service Worker API:</strong> ${swAvailable ? 'Available' : 'Not available'}<br>
+            <strong>Active Controller:</strong> ${swController ? 'Yes' : 'No'}<br>
+            <strong>Controller URL:</strong> ${swController ? swController.scriptURL : 'N/A'}
+        `);
+        
+        // Test 4: Focus Existing PWA Logic (simplified)
+        addResult('🎯 Test 4: Focus Test Starting', 'About to test existing PWA communication...');
+        
+        if (swController && token) {
+            const message = {
+                type: 'FOCUS_EXISTING_PWA',
+                url: `${window.location.origin}/play?token=${encodeURIComponent(token)}&pwa=true&from=simple-test`,
+                token: token
+            };
+            
+            let responseReceived = false;
+            
+            // Listen for response
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'NAVIGATE_TO_ASSIGNMENT_ACK') {
+                    responseReceived = true;
+                    const success = event.data.success;
+                    addResult(
+                        success ? '✅ Test 4: Focus Success!' : '⚠️ Test 4: No Existing PWA',
+                        `
+                            <strong>Response received:</strong> Yes<br>
+                            <strong>Success:</strong> ${success}<br>
+                            <strong>Details:</strong> <pre>${JSON.stringify(event.data, null, 2)}</pre>
+                        `,
+                        success ? 'success' : 'warning'
+                    );
+                    
+                    if (success) {
+                        addResult('🎉 Next Step', 'Existing PWA should have been focused. Check if it came to the front!');
+                    } else {
+                        addResult('📝 Next Step', 'No existing PWA found. A new window would normally open here.');
+                    }
+                }
+            });
+            
+            // Send the message
+            swController.postMessage(message);
+            addResult('📤 Test 4: Message Sent', `Message sent to service worker: <pre>${JSON.stringify(message, null, 2)}</pre>`);
+            
+            // Timeout check
+            setTimeout(() => {
+                if (!responseReceived) {
+                    addResult('⏰ Test 4: Timeout', 'No response received from service worker after 5 seconds.', 'error');
+                }
+            }, 5000);
+            
+        } else {
+            addResult('❌ Test 4: Cannot Test', `
+                Cannot test focus logic:<br>
+                <strong>Service Worker Controller:</strong> ${swController ? 'Available' : 'Missing'}<br>
+                <strong>Token:</strong> ${token ? 'Available' : 'Missing'}
+            `, 'error');
+        }
+        
+        // Test 5: Window Information
+        addResult('🪟 Test 5: Window Info', `
+            <strong>Display Mode:</strong> ${window.matchMedia('(display-mode: standalone)').matches ? 'Standalone (PWA)' : 'Browser'}<br>
+            <strong>Navigator Standalone:</strong> ${window.navigator.standalone || 'false'}<br>
+            <strong>Referrer:</strong> ${document.referrer || 'None'}<br>
+            <strong>User Agent:</strong> ${navigator.userAgent}
+        `);
+        
+        console.log('🧪 Simple test page loaded');
+        console.log('🧪 URL:', window.location.href);
+        console.log('🧪 Token:', token);
+        console.log('🧪 Target:', target);
+    </script>
+</body>
+</html> 

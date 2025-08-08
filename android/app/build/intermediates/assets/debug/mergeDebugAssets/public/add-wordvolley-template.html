@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add WordVolley Template</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .json-display {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏓 Add WordVolley Template</h1>
+        <p>This tool will add the WordVolley game template to your Firebase database.</p>
+        
+        <div id="status"></div>
+        
+        <div class="info">
+            <strong>Instructions:</strong>
+            <ol>
+                <li>Make sure you're logged into your Firebase project as a teacher</li>
+                <li>Click "Add WordVolley Template" below</li>
+                <li>Refresh your teacher dashboard to see the new game in "Start Creating"</li>
+            </ol>
+        </div>
+        
+        <button id="addTemplate" onclick="addWordVolleyTemplate()">
+            🏓 Add WordVolley Template
+        </button>
+        
+        <button onclick="showTemplateData()">
+            📋 Show Template Data
+        </button>
+        
+        <div id="templateData" class="json-display" style="display: none;"></div>
+        
+        <hr style="margin: 30px 0;">
+        
+        <h3>Manual Method (Alternative)</h3>
+        <p>If the automatic method doesn't work, you can manually add the template:</p>
+        <ol>
+            <li>Go to your Firebase Console → Firestore Database</li>
+            <li>Navigate to the <code>blankGameTemplates</code> collection</li>
+            <li>Click "Add document"</li>
+            <li>Use auto-generated ID</li>
+            <li>Copy the JSON data above and paste the fields manually</li>
+        </ol>
+    </div>
+
+    <script type="module">
+        // Import Firebase functions
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+
+        // Firebase config - you'll need to replace this with your actual config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBxQ8fQ9X2-3kQ9X2-3kQ9X2-3kQ9X2-3k",
+            authDomain: "verse-react-dev.firebaseapp.com", 
+            projectId: "verse-react-dev",
+            storageBucket: "verse-react-dev.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        const templateData = {
+            title: "Short A Words vs Long A Words",
+            type: "word-volley",
+            description: "Educational Pong-style game where students hit short A words while avoiding long A words",
+            difficulty: "medium",
+            gameSpeed: 3,
+            paddleSize: 5,
+            theme: "classic",
+            targetCategory: {
+                id: "target",
+                name: "Short A Words",
+                words: ["cat", "bat", "hat", "mat", "rat", "sat", "fat", "pat", "van", "can", "man", "pan", "ran", "tan", "fan", "bag", "tag", "rag", "wag", "lag"]
+            },
+            nonTargetCategory: {
+                id: "non-target",
+                name: "Long A Words",
+                words: ["cake", "make", "take", "bake", "lake", "wake", "snake", "grape", "plate", "gate", "late", "date", "rate", "hate", "mate", "fate", "game", "name", "same", "came"]
+            },
+            gameTime: 60,
+            winningScore: 10,
+            createdAt: serverTimestamp(),
+            userId: "system",
+            createdBy: "System Template"
+        };
+
+        window.addWordVolleyTemplate = async function() {
+            const statusDiv = document.getElementById('status');
+            const button = document.getElementById('addTemplate');
+            
+            try {
+                button.disabled = true;
+                statusDiv.innerHTML = '<div class="info">🔄 Adding WordVolley template...</div>';
+                
+                // Check if user is authenticated
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to add templates');
+                }
+                
+                console.log('🏓 Adding WordVolley template...');
+                
+                const docRef = await addDoc(collection(db, 'blankGameTemplates'), templateData);
+                
+                statusDiv.innerHTML = `
+                    <div class="success">
+                        ✅ WordVolley template added successfully!<br>
+                        <strong>Document ID:</strong> ${docRef.id}<br>
+                        <strong>Next:</strong> Refresh your teacher dashboard to see the new game.
+                    </div>
+                `;
+                
+                console.log('✅ WordVolley template added with ID:', docRef.id);
+                
+            } catch (error) {
+                console.error('❌ Error adding WordVolley template:', error);
+                statusDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Error adding template: ${error.message}<br>
+                        <strong>Suggestion:</strong> Try the manual method below.
+                    </div>
+                `;
+            } finally {
+                button.disabled = false;
+            }
+        };
+
+        window.showTemplateData = function() {
+            const dataDiv = document.getElementById('templateData');
+            if (dataDiv.style.display === 'none') {
+                dataDiv.textContent = JSON.stringify(templateData, null, 2);
+                dataDiv.style.display = 'block';
+            } else {
+                dataDiv.style.display = 'none';
+            }
+        };
+
+        // Check authentication status
+        auth.onAuthStateChanged((user) => {
+            const statusDiv = document.getElementById('status');
+            if (user) {
+                statusDiv.innerHTML = `<div class="success">✅ Logged in as: ${user.email}</div>`;
+            } else {
+                statusDiv.innerHTML = `<div class="error">❌ Not logged in. Please log into your Firebase project first.</div>`;
+            }
+        });
+    </script>
+</body>
+</html> 

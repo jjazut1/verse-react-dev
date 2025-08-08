@@ -120,7 +120,7 @@ service cloud.firestore {
             request.resource.data.configId in ['xOoA0q7ILtrdqdJt1ki5', 'Ua17C8DK6ZFsujj9Z1ZC']
         ) &&
         // Validate game type is one of the supported types
-        request.resource.data.gameType in ['sort-categories-egg', 'whack-a-mole', 'spinner-wheel', 'anagram', 'sentence-sense', 'place-value-showdown', 'word-volley'];
+        request.resource.data.gameType in ['sort-categories-egg', 'whack-a-mole', 'spinner-wheel', 'anagram', 'sentence-sense', 'place-value-showdown', 'word-volley', 'name-it'];
     }
 
     
@@ -229,7 +229,25 @@ service cloud.firestore {
       request.resource.data.targetCategory.words.size() > 0 &&
       request.resource.data.nonTargetCategory is map &&
       request.resource.data.nonTargetCategory.words is list &&
-      request.resource.data.nonTargetCategory.words.size() > 0)
+      request.resource.data.nonTargetCategory.words.size() > 0) ||
+      
+      // Name It game validation
+      (request.resource.data.type == 'name-it' &&
+      request.resource.data.title is string &&
+      request.resource.data.title.size() > 0 &&
+      request.resource.data.description is string &&
+      request.resource.data.gameTime is number &&
+      request.resource.data.gameTime >= 20 &&
+      request.resource.data.gameTime <= 900 &&
+      request.resource.data.difficulty is string &&
+      request.resource.data.difficulty in ['debug', 'easy', 'medium', 'hard'] &&
+      request.resource.data.enableWebRTC is bool &&
+      request.resource.data.enableSound is bool &&
+      request.resource.data.share is bool &&
+      request.resource.data.userId is string &&
+      request.resource.data.email is string &&
+      request.resource.data.createdAt is timestamp &&
+      request.resource.data.updatedAt is timestamp)
     ) &&
         // Common fields validation
         request.resource.data.userId == request.auth.uid;

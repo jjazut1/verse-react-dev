@@ -58,7 +58,10 @@ LuminateLearn is a comprehensive educational platform designed for K-12 teachers
   - **⚡ Speed Optimization**: 50% speed increase with proper Pong-style ball velocity (3-15 px/frame range)
   - **🎯 Enhanced Performance**: 7.5x faster ball speeds for engaging gameplay with zero text blur
   - **🔧 Reusable Architecture**: TextRenderer utility applicable to other high-speed games
-- **🎲 Name It**: Real-time multiplayer icon matching game inspired by Spot It! ✨ **NEW 2025**
+ - **🎲 Name It**: Real-time multiplayer icon matching game inspired by Spot It! ✨ **NEW 2025**
+   - **Single-Player Mode (current)**: Play against the clock with the unified High Score modal. Multiplayer is intentionally disabled by default; high scores are recorded only for this single-player mode.
+   - **Guest Roadmap (future)**: Planned hosted 1v1 where Player 1 (teacher/student) creates the room and Player 2 always joins as a guest (even if they have an account). Guests cannot create rooms and have room-scoped permissions only.
+   - **Native App Readiness**: Works inside iOS/Android native shells via Capacitor/WebView. Single-player requires no WebRTC. Future multiplayer can use Firebase Realtime Database as an authoritative sync layer if WebRTC is not available.
   - **🌐 WebRTC Multiplayer**: Direct peer-to-peer connection with Firebase fallback for reliability
   - **⚡ Real-time Synchronization**: Instant score updates and game state sync across players
   - **🎯 Smart Player Mapping**: Deterministic player ID management with persistent score tracking
