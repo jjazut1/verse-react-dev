@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useEffect, useRef } from 'react';
-import { Box, VStack, Text, Button, HStack } from '@chakra-ui/react';
+import { Box, VStack, Text, Button, HStack, Input, useToast, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, ModalFooter, Center } from '@chakra-ui/react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePlayerMapping } from './contexts/PlayerMappingContext';
 import { useGameState } from './hooks/useGameState';
@@ -21,6 +21,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
   const { currentUser } = useAuth();
   const playerId = currentUser?.uid || 'local-player';
   const playerMapping = usePlayerMapping();
+  const toast = useToast();
   const isGuestSession = useMemo(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -901,6 +902,12 @@ const NameItMinimal: React.FC<NameItProps> = ({
     try {
       const roomId = await webrtc.createRoom();
       console.log('🏠 NameItMinimal: Room created:', roomId);
+
+      // Auto-copy invite link and open share modal
+      const link = `${window.location.origin}${window.location.pathname}?guest=1&room=${roomId}`;
+      try { await navigator.clipboard?.writeText(link); } catch {}
+      toast({ title: 'Invite link copied', status: 'success', duration: 2500 });
+      setInviteModalOpen(true);
       
       // ✅ FIX: Host should immediately add itself to mapping when room is created
       console.log('🏠 NameItMinimal: Adding host to mapping system');
@@ -970,6 +977,29 @@ const NameItMinimal: React.FC<NameItProps> = ({
     }
   }, [enableWebRTC, webrtc.connectionStatus, webrtc, playerId, playerName]);
 
+  // Share helpers (invite modal)
+  const buildInviteLink = () => (webrtc.roomId ? `${window.location.origin}${window.location.pathname}?guest=1&room=${webrtc.roomId}` : '');
+  const shortInviteText = () => (webrtc.roomId ? `?guest=1&room=${webrtc.roomId}` : '');
+  const copyInviteLink = async () => {
+    const link = buildInviteLink();
+    if (link) {
+      try { await navigator.clipboard?.writeText(link); } catch {}
+      toast({ title: 'Invite link copied', status: 'success', duration: 2000 });
+    }
+  };
+  const shareInvite = async () => {
+    const link = buildInviteLink();
+    const data = { title: 'Join Name It', text: 'Tap to join my game:', url: link } as ShareData;
+    // @ts-ignore
+    if (navigator.share) {
+      try { await navigator.share(data); return; } catch {}
+    }
+    copyInviteLink();
+  };
+  const [isInviteModalOpen, setInviteModalOpen] = React.useState(false);
+  const [showQR, setShowQR] = React.useState(true);
+  const qrImageUrl = () => (buildInviteLink() ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(buildInviteLink())}` : '');
+
   return (
     <Box width="100%" padding={4}>
       <VStack spacing={4}>
@@ -983,7 +1013,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
             </Text>
           )}
           {enableWebRTC && webrtc.roomId && (
-            <VStack spacing={1} mt={1}>
+            <VStack spacing={2} mt={1}>
               <Text fontSize="sm" color="blue.600" fontFamily="monospace" cursor="pointer" 
                     onClick={() => navigator.clipboard?.writeText(webrtc.roomId || '')}
                     title="Click to copy room ID">
@@ -994,6 +1024,11 @@ const NameItMinimal: React.FC<NameItProps> = ({
                     title="Click to copy guest invite link">
                 🔗 Copy Invite Link: ?guest=1&room={webrtc.roomId}
               </Text>
+              <HStack justify="center" spacing={2}>
+                <Button size="xs" onClick={copyInviteLink}>Copy</Button>
+                <Button size="xs" variant="outline" onClick={shareInvite}>Share</Button>
+                <Button size="xs" variant="ghost" onClick={() => setInviteModalOpen(true)}>QR</Button>
+              </HStack>
             </VStack>
           )}
         </Box>
@@ -1049,6 +1084,38 @@ const NameItMinimal: React.FC<NameItProps> = ({
           )}
         </Box>
       </VStack>
+
+      {/* Invite Modal */}
+      <Modal isOpen={isInviteModalOpen} onClose={() => setInviteModalOpen(false)} size="md">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Share Invite</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={3} align="stretch">
+              <Box>
+                <Text fontSize="sm" color="gray.600">Short link</Text>
+                <Input value={shortInviteText()} isReadOnly fontFamily="mono" title={buildInviteLink()} />
+                <HStack mt={2}>
+                  <Button size="sm" onClick={copyInviteLink}>Copy</Button>
+                  <Button size="sm" variant="outline" onClick={shareInvite}>Share</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowQR(!showQR)}>
+                    {showQR ? 'Hide QR' : 'Show QR'}
+                  </Button>
+                </HStack>
+              </Box>
+              {showQR && webrtc.roomId && (
+                <Center>
+                  <img src={qrImageUrl()} alt="Invite QR" style={{ width: 220, height: 220 }} />
+                </Center>
+              )}
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={() => setInviteModalOpen(false)}>Close</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };
