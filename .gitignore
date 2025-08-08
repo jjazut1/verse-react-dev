@@ -1,3 +1,22 @@
+# Android build outputs (prevent API keys from leaking via packaged resources)
+android/**/build/
+android/app/build/
+android/app/**/intermediates/
+android/app/**/outputs/
+
+# iOS build outputs
+ios/**/build/
+ios/**/DerivedData/
+
+# Web build outputs
+dist/
+dev-dist/
+
+# Local data snapshots
+*.local.json
+current-*.json
+temp-*.json
+users.json
 # Logs
 logs
 *.log
