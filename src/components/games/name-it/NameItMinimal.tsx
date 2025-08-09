@@ -1018,7 +1018,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
       <VStack spacing={4}>
         {/* Header */}
         <Box textAlign="center">
-          <Text fontSize="2xl" fontWeight="bold">Name It - Minimal</Text>
+          <Text fontSize="2xl" fontWeight="bold">{config?.title || 'Name It'}</Text>
           {/* Removed duplicate header timer and connection line (room shown in bottom info) */}
           {isGuestPlayer && (
             <>
