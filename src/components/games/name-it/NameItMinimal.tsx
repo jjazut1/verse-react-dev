@@ -1082,25 +1082,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
               <Text fontSize="sm" color="green.700">Player 2 Ready ✓</Text>
             </Box>
           )}
-          {enableWebRTC && webrtc.roomId && !isGuestPlayer && (
-            <VStack spacing={2} mt={1}>
-              <Text fontSize="sm" color="blue.600" fontFamily="monospace" cursor="pointer" 
-                    onClick={() => navigator.clipboard?.writeText(webrtc.roomId || '')}
-                    title="Click to copy room ID">
-                📋 Copy Room ID: {webrtc.roomId}
-              </Text>
-              <Text fontSize="sm" color="blue.600" fontFamily="monospace" cursor="pointer"
-                    onClick={() => navigator.clipboard?.writeText(`${window.location.origin}${window.location.pathname}?guest=1&room=${webrtc.roomId}`)}
-                    title="Click to copy guest invite link">
-                🔗 Copy Invite Link: ?guest=1&room={webrtc.roomId}
-              </Text>
-              <HStack justify="center" spacing={2}>
-                <Button size="xs" onClick={copyInviteLink}>Copy</Button>
-                <Button size="xs" variant="outline" onClick={shareInvite}>Share</Button>
-                <Button size="xs" variant="ghost" onClick={() => setInviteModalOpen(true)}>QR</Button>
-              </HStack>
-            </VStack>
-          )}
+          {/* Host header invite details removed (use Share/Copy/QR in sticky controls) */}
         </Box>
 
         {/* Controls */}

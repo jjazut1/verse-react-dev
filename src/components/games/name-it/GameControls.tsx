@@ -475,32 +475,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
                   <Divider />
 
-                  {/* Join Room */}
-                  <Box>
-                    <Text fontWeight="medium" mb={2}>Join Existing Room</Text>
-                    <InputGroup>
-                      <Input
-                        placeholder="Enter Room ID"
-                        value={joinRoomId}
-                        onChange={(e) => setJoinRoomId(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleJoinRoom()}
-                      />
-                      <InputRightElement width="4rem">
-                        <Button
-                          h="1.75rem"
-                          size="sm"
-                          onClick={handleJoinRoom}
-                          isLoading={isJoiningRoom}
-                          isDisabled={!joinRoomId.trim()}
-                        >
-                          Join
-                        </Button>
-                      </InputRightElement>
-                    </InputGroup>
-                    <Text fontSize="xs" color="gray.500" mt={1}>
-                      Paste the room ID shared by your friend
-                    </Text>
-                  </Box>
+                  {/* Join Room removed for host UI; guests use invite link */}
 
                   {roomId && (
                     <>
