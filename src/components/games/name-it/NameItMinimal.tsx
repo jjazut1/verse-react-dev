@@ -1019,10 +1019,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
         {/* Header */}
         <Box textAlign="center">
           <Text fontSize="2xl" fontWeight="bold">Name It - Minimal</Text>
-          <Text fontSize="lg">Time: {formatTime(gameState.timeLeft)}</Text>
-          {enableWebRTC && !isGuestPlayer && (
-            <Text fontSize="md">Connection: {webrtc.connectionStatus} | Room: {webrtc.roomId || 'None'}</Text>
-          )}
+          {/* Removed duplicate header timer and connection line (room shown in bottom info) */}
           {isGuestPlayer && (
             <>
               <Box mt={2} display="inline-block" bg="yellow.50" border="1px solid" borderColor="yellow.200" px={3} py={1} borderRadius="md">
@@ -1138,7 +1135,7 @@ const NameItMinimal: React.FC<NameItProps> = ({
         {/* Debug Info */}
         <Box fontSize="sm" color="gray.600" textAlign="center">
           <Text>Players: {gameState.players.map((p, i) => `${i}:${p.name}(${gameState.scoresByPlayerId[p.id] || 0})`).join(', ')}</Text>
-          <Text>WebRTC: {webrtc.isHost ? 'Host' : 'Guest'} | Status: {webrtc.connectionStatus}</Text>
+          <Text>WebRTC: {webrtc.isHost ? 'Host' : 'Guest'} | Status: {webrtc.connectionStatus} | Room: {webrtc.roomId || 'None'}</Text>
           <Text>Local Index: {localPlayerIndexRef.current} | Mappings: {playerMapping.getAllMappings().length}</Text>
           {enableWebRTC && (
             <Button size="xs" onClick={playerMapping.logMappings} colorScheme="gray" mt={1}>
