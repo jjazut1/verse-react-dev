@@ -1082,6 +1082,14 @@ const NameItMinimal: React.FC<NameItProps> = ({
               <Text fontSize="sm" color="green.700">Player 2 Ready ✓</Text>
             </Box>
           )}
+          {/* Sticky share/copy/QR controls for host */}
+          {enableWebRTC && webrtc.roomId && !isGuestPlayer && (
+            <HStack justify="center" spacing={2} mt={2}>
+              <Button size="xs" onClick={copyInviteLink}>Copy</Button>
+              <Button size="xs" variant="outline" onClick={shareInvite}>Share</Button>
+              <Button size="xs" variant="ghost" onClick={() => setInviteModalOpen(true)}>QR</Button>
+            </HStack>
+          )}
           {/* Host header invite details removed (use Share/Copy/QR in sticky controls) */}
         </Box>
 
