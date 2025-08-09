@@ -283,33 +283,7 @@ export const GameArea: React.FC<GameAreaProps> = ({
         </VStack>
       </Box>
 
-      {/* Game Status Overlay */}
-      {!gameState.gameStarted && (
-        <Box
-          position="absolute"
-          top="50%"
-          left="50%"
-          transform="translate(-50%, -50%)"
-          zIndex={20}
-          textAlign="center"
-          backgroundColor="white"
-          padding={6}
-          borderRadius="lg"
-          boxShadow="lg"
-          border="2px solid"
-          borderColor="blue.200"
-        >
-          <Text fontSize="xl" fontWeight="bold" color="blue.600" mb={2}>
-            🎯 Name It Game
-          </Text>
-          <Text fontSize="md" color="gray.600">
-            Click "Start Game" to begin!
-          </Text>
-          <Text fontSize="sm" color="gray.500" mt={2}>
-            Find matching symbols between your card and the center card
-          </Text>
-        </Box>
-      )}
+      {/* Game Status Overlay removed per simplified UX */}
 
       {gameState.gameCompleted && (
         <Box
