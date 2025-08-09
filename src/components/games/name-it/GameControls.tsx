@@ -276,8 +276,8 @@ export const GameControls: React.FC<GameControlsProps> = ({
           </Tooltip>
         </HStack>
 
-        {/* Multiplayer Status */}
-            {isMultiplayerEnabled && (
+        {/* Multiplayer Status / Sticky Share Row */}
+            {(isMultiplayerEnabled || roomId) && (
           <VStack spacing={2}>
             <HStack spacing={2}>
               <Badge colorScheme={getConnectionStatusColor()}>
