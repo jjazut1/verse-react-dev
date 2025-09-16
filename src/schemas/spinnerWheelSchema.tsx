@@ -80,7 +80,6 @@ const WheelItemsManager: React.FC<{
   
   // Initialize items field SYNCHRONOUSLY before component renders (following Anagram pattern)
   if (!formData.items || formData.items.length === 0) {
-    console.log(`🚀 [WheelItemsManager] SYNC INIT - Creating default items`);
     const defaultItems = [
       { id: generateId(), text: 'Item 1', color: '#FF6B6B' },
       { id: generateId(), text: 'Item 2', color: '#4ECDC4' },
@@ -89,25 +88,19 @@ const WheelItemsManager: React.FC<{
     ];
     formData.items = defaultItems; // Direct assignment following Anagram pattern
     currentWheelItems = defaultItems; // Initialize module variable
-    console.log(`🚀 [WheelItemsManager] SYNC INIT - Set formData.items:`, formData.items);
   } else {
-    console.log(`🚀 [WheelItemsManager] SYNC INIT - Items already exist:`, formData.items);
-    console.log(`🚀 [WheelItemsManager] SYNC INIT - First item structure:`, formData.items[0]);
-    console.log(`🚀 [WheelItemsManager] SYNC INIT - First item has content field:`, !!formData.items[0]?.content);
+    
     // CRITICAL FIX: Only initialize currentWheelItems if it's empty to prevent overwriting fresh updates
     if (currentWheelItems.length === 0) {
-      console.log(`🚀 [WheelItemsManager] SYNC INIT - Initializing currentWheelItems from formData`);
       currentWheelItems = formData.items;
-      console.log(`🚀 [WheelItemsManager] SYNC INIT - currentWheelItems set to:`, currentWheelItems);
     } else {
-      console.log(`🚀 [WheelItemsManager] SYNC INIT - Skipping currentWheelItems update (already has ${currentWheelItems.length} items)`);
+      
     }
   }
 
   // Additional useEffect for safety (backup initialization)
   useEffect(() => {
     if (!formData.items || formData.items.length === 0) {
-      console.log(`🔄 [WheelItemsManager] USEEFFECT INIT - Creating default items`);
       const defaultItems = [
         { id: generateId(), text: 'Item 1', color: '#FF6B6B' },
         { id: generateId(), text: 'Item 2', color: '#4ECDC4' },
@@ -117,15 +110,12 @@ const WheelItemsManager: React.FC<{
       updateField('items', defaultItems);
       formData.items = defaultItems; // Also set it directly to avoid race condition (following Anagram pattern)
       currentWheelItems = defaultItems; // Initialize module-level variable
-      console.log(`🔄 [WheelItemsManager] USEEFFECT INIT - Set formData.items:`, formData.items);
     } else {
-      console.log(`🔄 [WheelItemsManager] USEEFFECT INIT - Items already exist:`, formData.items);
       // CRITICAL FIX: Only update currentWheelItems if it's empty to prevent overwriting manual updates
       if (currentWheelItems.length === 0) {
-        console.log(`🔄 [WheelItemsManager] USEEFFECT INIT - Initializing currentWheelItems from formData`);
         currentWheelItems = formData.items;
       } else {
-        console.log(`🔄 [WheelItemsManager] USEEFFECT INIT - Skipping currentWheelItems update (already has ${currentWheelItems.length} items)`);
+        
       }
     }
   }, [formData.items, updateField]); // Only depend on formData.items, not entire formData
@@ -189,9 +179,6 @@ const WheelItemsManager: React.FC<{
   };
 
   const updateItem = (id: string, text: string) => {
-    console.log(`🔧 [updateItem] Updated item id=${id} with text="${text}"`);
-    console.log(`🔧 [updateItem] Text contains HTML tags:`, text.includes('<') && text.includes('>'));
-    console.log(`🔧 [updateItem] Raw text content:`, text);
     
     // Extract plain text for fallback while preserving rich text content
     let plainText = '';
@@ -205,10 +192,10 @@ const WheelItemsManager: React.FC<{
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
         .trim();
-      console.log(`🔧 [updateItem] Extracted plain text from HTML:`, plainText);
+      
     } else {
       plainText = text.trim();
-      console.log(`🔧 [updateItem] Using text as-is (no HTML):`, plainText);
+      
     }
     
     // CRITICAL FIX: Update BOTH currentWheelItems AND formData.items simultaneously
@@ -224,7 +211,7 @@ const WheelItemsManager: React.FC<{
       return item;
     });
     currentWheelItems = updatedCurrentItems;
-    console.log(`📋 [updateItem] Updated currentWheelItems:`, currentWheelItems);
+    
     
     // Update formData.items with the same data
     const updatedFormDataItems = formData.items.map((item: any) => {
@@ -238,14 +225,13 @@ const WheelItemsManager: React.FC<{
       return item;
     });
     formData.items = updatedFormDataItems;
-    console.log(`🔄 [updateItem] Directly updated formData.items:`, formData.items);
+    
     
     // CRITICAL FIX: Also update React state with the same data
     updateField('items', updatedFormDataItems);
     
     // ADDITIONAL FIX: Force synchronization by ensuring both arrays have the same content
-    console.log(`🔄 [updateItem] Verification - currentWheelItems matches formData.items:`, 
-      JSON.stringify(currentWheelItems) === JSON.stringify(formData.items));
+    
   };
 
   const moveItemUp = (index: number) => {
@@ -558,9 +544,7 @@ const AppearanceManager: React.FC<{
 };
 
 const generateConfig = (formData: any, currentUser?: any): SpinnerWheelConfig => {
-  console.log('🔍 [generateConfig] ENTRY - Raw formData received:', formData);
-  console.log('🔍 [generateConfig] Raw formData.items:', formData.items);
-  console.log('🔍 [generateConfig] currentWheelItems:', currentWheelItems);
+  
   
   if (!formData) {
     formData = {};
@@ -583,15 +567,14 @@ const generateConfig = (formData: any, currentUser?: any): SpinnerWheelConfig =>
   // CRITICAL FIX: Always ensure currentWheelItems is synchronized with formData.items
   // If formData.items has more recent data, use it
   if (formData.items && formData.items.length > 0) {
-    console.log('🔍 [generateConfig] Synchronizing currentWheelItems with formData.items');
+    
     currentWheelItems = formData.items;
   }
   
   // Use current items from module variable if available, otherwise fallback to formData
   const itemsToUse = currentWheelItems.length > 0 ? currentWheelItems : formData.items || [];
   
-  console.log('🔍 [generateConfig] Using items from:', currentWheelItems.length > 0 ? 'currentWheelItems (most current)' : 'formData.items (fallback)');
-  console.log('🔍 [generateConfig] Final itemsToUse:', itemsToUse);
+  
   
   // Process items with colors - use currentWheelItems if available, otherwise fallback to formData.items
   const themeColors = safeFormData.wheelTheme === 'custom' ? safeFormData.customColors : colorThemes[safeFormData.wheelTheme as keyof typeof colorThemes];
@@ -620,13 +603,7 @@ const generateConfig = (formData: any, currentUser?: any): SpinnerWheelConfig =>
     // Fallback to generic item name if empty
     const finalText = plainText || `Item ${index + 1}`;
     
-    console.log(`🔍 [generateConfig] Processing item ${index}:`, {
-      originalText: item.text,
-      extractedPlainText: plainText,
-      finalText: finalText,
-      hasHtmlContent: textContent.includes('<') && textContent.includes('>'),
-      preservedHtmlContent: textContent.includes('<') ? textContent : null
-    });
+    
 
     // Build the item object, conditionally adding content field only if it has HTML
     const processedItem: any = {
@@ -662,8 +639,7 @@ const generateConfig = (formData: any, currentUser?: any): SpinnerWheelConfig =>
     updatedAt: serverTimestamp()
   };
   
-  console.log('🔍 [generateConfig] Final config items:', config.items);
-  console.log('🔍 [generateConfig] Sample item for rich text check:', config.items[0]);
+  
   return config;
 };
 

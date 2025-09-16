@@ -422,7 +422,6 @@ const CategoryManager: React.FC<{
 
   // Initialize exactly two categories if they don't exist
   if (!formData.categories || formData.categories.length !== 2) {
-    console.log('🚀 [CategoryManager] SYNC INIT - Creating default two categories');
     const defaultCategories: Category[] = [
       {
         id: 'whack-these',
@@ -442,14 +441,12 @@ const CategoryManager: React.FC<{
       }
     ];
     updateField('categories', defaultCategories);
-    console.log('🚀 [CategoryManager] SYNC INIT - Set formData.categories:', defaultCategories);
   }
 
   // Ensure both categories have items initialized
   let categoriesUpdated = false;
   const safeCategoryData = formData.categories?.map((category: any, index: number) => {
     if (!category.items) {
-      console.log('🔧 [CategoryManager] SAFETY - Initializing missing items for category:', category.title);
       categoriesUpdated = true;
       return {
         ...category,
@@ -514,7 +511,6 @@ const CategoryManager: React.FC<{
 
   // Handler functions for item management
   const handleItemContentChange = (categoryIndex: number, itemIndex: number, content: any) => {
-    console.log('Item content change:', { categoryIndex, itemIndex, content, contentType: typeof content });
     
     const newCategories = [...categories];
     
@@ -554,11 +550,6 @@ const CategoryManager: React.FC<{
       serializableContent = plainText;
     }
 
-    console.log('Processed content:', { 
-      plainText, 
-      serializableContent: typeof serializableContent === 'string' ? serializableContent : 'Object (converted to plain text)',
-      contentType: typeof serializableContent
-    });
 
     // Update the item with both plain text and serializable content
     newCategories[categoryIndex].items[itemIndex] = {
@@ -590,11 +581,9 @@ const CategoryManager: React.FC<{
       // Use setTimeout to focus the new item after the component has rendered
       setTimeout(() => {
         const { categoryIndex, itemIndex, id } = lastAddedItemRef.current;
-        console.log(`Attempting to focus new item at category ${categoryIndex}, item ${itemIndex}, id ${id}`);
         
         const itemElement = document.querySelector(`[data-editor-id="${id}"]`);
         if (itemElement) {
-          console.log('Found item element, focusing');
           // Find the actual editable element within the editor wrapper
           const editableElement = itemElement.querySelector('[contenteditable="true"]');
           if (editableElement) {
@@ -603,10 +592,8 @@ const CategoryManager: React.FC<{
             setActiveEditorId(id);
             setLastSelectionPath([categoryIndex, itemIndex]);
           } else {
-            console.log('Could not find editable element');
           }
         } else {
-          console.log('Could not find item element with id:', id);
         }
       }, 100);
     }
@@ -1314,7 +1301,6 @@ export const whackAMoleSchema: ConfigSchema = {
       updatedAt: serverTimestamp()
     };
     
-    console.log('Generated Whack-a-Mole config (serialization-safe):', config);
     
     return config;
   }
