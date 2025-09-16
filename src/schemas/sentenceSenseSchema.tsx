@@ -87,8 +87,7 @@ const SentenceManager: React.FC<{
     setGenLoading(true);
     try {
       const items = await generateCategoryItems({ prompt: genPrompt.trim(), count: genCount, mode: 'sentences' });
-      // eslint-disable-next-line no-console
-      console.log('[SentenceGen] raw items:', items);
+      
 
       const normalize = (value: any): string[] => {
         if (typeof value === 'string') {
@@ -127,8 +126,7 @@ const SentenceManager: React.FC<{
       const flattened: string[] = normalize(items)
         .map((s) => s.replace(/^\s*\d+[\.)-]?\s*/, '').replace(/^[-•\*]\s*/, '').trim())
         .map((s) => s.replace(/^\"|\"$/g, ''));
-      // eslint-disable-next-line no-console
-      console.log('[SentenceGen] normalized items:', flattened);
+      
 
       const trimmed = (flattened || [])
         .filter((t) => t && t.length > 0)

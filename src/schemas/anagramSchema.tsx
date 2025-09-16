@@ -95,7 +95,7 @@ const AnagramManager: React.FC<{
       const mode = withDefinitions ? 'word_defs' : 'items';
       const items = await generateCategoryItems({ prompt: genPrompt.trim(), count: 5, mode });
       // eslint-disable-next-line no-console
-      console.log('[AnagramGen] raw items:', items, 'mode:', mode);
+      
       let generated: any[] = [];
       if (withDefinitions) {
         let pairs = (items as any[]).filter((o) => o && typeof (o as any).word === 'string' && typeof (o as any).definition === 'string');
