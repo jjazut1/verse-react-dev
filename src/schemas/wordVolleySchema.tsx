@@ -26,6 +26,7 @@ import {
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import { generateCategoryItems } from '../services/categoryAgent';
+import { AIGeneratorBar } from '../components/common/AIGeneratorBar';
 
 // Type definitions
 interface WordCategory {
@@ -211,34 +212,17 @@ const WordCategoryManager: React.FC<{
                   {/* AI Assistant for Target */}
                   <FormControl>
                     <FormLabel>Use AI to Generate Words (Optional)</FormLabel>
-                    <HStack align="stretch" spacing={2}>
-                      <Input
-                        placeholder="Describe words (e.g., short a CVC words)"
-                        value={genTarget.prompt}
-                        onChange={(e) => setGenTarget((prev) => ({ ...prev, prompt: e.target.value }))}
-                      />
-                      <Select
-                        width="110px"
-                        value={genTarget.count}
-                        onChange={(e) => setGenTarget((prev) => ({ ...prev, count: Number(e.target.value) }))}
-                      >
-                        <option value={10}>10</option>
-                        <option value={15}>15</option>
-                        <option value={20}>20</option>
-                        <option value={25}>25</option>
-                      </Select>
-                      <Select
-                        width="130px"
-                        value={genTarget.replace ? 'replace' : 'append'}
-                        onChange={(e) => setGenTarget((prev) => ({ ...prev, replace: e.target.value === 'replace' }))}
-                      >
-                        <option value="replace">Replace</option>
-                        <option value="append">Append</option>
-                      </Select>
-                      <Button colorScheme="purple" isLoading={genTarget.loading} onClick={() => handleGenerate('target')}>
-                        Generate
-                      </Button>
-                    </HStack>
+                    <AIGeneratorBar
+                      prompt={genTarget.prompt}
+                      onPromptChange={(v) => setGenTarget((p) => ({ ...p, prompt: v }))}
+                      count={genTarget.count}
+                      onCountChange={(v) => setGenTarget((p) => ({ ...p, count: v }))}
+                      replace={genTarget.replace}
+                      onReplaceChange={(v) => setGenTarget((p) => ({ ...p, replace: v }))}
+                      isLoading={genTarget.loading}
+                      onGenerate={() => handleGenerate('target')}
+                      promptPlaceholder="Describe words (e.g., short a CVC words)"
+                    />
                   </FormControl>
 
                   <Box width="100%">
@@ -317,34 +301,17 @@ const WordCategoryManager: React.FC<{
                   {/* AI Assistant for Non-Target */}
                   <FormControl>
                     <FormLabel>Use AI to Generate Words (Optional)</FormLabel>
-                    <HStack align="stretch" spacing={2}>
-                      <Input
-                        placeholder="Describe words (e.g., non-short a words)"
-                        value={genNonTarget.prompt}
-                        onChange={(e) => setGenNonTarget((prev) => ({ ...prev, prompt: e.target.value }))}
-                      />
-                      <Select
-                        width="110px"
-                        value={genNonTarget.count}
-                        onChange={(e) => setGenNonTarget((prev) => ({ ...prev, count: Number(e.target.value) }))}
-                      >
-                        <option value={10}>10</option>
-                        <option value={15}>15</option>
-                        <option value={20}>20</option>
-                        <option value={25}>25</option>
-                      </Select>
-                      <Select
-                        width="130px"
-                        value={genNonTarget.replace ? 'replace' : 'append'}
-                        onChange={(e) => setGenNonTarget((prev) => ({ ...prev, replace: e.target.value === 'replace' }))}
-                      >
-                        <option value="replace">Replace</option>
-                        <option value="append">Append</option>
-                      </Select>
-                      <Button colorScheme="purple" isLoading={genNonTarget.loading} onClick={() => handleGenerate('nonTarget')}>
-                        Generate
-                      </Button>
-                    </HStack>
+                    <AIGeneratorBar
+                      prompt={genNonTarget.prompt}
+                      onPromptChange={(v) => setGenNonTarget((p) => ({ ...p, prompt: v }))}
+                      count={genNonTarget.count}
+                      onCountChange={(v) => setGenNonTarget((p) => ({ ...p, count: v }))}
+                      replace={genNonTarget.replace}
+                      onReplaceChange={(v) => setGenNonTarget((p) => ({ ...p, replace: v }))}
+                      isLoading={genNonTarget.loading}
+                      onGenerate={() => handleGenerate('nonTarget')}
+                      promptPlaceholder="Describe words (e.g., non-short a words)"
+                    />
                   </FormControl>
 
                   <Box width="100%">
