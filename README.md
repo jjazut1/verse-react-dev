@@ -2525,3 +2525,11 @@ For questions, support, or feature requests:
 ---
 
 **Built with ❤️ for educators and students worldwide**
+
+## 2025-09-16
+- Added AI generators: Word Volley, Spinner Wheel, Whack-a-Mole (both categories), Anagram (words + definitions), Sentence Sense (single sentence).
+- ConfigurationRouter: open blank templates by default for all games.
+- Standardized cancel/save navigation to /teacher (top of page).
+- Functions-gen2: processCategoryGenRequest supports modes 'items', 'sentences', 'word_defs' with robust fallback parsing.
+- categoryAgent: Firestore-triggered request/response with mode support.
+- Bug fixes: spinner router errors, schema validations, casing for anagram words.
