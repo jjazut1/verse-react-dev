@@ -15,7 +15,6 @@ import {
 import { 
   generateEggs, 
   generateBaskets, 
-  isWordCorrectForBasket, 
   calculateScoreForPlacement, 
   isGameComplete as checkGameComplete,
   getFallbackConfigs,
@@ -38,6 +37,7 @@ export const useGameLogic = (
     eggs: [],
     crackedEggs: [],
     selectedWord: null,
+    selectedEggId: null,
     isWordSelected: false,
     baskets: [],
     gameConfig: {
@@ -66,6 +66,7 @@ export const useGameLogic = (
     isHighScore: false,
     showHighScoreDisplayModal: false,
     isSubmittingScore: false,
+    placedEggIds: [],
   });
 
   // Define functions first to avoid circular dependencies
@@ -201,7 +202,8 @@ export const useGameLogic = (
         eggs: updatedEggs,
         crackedEggs: newCrackedEggs,
         selectedWord: null,
-        isWordSelected: false
+        isWordSelected: false,
+        selectedEggId: egg.id
       };
     });
   }, []);
@@ -259,7 +261,6 @@ export const useGameLogic = (
   }, [gameState.isWordSelected, gameState.selectedWord, gameState.baskets]);
 
   const placeWordInBasket = useCallback((word: Word, basket: BasketType) => {
-    const isCorrect = isWordCorrectForBasket(word, basket);
     const points = calculateScoreForPlacement(word, basket);
     
     setGameState(prev => {
@@ -269,6 +270,7 @@ export const useGameLogic = (
       
       const newScore = prev.score + points;
       const gameComplete = checkGameComplete(prev.eggs, updatedBaskets);
+      const updatedPlaced = prev.selectedEggId ? [...prev.placedEggIds, prev.selectedEggId] : prev.placedEggIds;
       
       return {
         ...prev,
@@ -276,7 +278,9 @@ export const useGameLogic = (
         score: newScore,
         isGameComplete: gameComplete,
         selectedWord: null,
-        isWordSelected: false
+        isWordSelected: false,
+        placedEggIds: updatedPlaced,
+        selectedEggId: null
       };
     });
   }, []);

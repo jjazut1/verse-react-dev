@@ -50,4 +50,4 @@ setPersistence(auth, browserLocalPersistence)
     console.error('Error setting auth persistence:', error);
   });
 
-export { db, auth, functions, rtdb }; 
+export { db, auth, functions, rtdb };

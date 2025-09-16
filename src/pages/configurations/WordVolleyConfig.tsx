@@ -1,15 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '@chakra-ui/react';
 import { ConfigurationFramework } from '../../components/common/ConfigurationFramework';
 import { wordVolleySchema } from '../../schemas/wordVolleySchema';
-
-interface OutletContextType {
-  onError?: (message: string) => void;
-}
 
 interface WordVolleyConfigDoc {
   id: string;
@@ -29,7 +25,6 @@ interface WordVolleyConfigDoc {
 
 const WordVolleyConfig = () => {
   const navigate = useNavigate();
-  const { onError } = useOutletContext<OutletContextType>();
   const { templateId } = useParams();
   const { currentUser } = useAuth();
   const toast = useToast();
@@ -65,30 +60,26 @@ const WordVolleyConfig = () => {
           setIsEditing(true); // Regular editing
         }
 
-        // Search multiple collections for the configuration
+        // Only load from user configs and blank templates
         const collections = [
-          'wordVolleyConfigs',
-          'gameConfigurations', 
-          'templates',
-          'sharedTemplates'
+          { name: 'userGameConfigs', ref: doc(db, 'userGameConfigs', templateId) },
+          { name: 'blankGameTemplates', ref: doc(db, 'blankGameTemplates', templateId) }
         ];
 
         let configDoc: WordVolleyConfigDoc | null = null;
         let foundCollection = '';
 
-        for (const collectionName of collections) {
+        for (const collection of collections) {
           try {
-            const docRef = doc(db, collectionName, templateId);
-            const docSnap = await getDoc(docRef);
-            
+            const docSnap = await getDoc(collection.ref);
             if (docSnap.exists()) {
               configDoc = { id: docSnap.id, ...docSnap.data() } as WordVolleyConfigDoc;
-              foundCollection = collectionName;
-              console.log(`✅ Found Word Volley config in ${collectionName}:`, configDoc);
+              foundCollection = collection.name;
+              console.log(`✅ Found Word Volley config in ${collection.name}:`, configDoc);
               break;
             }
           } catch (error) {
-            console.warn(`Failed to check ${collectionName}:`, error);
+            console.warn(`Failed to check ${collection.name}:`, error);
             continue;
           }
         }
@@ -106,11 +97,9 @@ const WordVolleyConfig = () => {
           return;
         }
 
-        // Check permissions for shared templates
-        if (foundCollection === 'sharedTemplates' && configDoc.userId !== currentUser.uid) {
-          console.log('✅ Loading shared template (read-only access)');
-          setIsEditing(false); // Force copy mode for shared templates
-        } else if (configDoc.userId && configDoc.userId !== currentUser.uid) {
+        // Permissions: admin (blank templates) or non-owner => copy mode
+        const isAdminConfig = foundCollection === 'blankGameTemplates';
+        if (configDoc.userId && configDoc.userId !== currentUser.uid) {
           console.error('❌ Permission denied: User does not own this configuration');
           toast({
             title: 'Access Denied',
@@ -121,6 +110,9 @@ const WordVolleyConfig = () => {
           });
           navigate('/');
           return;
+        }
+        if (isAdminConfig) {
+          setIsEditing(false);
         }
 
         // Transform the loaded data to match the form structure
@@ -167,10 +159,6 @@ const WordVolleyConfig = () => {
     loadConfiguration();
   }, [templateId, currentUser, navigate, toast]);
 
-  const handleCancel = () => {
-    navigate('/');
-  };
-
   if (loading) {
     return <div>Loading configuration...</div>;
   }
@@ -178,7 +166,6 @@ const WordVolleyConfig = () => {
   return (
     <ConfigurationFramework
       schema={wordVolleySchema}
-      onCancel={handleCancel}
       initialData={initialData}
       isEditing={isEditing}
       documentId={isEditing ? templateId : undefined}

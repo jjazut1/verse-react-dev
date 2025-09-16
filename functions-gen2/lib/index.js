@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.processTTSRequest = exports.fixStudentPasswordFlag = exports.checkStudentPasswordStatus = exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
+exports.generateCategoryItems = exports.processCategoryGenRequest = exports.processTTSRequest = exports.fixStudentPasswordFlag = exports.checkStudentPasswordStatus = exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.OPENAI_API_KEY = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
@@ -12,6 +12,7 @@ const emailTemplates_1 = require("./emailTemplates");
 const functions = require("firebase-functions");
 // AWS Polly imports
 const client_polly_1 = require("@aws-sdk/client-polly");
+const crypto_1 = require("crypto");
 // Define the secrets
 exports.SENDGRID_API_KEY = (0, params_1.defineSecret)("SENDGRID_API_KEY");
 exports.SENDER_EMAIL = (0, params_1.defineSecret)("SENDER_EMAIL");
@@ -19,6 +20,8 @@ exports.APP_URL = (0, params_1.defineSecret)("APP_URL");
 // AWS secrets for Polly TTS
 exports.AWS_ACCESS_KEY_ID = (0, params_1.defineSecret)("AWS_ACCESS_KEY_ID");
 exports.AWS_SECRET_ACCESS_KEY = (0, params_1.defineSecret)("AWS_SECRET_ACCESS_KEY");
+// LLM provider secret (OpenAI style API)
+exports.OPENAI_API_KEY = (0, params_1.defineSecret)("OPENAI_API_KEY");
 // Get environment
 const isProduction = process.env.NODE_ENV === 'production';
 // Configuration flag to use untrackable email templates
@@ -662,6 +665,294 @@ exports.processTTSRequest = (0, firestore_1.onDocumentCreated)({
             requestId: requestId,
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
+    }
+});
+// Firestore-triggered category generation to avoid CORS issues
+exports.processCategoryGenRequest = (0, firestore_1.onDocumentCreated)({
+    document: 'categoryGenRequests/{requestId}',
+    secrets: [exports.OPENAI_API_KEY],
+}, async (event) => {
+    var _a, _b, _c, _d;
+    const requestId = event.params.requestId;
+    try {
+        const data = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
+        if (!data) {
+            console.error('No request data found');
+            return;
+        }
+        const { prompt, count = 10, uid, mode } = data;
+        if (!prompt || typeof prompt !== 'string') {
+            await admin.firestore().doc(`categoryGenResults/${requestId}`).set({
+                success: false,
+                error: 'Missing prompt',
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            return;
+        }
+        // Optional role check (teacher/admin)
+        if (uid) {
+            try {
+                const userDoc = await admin.firestore().collection('users').doc(uid).get();
+                const role = userDoc.exists ? userDoc.data().role : undefined;
+                if (role !== 'teacher' && role !== 'admin') {
+                    await admin.firestore().doc(`categoryGenResults/${requestId}`).set({
+                        success: false,
+                        error: 'Permission denied',
+                        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                    return;
+                }
+            }
+            catch (e) {
+                console.warn('Role check failed', e);
+            }
+        }
+        // Call OpenAI-compatible API
+        const apiKey = exports.OPENAI_API_KEY.value();
+        const requestedCount = Math.max(1, Math.min(25, Number(count) || 10));
+        const isSentenceMode = String(mode || '').toLowerCase() === 'sentences';
+        const isWordDefMode = String(mode || '').toLowerCase() === 'word_defs';
+        const system = isSentenceMode
+            ? 'You generate classroom-safe, age-appropriate simple sentences only. Output JSON array of complete sentence strings, no explanations.'
+            : isWordDefMode
+                ? 'You generate child-friendly dictionary entries. Output JSON array of objects: {"word":"...","definition":"..."}. No explanations or extra text.'
+                : 'You generate classroom-safe, age-appropriate single-word or short-phrase items only. Output JSON array of strings, no explanations.';
+        const user = isSentenceMode
+            ? `Generate ${requestedCount} simple sentences for: ${prompt}. Rules: minimum 2 words; avoid quotes; no numbering/bullets; no profanity; strictly return JSON array only.`
+            : isWordDefMode
+                ? `Generate ${requestedCount} kid-friendly word + definition pairs for: ${prompt}. Return JSON array of {word, definition}. Rules: everyday vocabulary; one short simple sentence for definition; no quotes; no numbers; no extra keys; JSON only.`
+                : `Generate ${requestedCount} items for: ${prompt}. Rules: single words preferred; no punctuation; no numbers; no profanity; no duplicates; return JSON array only.`;
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                temperature: 0.4,
+                max_tokens: 400,
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: user }
+                ]
+            })
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`OpenAI error: ${response.status} ${text}`);
+        }
+        const json = await response.json();
+        const content = ((_d = (_c = (_b = json === null || json === void 0 ? void 0 : json.choices) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.message) === null || _d === void 0 ? void 0 : _d.content) || '[]';
+        let items = [];
+        try {
+            const start = content.indexOf('[');
+            const end = content.lastIndexOf(']');
+            const slice = start >= 0 && end >= 0 ? content.slice(start, end + 1) : content;
+            const parsed = JSON.parse(slice);
+            if (Array.isArray(parsed))
+                items = parsed;
+        }
+        catch (_e) { }
+        // If sentence/word_defs mode returned simple array of strings, coerce in word_defs
+        if (isWordDefMode && Array.isArray(items) && items.every((s) => typeof s === 'string')) {
+            items = items.map((w) => ({ word: w, definition: '' }));
+        }
+        // Fallback parsing when model returns non-JSON
+        if (!Array.isArray(items) || items.length === 0) {
+            const text = String(content || '').trim();
+            const normalizeLines = (value) => {
+                if (typeof value === 'string') {
+                    const unquoted = value.replace(/^\s*\"|\"\s*$/g, '');
+                    const lines = unquoted
+                        .split(/\n+/)
+                        .flatMap((line) => line.split(/(?:(?:^|\s)(?:\d+|[-•\*])(?:[\.)\-:]\s+))/))
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                    if (lines.length > 1)
+                        return lines;
+                    // Sentence split fallback
+                    return unquoted.split(/(?<=[\.!?])\s+|;\s+/).filter(Boolean);
+                }
+                if (Array.isArray(value))
+                    return value.flatMap(normalizeLines);
+                if (value && typeof value === 'object' && typeof value.text === 'string')
+                    return normalizeLines(value.text);
+                return [];
+            };
+            if (isWordDefMode) {
+                // Basic pair extraction from lines like "word - definition"
+                const lines = normalizeLines(text);
+                items = lines.map((l) => {
+                    const m = l.split(/\s*[-:–]\s+/);
+                    return { word: (m[0] || '').trim(), definition: (m[1] || '').trim() };
+                }).filter((o) => o.word && o.definition);
+            }
+            else {
+                items = normalizeLines(text);
+            }
+        }
+        // Normalize
+        const seen = new Set();
+        if (isWordDefMode) {
+            items = items
+                .map((o) => {
+                if (typeof o === 'object' && o && typeof o.word === 'string' && typeof o.definition === 'string') {
+                    return { word: o.word.trim(), definition: o.definition.trim() };
+                }
+                return null;
+            })
+                .filter(Boolean)
+                .filter((o) => o.word.length > 0 && o.definition.length > 0)
+                .filter((o) => {
+                const key = o.word.toLowerCase();
+                if (seen.has(key))
+                    return false;
+                seen.add(key);
+                return true;
+            })
+                .slice(0, requestedCount);
+        }
+        else {
+            items = items
+                .map((s) => (typeof s === 'string' ? s.trim() : ''))
+                .map((s) => s.replace(/^\s*\d+[\.)-]?\s*/, '').replace(/^[-•\*]\s*/, ''))
+                .filter((s) => s.length > 0 && (isSentenceMode ? s.split(/\s+/).length >= 2 && s.length <= 220 : s.length <= 60))
+                .filter((s) => {
+                const key = s.toLowerCase();
+                if (seen.has(key))
+                    return false;
+                seen.add(key);
+                return true;
+            })
+                .slice(0, requestedCount);
+        }
+        await admin.firestore().doc(`categoryGenResults/${requestId}`).set({
+            success: true,
+            items,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    }
+    catch (error) {
+        console.error('processCategoryGenRequest error', error);
+        await admin.firestore().doc(`categoryGenResults/${requestId}`).set({
+            success: false,
+            error: (error === null || error === void 0 ? void 0 : error.message) || 'Generation failed',
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    }
+});
+// Category item generation via LLM (OpenAI-compatible API), callable by teachers
+exports.generateCategoryItems = (0, https_1.onCall)({
+    cors: true,
+    secrets: [exports.OPENAI_API_KEY],
+    region: 'us-central1'
+}, async (request) => {
+    var _a, _b, _c, _d, _e;
+    try {
+        const { prompt, count } = request.data || {};
+        if (typeof prompt !== 'string' || prompt.trim().length < 3) {
+            throw new functions.https.HttpsError('invalid-argument', 'Prompt is required');
+        }
+        const requestedCount = Math.max(1, Math.min(25, Number(count) || 10));
+        // Optional auth check: only allow teachers/admins
+        const uid = (_a = request.auth) === null || _a === void 0 ? void 0 : _a.uid;
+        if (!uid) {
+            throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+        }
+        const userDoc = await admin.firestore().collection('users').doc(uid).get();
+        const role = userDoc.exists ? userDoc.data().role : undefined;
+        if (role !== 'teacher' && role !== 'admin') {
+            throw new functions.https.HttpsError('permission-denied', 'Only teachers/admins can generate items');
+        }
+        // Basic rate limiting: 50 requests per 6 hours per user
+        const now = Date.now();
+        const windowMs = 6 * 60 * 60 * 1000;
+        const since = new Date(now - windowMs);
+        const rateRef = admin.firestore().collection('generationLogs');
+        const recent = await rateRef
+            .where('uid', '==', uid)
+            .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(since))
+            .count()
+            .get();
+        const recentCount = ((_b = recent.data()) === null || _b === void 0 ? void 0 : _b.count) || 0;
+        if (recentCount > 200) {
+            throw new functions.https.HttpsError('resource-exhausted', 'Rate limit exceeded');
+        }
+        // Cache lookup
+        const hash = (0, crypto_1.createHash)('sha256').update(`${prompt}|${requestedCount}`).digest('hex');
+        const cacheDocRef = admin.firestore().collection('generationCache').doc(hash);
+        const cacheDoc = await cacheDocRef.get();
+        if (cacheDoc.exists) {
+            const data = cacheDoc.data();
+            if (data && Array.isArray(data.items)) {
+                await rateRef.add({ uid, prompt, count: requestedCount, cached: true, timestamp: admin.firestore.FieldValue.serverTimestamp() });
+                return { items: data.items.slice(0, requestedCount) };
+            }
+        }
+        // Call OpenAI-compatible API
+        const apiKey = exports.OPENAI_API_KEY.value();
+        if (!apiKey) {
+            throw new functions.https.HttpsError('failed-precondition', 'OPENAI_API_KEY not configured');
+        }
+        const system = 'You generate classroom-safe, age-appropriate single-word or short-phrase items only. Output JSON array of strings, no explanations.';
+        const user = `Generate ${requestedCount} items for: ${prompt}. Rules: single words preferred; no punctuation; no numbers; no profanity; no duplicates; return JSON array only.`;
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                temperature: 0.4,
+                max_tokens: 400,
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: user }
+                ]
+            })
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`OpenAI error: ${response.status} ${text}`);
+        }
+        const json = await response.json();
+        const content = ((_e = (_d = (_c = json === null || json === void 0 ? void 0 : json.choices) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.message) === null || _e === void 0 ? void 0 : _e.content) || '[]';
+        // Parse JSON array from content (tolerant)
+        let items = [];
+        try {
+            const start = content.indexOf('[');
+            const end = content.lastIndexOf(']');
+            const slice = start >= 0 && end >= 0 ? content.slice(start, end + 1) : content;
+            const parsed = JSON.parse(slice);
+            if (Array.isArray(parsed))
+                items = parsed;
+        }
+        catch (_f) { }
+        // Normalize: trim, dedupe, filter length, clamp
+        const seen = new Set();
+        items = items
+            .map((s) => (typeof s === 'string' ? s.trim() : ''))
+            .filter((s) => s.length > 0 && s.length <= 30)
+            .filter((s) => {
+            const key = s.toLowerCase();
+            if (seen.has(key))
+                return false;
+            seen.add(key);
+            return true;
+        })
+            .slice(0, requestedCount);
+        // Persist cache (TTL-ish via timestamp)
+        await cacheDocRef.set({ prompt, count: requestedCount, items, timestamp: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        await rateRef.add({ uid, prompt, count: requestedCount, cached: false, timestamp: admin.firestore.FieldValue.serverTimestamp() });
+        return { items };
+    }
+    catch (error) {
+        firebase_functions_1.logger.error('generateCategoryItems error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', (error === null || error === void 0 ? void 0 : error.message) || 'Generation failed');
     }
 });
 //# sourceMappingURL=index.js.map

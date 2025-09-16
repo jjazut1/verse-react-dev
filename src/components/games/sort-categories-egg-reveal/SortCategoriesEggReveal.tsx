@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Box } from '@chakra-ui/react';
 import { SortCategoriesEggRevealProps } from './types';
 import { useGameLogic } from './useGameLogic';
@@ -24,9 +24,15 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
     onHighScoreProcessComplete
   );
 
+  // UI sound toggle: controls both TTS and sound effects
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const handleToggleSound = useCallback(() => {
+    setSoundEnabled((prev) => !prev);
+  }, []);
+
   return (
     <Box width="100vw" maxWidth="100%" overflow="hidden" height="auto">
-      <PWAGameHeader gameTitle="Sort Categories Egg Reveal" variant="compact" />
+      <PWAGameHeader gameTitle="Sort Categories" variant="compact" />
       
       <ConfigModal
         gameState={gameLogic.gameState}
@@ -48,11 +54,14 @@ const SortCategoriesEggReveal: React.FC<SortCategoriesEggRevealProps> = ({
             useAmazonPolly={initialConfig.useAmazonPolly}
             textToSpeechMode={initialConfig.textToSpeechMode}
             containerType={initialConfig.containerType}
+            soundEnabled={soundEnabled}
           />
           <GameControls
             gameState={gameLogic.gameState}
             onResetGame={gameLogic.handleResetGame}
             onCloseGame={gameLogic.handleCloseGame}
+            soundEnabled={soundEnabled}
+            onToggleSound={handleToggleSound}
           />
         </Box>
       ) : (

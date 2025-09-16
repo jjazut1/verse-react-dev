@@ -4,6 +4,7 @@ import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext'
 import { ModalProvider } from './contexts/ModalContext'
 import { LoadingProvider } from './contexts/LoadingContext'
 import Navbar from './components/Navbar'
+import Footer from './components/Footer'
 import { GlobalModals } from './components/GlobalModals'
 import Home from './pages/Home'
 import Login from './pages/Login'
@@ -119,6 +120,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     <>
       <Navbar />
       {children}
+      <Footer />
     </>
   );
 };

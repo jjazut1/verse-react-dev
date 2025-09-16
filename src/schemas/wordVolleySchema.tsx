@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { serverTimestamp } from 'firebase/firestore';
 import {
   Box,
@@ -21,8 +21,11 @@ import {
   TabPanels,
   Tab,
   TabPanel,
+  Select,
+  useToast,
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
+import { generateCategoryItems } from '../services/categoryAgent';
 
 // Type definitions
 interface WordCategory {
@@ -44,14 +47,12 @@ interface WordVolleyFormData {
   share: boolean;
 }
 
-// Generate unique ID
-const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
 // Word Category Manager Component
 const WordCategoryManager: React.FC<{
   formData: Partial<WordVolleyFormData>;
   updateField: (field: string, value: any) => void;
 }> = ({ formData, updateField }) => {
+  const toast = useToast();
   
   // Initialize categories synchronously if they don't exist
   if (!formData.targetCategory) {
@@ -86,6 +87,44 @@ const WordCategoryManager: React.FC<{
     name: 'Other Words',
     words: ['dog', 'tree', 'house', 'car', 'sun'],
     isTarget: false
+  };
+
+  // Local AI generation state
+  const [genTarget, setGenTarget] = useState<{ prompt: string; count: number; replace: boolean; loading: boolean }>({ prompt: '', count: 10, replace: true, loading: false });
+  const [genNonTarget, setGenNonTarget] = useState<{ prompt: string; count: number; replace: boolean; loading: boolean }>({ prompt: '', count: 10, replace: true, loading: false });
+
+  const MAX_WORDS = 50;
+
+  const handleGenerate = async (which: 'target' | 'nonTarget') => {
+    const state = which === 'target' ? genTarget : genNonTarget;
+    if (!state.prompt.trim()) {
+      toast({ title: 'Enter a prompt to generate words', status: 'warning', duration: 3000 });
+      return;
+    }
+    which === 'target' ? setGenTarget({ ...state, loading: true }) : setGenNonTarget({ ...state, loading: true });
+    try {
+      const items = await generateCategoryItems({ prompt: state.prompt.trim(), count: state.count });
+      const trimmed = (items || [])
+        .map((t) => (typeof t === 'string' ? t.trim() : ''))
+        .filter((t) => t.length > 0)
+        .slice(0, MAX_WORDS);
+      if (which === 'target') {
+        const current = targetCategory.words || [];
+        const merged = state.replace ? trimmed : [...current, ...trimmed];
+        updateField('targetCategory', { ...targetCategory, words: merged.slice(0, MAX_WORDS) });
+      } else {
+        const current = nonTargetCategory.words || [];
+        const merged = state.replace ? trimmed : [...current, ...trimmed];
+        updateField('nonTargetCategory', { ...nonTargetCategory, words: merged.slice(0, MAX_WORDS) });
+      }
+      toast({ title: 'Words generated', status: 'success', duration: 2000 });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Word Volley generation failed', e);
+      toast({ title: 'Generation failed', status: 'error', duration: 4000 });
+    } finally {
+      which === 'target' ? setGenTarget({ ...state, loading: false }) : setGenNonTarget({ ...state, loading: false });
+    }
   };
 
   const handleWordChange = (categoryType: 'target' | 'nonTarget', index: number, value: string) => {
@@ -169,6 +208,39 @@ const WordCategoryManager: React.FC<{
                     />
                   </FormControl>
 
+                  {/* AI Assistant for Target */}
+                  <FormControl>
+                    <FormLabel>Use AI to Generate Words (Optional)</FormLabel>
+                    <HStack align="stretch" spacing={2}>
+                      <Input
+                        placeholder="Describe words (e.g., short a CVC words)"
+                        value={genTarget.prompt}
+                        onChange={(e) => setGenTarget((prev) => ({ ...prev, prompt: e.target.value }))}
+                      />
+                      <Select
+                        width="110px"
+                        value={genTarget.count}
+                        onChange={(e) => setGenTarget((prev) => ({ ...prev, count: Number(e.target.value) }))}
+                      >
+                        <option value={10}>10</option>
+                        <option value={15}>15</option>
+                        <option value={20}>20</option>
+                        <option value={25}>25</option>
+                      </Select>
+                      <Select
+                        width="130px"
+                        value={genTarget.replace ? 'replace' : 'append'}
+                        onChange={(e) => setGenTarget((prev) => ({ ...prev, replace: e.target.value === 'replace' }))}
+                      >
+                        <option value="replace">Replace</option>
+                        <option value="append">Append</option>
+                      </Select>
+                      <Button colorScheme="purple" isLoading={genTarget.loading} onClick={() => handleGenerate('target')}>
+                        Generate
+                      </Button>
+                    </HStack>
+                  </FormControl>
+
                   <Box width="100%">
                     <FormLabel>Words</FormLabel>
                     <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={3}>
@@ -240,6 +312,39 @@ const WordCategoryManager: React.FC<{
                       placeholder="e.g., Other Words"
                       className="apple-input"
                     />
+                  </FormControl>
+
+                  {/* AI Assistant for Non-Target */}
+                  <FormControl>
+                    <FormLabel>Use AI to Generate Words (Optional)</FormLabel>
+                    <HStack align="stretch" spacing={2}>
+                      <Input
+                        placeholder="Describe words (e.g., non-short a words)"
+                        value={genNonTarget.prompt}
+                        onChange={(e) => setGenNonTarget((prev) => ({ ...prev, prompt: e.target.value }))}
+                      />
+                      <Select
+                        width="110px"
+                        value={genNonTarget.count}
+                        onChange={(e) => setGenNonTarget((prev) => ({ ...prev, count: Number(e.target.value) }))}
+                      >
+                        <option value={10}>10</option>
+                        <option value={15}>15</option>
+                        <option value={20}>20</option>
+                        <option value={25}>25</option>
+                      </Select>
+                      <Select
+                        width="130px"
+                        value={genNonTarget.replace ? 'replace' : 'append'}
+                        onChange={(e) => setGenNonTarget((prev) => ({ ...prev, replace: e.target.value === 'replace' }))}
+                      >
+                        <option value="replace">Replace</option>
+                        <option value="append">Append</option>
+                      </Select>
+                      <Button colorScheme="purple" isLoading={genNonTarget.loading} onClick={() => handleGenerate('nonTarget')}>
+                        Generate
+                      </Button>
+                    </HStack>
                   </FormControl>
 
                   <Box width="100%">

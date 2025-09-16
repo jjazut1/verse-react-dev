@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ConfigSchema } from '../components/common/ConfigurationFramework';
 import { serverTimestamp } from 'firebase/firestore';
 import {
@@ -21,8 +21,12 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
+  Input,
+  Select,
+  useToast,
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
+import { generateCategoryItems } from '../services/categoryAgent';
 
 // Custom component for sentence management
 const SentenceManager: React.FC<{
@@ -30,7 +34,8 @@ const SentenceManager: React.FC<{
   updateField: (fieldName: string, value: any) => void;
   errors: Record<string, string>;
   saveAttempted: boolean;
-}> = ({ formData, updateField, errors, saveAttempted }) => {
+}> = ({ formData, updateField, errors }) => {
+  const toast = useToast();
   // Initialize sentences field if it doesn't exist
   useEffect(() => {
     if (formData && !formData.sentences) {
@@ -67,6 +72,83 @@ const SentenceManager: React.FC<{
       updateField('sentences', updatedSentences);
     }
   };
+
+  // AI generation state and handler (mirrors Sort Categories agent)
+  const [genPrompt, setGenPrompt] = useState('');
+  const [genCount] = useState<number>(1);
+  const [genReplace, setGenReplace] = useState<boolean>(false);
+  const [genLoading, setGenLoading] = useState<boolean>(false);
+
+  const handleGenerateSentences = async () => {
+    if (!genPrompt.trim()) {
+      toast({ title: 'Enter a prompt to generate sentences', status: 'warning', duration: 3000 });
+      return;
+    }
+    setGenLoading(true);
+    try {
+      const items = await generateCategoryItems({ prompt: genPrompt.trim(), count: genCount, mode: 'sentences' });
+      // eslint-disable-next-line no-console
+      console.log('[SentenceGen] raw items:', items);
+
+      const normalize = (value: any): string[] => {
+        if (typeof value === 'string') {
+          const text = value.trim();
+          // If it looks like JSON, try to parse
+          if ((text.startsWith('[') && text.endsWith(']')) || (text.startsWith('{') && text.endsWith('}'))) {
+            try {
+              const parsed = JSON.parse(text);
+              return normalize(parsed);
+            } catch {
+              // fall through to heuristics
+            }
+          }
+          // Strip wrapping quotes if present
+          const unquoted = text.replace(/^"|"$/g, '');
+          // Split on newlines or numbered lists
+          const parts = unquoted
+            .split(/\n+/)
+            .flatMap((line) => line.split(/(?:(?:^|\s)(?:\d+|[-•\*])(?:[\.)\-:]\s+))/).filter(Boolean));
+          // If still a single blob, try sentence splitting
+          if (parts.length <= 1) {
+            // Split on common delimiters: period, question, exclamation, semicolon
+            return unquoted.split(/(?<=[\.!?])\s+|;\s+/).filter(Boolean);
+          }
+          return parts;
+        }
+        if (Array.isArray(value)) {
+          return value.flatMap(normalize);
+        }
+        if (value && typeof value === 'object' && typeof value.text === 'string') {
+          return normalize(value.text);
+        }
+        return [];
+      };
+
+      const flattened: string[] = normalize(items)
+        .map((s) => s.replace(/^\s*\d+[\.)-]?\s*/, '').replace(/^[-•\*]\s*/, '').trim())
+        .map((s) => s.replace(/^\"|\"$/g, ''));
+      // eslint-disable-next-line no-console
+      console.log('[SentenceGen] normalized items:', flattened);
+
+      const trimmed = (flattened || [])
+        .filter((t) => t && t.length > 0)
+        .map((t, i) => ({ id: `${Date.now()}-${i}`, original: t, difficulty: 'medium' }))
+        .filter((s) => (s.original.split(' ').length >= 2));
+      if (!trimmed.length) {
+        toast({ title: 'No sentences generated', status: 'info', duration: 2500 });
+        return;
+      }
+      const merged = genReplace ? trimmed : [...sentences, ...trimmed];
+      updateField('sentences', merged.slice(0, 50));
+      toast({ title: 'Sentences generated', status: 'success', duration: 2000 });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Sentence generation failed', e);
+      toast({ title: 'Generation failed', status: 'error', duration: 4000 });
+    } finally {
+      setGenLoading(false);
+    }
+  };
   
   return (
     <VStack spacing={6} align="stretch">
@@ -77,6 +159,30 @@ const SentenceManager: React.FC<{
         </Text>
       </FormControl>
       
+      {/* AI Assistant */}
+      <FormControl>
+        <FormLabel>Use AI to Generate a Sentence (Optional)</FormLabel>
+        <HStack align="stretch" spacing={2}>
+          <Input
+            placeholder="Describe the sentences (e.g., Grade 2 simple sentences about animals)"
+            value={genPrompt}
+            onChange={(e) => setGenPrompt(e.target.value)}
+          />
+          <Select
+            width="130px"
+            value={genReplace ? 'replace' : 'append'}
+            onChange={(e) => setGenReplace(e.target.value === 'replace')}
+          >
+            <option value="replace">Replace</option>
+            <option value="append">Append</option>
+          </Select>
+          <Button colorScheme="purple" isLoading={genLoading} onClick={handleGenerateSentences}>
+            Generate
+          </Button>
+        </HStack>
+        <Text fontSize="xs" color="gray.500" mt={1}>Minimum 2 words per sentence. Max 50 sentences total.</Text>
+      </FormControl>
+
       {/* Sentence Management */}
       <VStack spacing={4} align="stretch">
         {sentences.length === 0 ? (

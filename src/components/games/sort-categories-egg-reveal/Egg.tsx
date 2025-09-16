@@ -1,8 +1,19 @@
 import { Box, Text, useBreakpointValue } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import React, { useState, useEffect } from 'react';
-import { playSound } from '../../../utils/soundUtils';
+// import { playSound } from '../../../utils/soundUtils';
 import { speakEnhanced, speakWithPollyPhonemes, speakWithPollyRegular, speakPhonics, speakText, isTTSAvailable } from '../../../utils/soundUtils';
+
+// Temporary build fingerprint for troubleshooting bundle versions
+const AMAZON_BOX_VERSION = 'isometric-cube-v3';
+const SORT_CATEGORIES_BUILD_FINGERPRINT = `SC-EGG ${AMAZON_BOX_VERSION} 2025-08-26T12:55`;
+
+// Log once per page load to identify which bundle is active
+if (typeof window !== 'undefined' && !(window as any).__SC_EGG_BUILD_LOGGED__) {
+  // eslint-disable-next-line no-console
+  console.log(`[SortCategories] BUILD: ${SORT_CATEGORIES_BUILD_FINGERPRINT}`);
+  (window as any).__SC_EGG_BUILD_LOGGED__ = true;
+}
 
 interface ContainerProps {
   onClick: () => void;
@@ -15,6 +26,7 @@ interface ContainerProps {
   useAmazonPolly?: boolean;
   textToSpeechMode?: string;
   containerType?: string;
+  soundEnabled?: boolean;
 }
 
 const Container: React.FC<ContainerProps> = ({ 
@@ -27,10 +39,12 @@ const Container: React.FC<ContainerProps> = ({
   usePhonicsMode = false, 
   useAmazonPolly = false,
   textToSpeechMode,
-  containerType = 'eggs'
+  containerType = 'eggs',
+  soundEnabled = true
 }) => {
   const [showCracks, setShowCracks] = useState(false);
-  const [isOpened, setIsOpened] = useState(false);
+  // Track opened state for potential future animations
+  const [, setIsOpened] = useState(false);
   const [pastelColor] = useState(generatePastelColor());
   const [isWordPickedUp, setIsWordPickedUp] = useState(false);
 
@@ -53,10 +67,10 @@ const Container: React.FC<ContainerProps> = ({
         };
       case 'amazon':
         return {
-          borderRadius: '4px',
-          background: 'linear-gradient(135deg, #ffd89b, #d4a76a)',
-          boxShadow: 'inset -2px -2px 4px rgba(0, 0, 0, 0.1), inset 2px 2px 4px rgba(255, 255, 255, 0.3)',
-          border: '2px solid rgba(139, 69, 19, 0.3)',
+          borderRadius: '0px',
+          background: 'transparent',
+          boxShadow: 'none',
+          border: 'none',
         };
       default: // eggs
         return {
@@ -105,23 +119,25 @@ const Container: React.FC<ContainerProps> = ({
 
     if (cracked) {
       // Determine TTS mode once
-      const ttsMode = textToSpeechMode || (enableTextToSpeech ? 'amazon-polly-phonics' : 'disabled');
+      const ttsMode = soundEnabled ? (textToSpeechMode || (enableTextToSpeech ? 'amazon-polly-phonics' : 'disabled')) : 'disabled';
       
       // Always play container sound for immediate feedback
-      try {
-        audio = new Audio(getContainerSound());
-        audio.volume = 0.5; // Reduce volume so it doesn't interfere with TTS
-        
-        // Add error handling for missing sound files
-        audio.addEventListener('error', (e) => {
-          console.warn(`Sound file not found: ${getContainerSound()}. Please add sound files to public/sounds/`);
-        });
-        
-        audio.play().catch((error) => {
-          console.warn('Could not play container sound:', error);
-        });
-      } catch (error) {
-        console.error('Error creating audio element:', error);
+      if (soundEnabled) {
+        try {
+          audio = new Audio(getContainerSound());
+          audio.volume = 0.5; // Reduce volume so it doesn't interfere with TTS
+          
+          // Add error handling for missing sound files
+          audio.addEventListener('error', () => {
+            console.warn(`Sound file not found: ${getContainerSound()}. Please add sound files to public/sounds/`);
+          });
+          
+          audio.play().catch((error) => {
+            console.warn('Could not play container sound:', error);
+          });
+        } catch (error) {
+          console.error('Error creating audio element:', error);
+        }
       }
 
       // Add opening effects
@@ -188,7 +204,7 @@ const Container: React.FC<ContainerProps> = ({
         audio.currentTime = 0;
       }
     };
-  }, [cracked, enableTextToSpeech, usePhonicsMode, useAmazonPolly, item, textToSpeechMode, containerType]);
+  }, [cracked, enableTextToSpeech, usePhonicsMode, useAmazonPolly, item, textToSpeechMode, containerType, soundEnabled]);
 
   // Generate a random pastel color
   function generatePastelColor(): string {
@@ -225,6 +241,8 @@ const Container: React.FC<ContainerProps> = ({
       <AnimatePresence>
         {!cracked && (
           <motion.div
+            data-amazon-version={containerType === 'amazon' ? AMAZON_BOX_VERSION : undefined}
+            data-build={SORT_CATEGORIES_BUILD_FINGERPRINT}
             initial={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.3 }}
@@ -239,16 +257,18 @@ const Container: React.FC<ContainerProps> = ({
             }}
           >
             {/* Container highlight */}
-            <Box
-              position="absolute"
-              top="20%"
-              left="30%"
-              width="20%"
-              height="20%"
-              borderRadius={containerType === 'presents' || containerType === 'amazon' ? '4px' : '50%'}
-              backgroundColor="rgba(255, 255, 255, 0.4)"
-              filter="blur(2px)"
-            />
+            {containerType !== 'amazon' && (
+              <Box
+                position="absolute"
+                top="20%"
+                left="30%"
+                width="20%"
+                height="20%"
+                borderRadius={containerType === 'presents' ? '4px' : '50%'}
+                backgroundColor="rgba(255, 255, 255, 0.4)"
+                filter="blur(2px)"
+              />
+            )}
             
             {/* Container-specific decorations */}
             {containerType === 'presents' && (
@@ -278,34 +298,45 @@ const Container: React.FC<ContainerProps> = ({
             
             {containerType === 'amazon' && (
               <>
-                {/* Amazon tape */}
-                <Box
-                  position="absolute"
-                  top="50%"
-                  left="0"
-                  width="100%"
-                  height="10%"
-                  backgroundColor="rgba(139, 69, 19, 0.4)"
-                  transform="translateY(-50%)"
-                />
-                {/* Amazon smile */}
-                <Box
-                  position="absolute"
-                  bottom="15%"
-                  right="15%"
-                  width="20%"
-                  height="15%"
-                  borderRadius="50%"
-                  backgroundColor="rgba(255, 255, 255, 0.8)"
-                  fontSize="6px"
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  color="orange"
-                  fontWeight="bold"
-                >
-                  📦
-                </Box>
+                {/* Isometric cube rendered as SVG for crisp faces */}
+                <Box position="absolute" top={0} left={0} right={0} bottom={0}>
+  <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <linearGradient id="isoTop" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#EAC18A"/>
+        <stop offset="100%" stopColor="#DBA86D"/>
+      </linearGradient>
+      <linearGradient id="isoLeft" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#E0AE70"/>
+        <stop offset="100%" stopColor="#C79052"/>
+      </linearGradient>
+      <linearGradient id="isoRight" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#D19E60"/>
+        <stop offset="100%" stopColor="#B88043"/>
+      </linearGradient>
+      <linearGradient id="tape" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#47B1FF"/>
+        <stop offset="100%" stopColor="#1F90EA"/>
+      </linearGradient>
+    </defs>
+
+    <g transform="scale(1.5) translate(-16.7,-16.7)">
+      {/* Top diamond (isometric) */}
+      <polygon points="50,10 85,30 50,50 15,30" fill="url(#isoTop)" stroke="rgba(139,69,19,0.28)" strokeWidth="0.8"/>
+      {/* Left face */}
+      <polygon points="15,30 50,50 50,90 15,70" fill="url(#isoLeft)" stroke="rgba(139,69,19,0.28)" strokeWidth="0.8"/>
+      {/* Right face */}
+      <polygon points="85,30 50,50 50,90 85,70" fill="url(#isoRight)" stroke="rgba(139,69,19,0.30)" strokeWidth="0.8"/>
+      {/* Soft shadow accents */}
+      <path d="M50 50 L15 30" stroke="rgba(0,0,0,0.06)" strokeWidth="1" />
+      <path d="M50 50 L85 30" stroke="rgba(0,0,0,0.06)" strokeWidth="1" />
+      {/* Tape across top, trimmed to top-face edges, preserving current width */}
+      <polygon points="63,17 72,23 37,43 28,37" fill="url(#tape)" />
+      {/* Smile on left face (lower right end more) */}
+      <path d="M25 58 C 32 68, 40 71, 46 64" stroke="#2F2F2F" strokeWidth="2" fill="transparent" />
+    </g>
+  </svg>
+</Box>
               </>
             )}
             
@@ -407,7 +438,7 @@ const Container: React.FC<ContainerProps> = ({
                 transform: "scale(1.05)",
                 boxShadow: "0 3px 6px rgba(0, 0, 0, 0.15)"
               }}
-              opacity={isWordPickedUp ? 0.5 : 1}
+              opacity={isWordPickedUp ? 0.0 : 1}
               pointerEvents={isWordPickedUp ? "none" : "auto"}
             >
               {item}

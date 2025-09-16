@@ -36,9 +36,7 @@ const SentenceSenseConfig: React.FC = () => {
         // Collections to search through in order
         const collections = [
           { name: 'userGameConfigs', ref: 'userGameConfigs' },
-          { name: 'gameConfigs', ref: 'gameConfigs' },
-          { name: 'blankGameTemplates', ref: 'blankGameTemplates' },
-          { name: 'categoryTemplates', ref: 'categoryTemplates' }
+          { name: 'blankGameTemplates', ref: 'blankGameTemplates' }
         ];
         
         let docSnap = null;
@@ -51,7 +49,7 @@ const SentenceSenseConfig: React.FC = () => {
           if (tempDocSnap.exists()) {
             docSnap = tempDocSnap;
             foundCollection = collection.name;
-            isAdminConfig = collection.name === 'gameConfigs' || collection.name === 'blankGameTemplates' || collection.name === 'categoryTemplates';
+            isAdminConfig = collection.name === 'blankGameTemplates';
             break;
           }
         }
@@ -71,25 +69,16 @@ const SentenceSenseConfig: React.FC = () => {
           } else if (isAdminConfig || data.userId !== currentUser?.uid) {
             setIsEditing(false);
             setIsCopyOperation(true); // Treat as copy if user doesn't own it or it's an admin config
-            toast({
-              title: "Creating a copy",
-              description: isAdminConfig ? 
-                "This is an official template. You'll create a copy that you can customize." :
-                "You're not the owner of this configuration, so you'll create a copy instead.",
-              status: "info",
-              duration: 5000,
-            });
+            // Suppress toast for blank templates
           } else {
             setIsEditing(true);
           }
           
-          // Populate initial data - if copy, append "Copy of " to title
+          const shouldPrefixCopy = (isCopy || isAdminConfig || data.userId !== currentUser?.uid) && (foundCollection !== 'blankGameTemplates');
           const loadedData = {
             ...data,
-            title: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? 
-              `Copy of ${data.title || 'Untitled Sentence Sense Game'}` : 
-              (data.title || ''),
-            share: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? false : data.share, // Reset share to false for copies
+            title: shouldPrefixCopy ? `Copy of ${data.title || 'Untitled Sentence Sense Game'}` : (data.title || ''),
+            share: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? false : data.share,
           };
           
           setInitialData(loadedData);

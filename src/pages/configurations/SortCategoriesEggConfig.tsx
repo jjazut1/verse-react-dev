@@ -43,12 +43,10 @@ const SortCategoriesEggConfig: React.FC = () => {
       try {
         let isAdminConfig = false;
         
-        // Try multiple collections to find the template
+        // Only support user configs and blank templates
         const collections = [
           { name: 'userGameConfigs', ref: doc(db, 'userGameConfigs', templateId) },
-          { name: 'gameConfigs', ref: doc(db, 'gameConfigs', templateId) },
-          { name: 'blankGameTemplates', ref: doc(db, 'blankGameTemplates', templateId) },
-          { name: 'categoryTemplates', ref: doc(db, 'categoryTemplates', templateId) }
+          { name: 'blankGameTemplates', ref: doc(db, 'blankGameTemplates', templateId) }
         ];
         
         let foundCollection = '';
@@ -59,7 +57,8 @@ const SortCategoriesEggConfig: React.FC = () => {
           if (tempDocSnap.exists()) {
             docSnap = tempDocSnap;
             foundCollection = collection.name;
-            isAdminConfig = collection.name === 'gameConfigs' || collection.name === 'blankGameTemplates' || collection.name === 'categoryTemplates';
+            // Treat blank templates as admin-owned, user configs as owned
+            isAdminConfig = collection.name === 'blankGameTemplates';
             // console.log(`✅ Found in collection: ${collection.name}`);
             break;
           }
@@ -71,33 +70,38 @@ const SortCategoriesEggConfig: React.FC = () => {
           // Check if this is a copy operation or user doesn't have permission
           if (isCopy) {
             setIsEditing(false);
-            toast({
-              title: "Creating a copy",
-              description: "Creating a new copy of this sort categories configuration.",
-              status: "info",
-              duration: 5000,
-            });
+            // Suppress toast when opening blank templates
+            if (foundCollection !== 'blankGameTemplates') {
+              toast({
+                title: "Creating a copy",
+                description: "Creating a new copy of this sort categories configuration.",
+                status: "info",
+                duration: 5000,
+              });
+            }
           } else if (isAdminConfig || data.userId !== currentUser?.uid) {
             setIsEditing(false);
             setIsCopyOperation(true); // Treat as copy if user doesn't own it or it's an admin config
-            toast({
-              title: "Creating a copy",
-              description: isAdminConfig ? 
-                "This is an official template. You'll create a copy that you can customize." :
-                "You're not the owner of this configuration, so you'll create a copy instead.",
-              status: "info",
-              duration: 5000,
-            });
+            // Only show the toast for official templates, not blank templates
+            if (isAdminConfig && foundCollection !== 'blankGameTemplates') {
+              toast({
+                title: "Creating a copy",
+                description: "This is an official template. You'll create a copy that you can customize.",
+                status: "info",
+                duration: 5000,
+              });
+            }
           } else {
             setIsEditing(true);
           }
           
-          // Populate initial data - if copy, append "Copy of " to title
+          // Populate initial data - for blank templates, DO NOT prefix "Copy of"
+          const shouldPrefixCopy = (isCopy || data.userId !== currentUser?.uid) && foundCollection !== 'blankGameTemplates';
           const loadedData = {
             ...data,
-            title: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? 
-              `Copy of ${data.title || 'Untitled Sort Categories Game'}` : 
-              (data.title || ''),
+            title: shouldPrefixCopy
+              ? `Copy of ${data.title || 'Untitled Sort Categories Game'}`
+              : (data.title || ''),
             share: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? false : data.share, // Reset share to false for copies
           };
           
