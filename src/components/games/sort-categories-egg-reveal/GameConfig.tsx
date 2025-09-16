@@ -24,6 +24,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { MAX_ITEMS_PER_CATEGORY, MIN_ITEMS_PER_CATEGORY, MAX_CATEGORIES, MIN_CATEGORIES } from '../../../constants/game';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { generateCategoryItems } from '../../../services/categoryAgent';
 
 interface GameConfigProps {
   isOpen: boolean;
@@ -327,6 +328,41 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
     }
   };
 
+  // LLM generation per-category
+  const [genLoadingIndex, setGenLoadingIndex] = useState<number | null>(null);
+  const [genPrompt, setGenPrompt] = useState<string>('');
+  const [genCount, setGenCount] = useState<number>(10);
+  const [genReplace, setGenReplace] = useState<boolean>(true);
+
+  const handleGenerateItems = async (categoryIndex: number) => {
+    try {
+      if (!genPrompt.trim()) {
+        toast({ title: 'Enter a prompt', status: 'warning', duration: 3000 });
+        return;
+      }
+      setGenLoadingIndex(categoryIndex);
+      const items = await generateCategoryItems({ prompt: genPrompt.trim(), count: genCount });
+      if (!items.length) {
+        toast({ title: 'No items generated', status: 'info', duration: 3000 });
+        return;
+      }
+      const normalized = items.map((t) => ({ content: t, text: (t || '').toString() }));
+      setCategories(prev => {
+        const copy = [...prev];
+        const current = copy[categoryIndex];
+        const newItems = genReplace ? normalized : [...current.items, ...normalized];
+        copy[categoryIndex] = { ...current, items: newItems };
+        return copy;
+      });
+      toast({ title: 'Items generated', status: 'success', duration: 2000 });
+    } catch (e) {
+      console.error('Generation error', e);
+      toast({ title: 'Generation failed', status: 'error', duration: 4000 });
+    } finally {
+      setGenLoadingIndex(null);
+    }
+  };
+
   // Add loadTemplate function
   const loadTemplate = (config: any) => {
     setTitle(config.title || '');
@@ -446,6 +482,33 @@ const GameConfig: React.FC<GameConfigProps> = ({ isOpen, onClose, onConfigSelect
                 placeholder="Category name"
               />
             </FormControl>
+
+            {/* Assistant controls */}
+            <FormLabel>Use AI to Generate Items (Optional)</FormLabel>
+            <HStack w="100%">
+              <Input
+                placeholder="Describe items to generate (e.g., short a CVC words)"
+                value={genPrompt}
+                onChange={(e) => setGenPrompt(e.target.value)}
+              />
+              <Select w="110px" value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}>
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={20}>20</option>
+                <option value={25}>25</option>
+              </Select>
+              <Select w="130px" value={genReplace ? 'replace' : 'append'} onChange={(e) => setGenReplace(e.target.value === 'replace')}>
+                <option value="replace">Replace</option>
+                <option value="append">Append</option>
+              </Select>
+              <Button
+                colorScheme="purple"
+                isLoading={genLoadingIndex === categoryIndex}
+                onClick={() => handleGenerateItems(categoryIndex)}
+              >
+                Generate
+              </Button>
+            </HStack>
             
             <FormLabel alignSelf="flex-start">Items</FormLabel>
             {category.items.map((item, itemIndex) => (

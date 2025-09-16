@@ -35,12 +35,10 @@ const SpinnerWheelConfig: React.FC = () => {
       try {
         let isAdminConfig = false;
         
-        // Try multiple collections to find the template
+        // Only load from user configs and blank templates
         const collections = [
           { name: 'userGameConfigs', ref: doc(db, 'userGameConfigs', templateId) },
-          { name: 'gameConfigs', ref: doc(db, 'gameConfigs', templateId) },
-          { name: 'blankGameTemplates', ref: doc(db, 'blankGameTemplates', templateId) },
-          { name: 'categoryTemplates', ref: doc(db, 'categoryTemplates', templateId) }
+          { name: 'blankGameTemplates', ref: doc(db, 'blankGameTemplates', templateId) }
         ];
         
         let foundCollection = '';
@@ -50,7 +48,7 @@ const SpinnerWheelConfig: React.FC = () => {
           if (tempDocSnap.exists()) {
             docSnap = tempDocSnap;
             foundCollection = collection.name;
-            isAdminConfig = collection.name === 'gameConfigs' || collection.name === 'blankGameTemplates' || collection.name === 'categoryTemplates';
+            isAdminConfig = collection.name === 'blankGameTemplates';
             break;
           }
         }
@@ -70,25 +68,16 @@ const SpinnerWheelConfig: React.FC = () => {
           } else if (isAdminConfig || data.userId !== currentUser?.uid) {
             setIsEditing(false);
             setIsCopyOperation(true); // Treat as copy if user doesn't own it or it's an admin config
-            toast({
-              title: "Creating a copy",
-              description: isAdminConfig ? 
-                "This is an official template. You'll create a copy that you can customize." :
-                "You're not the owner of this configuration, so you'll create a copy instead.",
-              status: "info",
-              duration: 5000,
-            });
+            // Suppress toast for blank templates
           } else {
             setIsEditing(true);
           }
           
-          // Populate initial data - if copy, append "Copy of " to title
+          const shouldPrefixCopy = (isCopy || isAdminConfig || data.userId !== currentUser?.uid) && (foundCollection !== 'blankGameTemplates');
           const loadedData = {
             ...data,
-            title: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? 
-              `Copy of ${data.title || 'Untitled Spinner Wheel'}` : 
-              (data.title || ''),
-            share: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? false : data.share, // Reset share to false for copies
+            title: shouldPrefixCopy ? `Copy of ${data.title || 'Untitled Spinner Wheel'}` : (data.title || ''),
+            share: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? false : data.share,
           };
           
           setInitialData(loadedData);

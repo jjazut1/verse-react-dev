@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@chakra-ui/react';
 import { db } from '../../config/firebase';
-import { useAuth } from '../../contexts/AuthContext';
 import { ConfigurationFramework } from '../../components/common/ConfigurationFramework';
 import { nameItSchema } from '../../schemas/nameItSchema';
 
@@ -11,7 +10,6 @@ const NameItConfig: React.FC = () => {
   const { templateId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const { currentUser } = useAuth();
   
   const [initialData, setInitialData] = useState<any>({});
   const [isEditing, setIsEditing] = useState(false);
@@ -27,10 +25,9 @@ const NameItConfig: React.FC = () => {
       
       setIsLoading(true);
       try {
-        // Try multiple collections to find the template
+        // Only load from user configs and blank templates
         const collections = [
           { name: 'userGameConfigs', ref: doc(db, 'userGameConfigs', templateId) },
-          { name: 'gameConfigs', ref: doc(db, 'gameConfigs', templateId) },
           { name: 'blankGameTemplates', ref: doc(db, 'blankGameTemplates', templateId) }
         ];
         
@@ -73,10 +70,6 @@ const NameItConfig: React.FC = () => {
     loadConfiguration();
   }, [templateId, navigate, toast]);
 
-  const handleCancel = () => {
-    navigate('/teacher');
-  };
-
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -84,7 +77,6 @@ const NameItConfig: React.FC = () => {
   return (
     <ConfigurationFramework
       schema={nameItSchema}
-      onCancel={handleCancel}
       initialData={initialData}
       isEditing={isEditing}
     />

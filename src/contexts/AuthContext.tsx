@@ -351,7 +351,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     provider.setCustomParameters(customParams);
     
-    if (useRedirect) {
+    const isWebAppOrigin = typeof window !== 'undefined' && window.location.hostname.endsWith('web.app');
+    // Redirect-first on web.app (most reliable) or when explicitly requested
+    if (useRedirect || isWebAppOrigin) {
       try {
         await signInWithRedirect(auth, provider);
         // Note: signInWithRedirect doesn't return a result directly
@@ -364,14 +366,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     try {
-      // Test popup blocker first
-      const testPopup = window.open('', '_blank', 'width=1,height=1');
-             if (!testPopup || testPopup.closed) {
-         testPopup?.close();
-         return await loginWithGoogle(true);
-       }
-      testPopup.close();
-      
       // Use signInWithPopup for direct feedback with timeout
       const signInPromise = signInWithPopup(auth, provider);
       const timeoutPromise = new Promise((_, reject) => {

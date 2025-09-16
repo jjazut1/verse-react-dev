@@ -19,6 +19,7 @@ export interface GameState {
   eggs: EggType[];
   crackedEggs: EggType[];
   selectedWord: Word | null;
+  selectedEggId: string | null;
   isWordSelected: boolean;
   baskets: BasketType[];
   gameConfig: SortCategoriesConfig;
@@ -33,6 +34,7 @@ export interface GameState {
   isHighScore: boolean;
   showHighScoreDisplayModal: boolean;
   isSubmittingScore: boolean;
+  placedEggIds: string[];
 }
 
 export interface RichTextProps {

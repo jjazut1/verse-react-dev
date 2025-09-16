@@ -3,7 +3,9 @@ import {
   Flex,
   HStack,
   Text,
-  Button
+  Button,
+  Switch,
+  Tooltip,
 } from '@chakra-ui/react';
 import { GameState } from './types';
 
@@ -11,12 +13,16 @@ interface GameControlsProps {
   gameState: GameState;
   onResetGame: () => void;
   onCloseGame: () => void;
+  soundEnabled?: boolean;
+  onToggleSound?: () => void;
 }
 
 const GameControls: React.FC<GameControlsProps> = ({
   gameState,
   onResetGame,
-  onCloseGame
+  onCloseGame,
+  soundEnabled = true,
+  onToggleSound
 }) => {
   return (
     <Flex 
@@ -40,6 +46,14 @@ const GameControls: React.FC<GameControlsProps> = ({
         <Text fontSize={{ base: "sm", md: "md" }} fontWeight="bold" color="blue.600">
           Score: {gameState.score}
         </Text>
+        <HStack spacing={1}>
+          <Tooltip label={soundEnabled ? 'Sound on' : 'Sound off'}>
+            <HStack>
+              <Text fontSize={{ base: 'xs', md: 'sm' }} color="gray.600">Sound</Text>
+              <Switch size="sm" isChecked={soundEnabled} onChange={onToggleSound} />
+            </HStack>
+          </Tooltip>
+        </HStack>
       </HStack>
       
       {gameState.isGameComplete && (

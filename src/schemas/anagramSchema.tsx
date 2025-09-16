@@ -1,4 +1,6 @@
 import React from 'react';
+import { useToast, Select } from '@chakra-ui/react';
+import { generateCategoryItems } from '../services/categoryAgent';
 import { ConfigSchema } from '../components/common/ConfigurationFramework';
 import { serverTimestamp } from 'firebase/firestore';
 import {
@@ -28,7 +30,8 @@ const AnagramManager: React.FC<{
   updateField: (fieldName: string, value: any) => void;
   errors: Record<string, string>;
   saveAttempted: boolean;
-}> = ({ formData, updateField, errors, saveAttempted }) => {
+}> = ({ formData, updateField, errors }) => {
+  const toast = useToast();
   // Initialize fields SYNCHRONOUSLY before component renders
   if (formData.withDefinitions === undefined) {
     updateField('withDefinitions', false);
@@ -36,7 +39,7 @@ const AnagramManager: React.FC<{
   }
   
   if (!formData.anagrams || formData.anagrams.length === 0) {
-    const defaultAnagrams = [{ id: '1', word: 'LISTEN', definition: 'To hear with attention' }];
+    const defaultAnagrams = [{ id: '1', word: 'listen', definition: 'To hear with attention' }];
     updateField('anagrams', defaultAnagrams);
     formData.anagrams = defaultAnagrams; // Also set it directly to avoid race condition
   } else {
@@ -59,7 +62,7 @@ const AnagramManager: React.FC<{
       updateField('withDefinitions', false);
     }
     if (!formData.anagrams || formData.anagrams.length === 0) {
-      updateField('anagrams', [{ id: '1', word: 'LISTEN', definition: 'To hear with attention' }]);
+      updateField('anagrams', [{ id: '1', word: 'listen', definition: 'To hear with attention' }]);
     } else {
       // Check for format conversion in useEffect as well
       const needsConversion = formData.anagrams.some((anagram: any) => anagram.original && !anagram.word);
@@ -76,6 +79,54 @@ const AnagramManager: React.FC<{
   
   const withDefinitions = formData.withDefinitions ?? false;
   const anagrams = formData.anagrams || [{ id: '1', word: 'LISTEN', definition: 'To hear with attention' }];
+
+  // AI generator state
+  const [genPrompt, setGenPrompt] = React.useState('');
+  const [genReplace, setGenReplace] = React.useState(false); // false = append (default)
+  const [genLoading, setGenLoading] = React.useState(false);
+
+  const handleGenerate = async () => {
+    if (!genPrompt.trim()) {
+      toast({ title: 'Enter a prompt to generate words', status: 'warning', duration: 2500 });
+      return;
+    }
+    setGenLoading(true);
+    try {
+      const mode = withDefinitions ? 'word_defs' : 'items';
+      const items = await generateCategoryItems({ prompt: genPrompt.trim(), count: 5, mode });
+      // eslint-disable-next-line no-console
+      console.log('[AnagramGen] raw items:', items, 'mode:', mode);
+      let generated: any[] = [];
+      if (withDefinitions) {
+        let pairs = (items as any[]).filter((o) => o && typeof (o as any).word === 'string' && typeof (o as any).definition === 'string');
+        // Fallback: try to split simple "word - definition" strings
+        if (pairs.length === 0) {
+          const asStrings = (items as any[]).map((s) => String(s)).filter(Boolean);
+          pairs = asStrings.map((l) => {
+            const m = l.split(/\s*[-:–]\s+/);
+            return { word: (m[0] || '').trim(), definition: (m[1] || '').trim() };
+          }).filter((o) => o.word && o.definition);
+        }
+        generated = pairs.map((o) => ({ id: Date.now().toString() + Math.random(), word: String(o.word).trim(), definition: o.definition || '' }));
+      } else {
+        const words = (items as any[]).map((s) => String(s)).filter(Boolean);
+        generated = words.map((w) => ({ id: Date.now().toString() + Math.random(), word: String(w).trim(), definition: '' }));
+      }
+      const next = genReplace ? generated : [...anagrams, ...generated];
+      if (generated.length === 0) {
+        toast({ title: 'No words generated', status: 'info', duration: 2000 });
+        return;
+      }
+      updateField('anagrams', next.slice(0, 100));
+      toast({ title: 'Generated', status: 'success', duration: 1500 });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Anagram generate failed', e);
+      toast({ title: 'Generation failed', status: 'error', duration: 3000 });
+    } finally {
+      setGenLoading(false);
+    }
+  };
   
   const handleDefinitionModeChange = (value: string) => {
     updateField('withDefinitions', value === 'true');
@@ -125,6 +176,23 @@ const AnagramManager: React.FC<{
         </RadioGroup>
       </FormControl>
       
+      {/* AI Assistant */}
+      <FormControl>
+        <FormLabel>Use AI to Generate Words (Optional)</FormLabel>
+        <HStack align="stretch" spacing={2}>
+          <Input
+            placeholder="Describe the words (e.g., 2nd grade animals vocabulary)"
+            value={genPrompt}
+            onChange={(e) => setGenPrompt(e.target.value)}
+          />
+          <Select width="130px" value={genReplace ? 'replace' : 'append'} onChange={(e) => setGenReplace(e.target.value === 'replace')}>
+            <option value="append">Append</option>
+            <option value="replace">Replace</option>
+          </Select>
+          <Button colorScheme="purple" isLoading={genLoading} onClick={handleGenerate}>Generate</Button>
+        </HStack>
+      </FormControl>
+
       {/* Word and Definition Management */}
       <VStack spacing={4} align="stretch">
         {anagrams.map((anagram: any, index: number) => (

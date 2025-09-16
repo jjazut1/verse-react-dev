@@ -38,6 +38,7 @@ import { AddIcon, DeleteIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { MAX_ITEMS_PER_CATEGORY, MIN_ITEMS_PER_CATEGORY, MAX_CATEGORIES, MIN_CATEGORIES } from '../constants/game';
+import { generateCategoryItems } from '../services/categoryAgent';
 
 // Category Manager Component
 const CategoryManager: React.FC<{
@@ -62,6 +63,30 @@ const CategoryManager: React.FC<{
   }, [formData, updateField]);
 
   const categories = formData?.categories || [];
+
+  // Ensure each category has a stable id
+  useEffect(() => {
+    if (!Array.isArray(categories)) return;
+    let changed = false;
+    const withIds = categories.map((c: any) => {
+      if (!c.id) {
+        changed = true;
+        return { ...c, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
+      }
+      return c;
+    });
+    if (changed) updateField('categories', withIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories?.length]);
+
+  // Local generation UI state keyed by category id
+  const [genState, setGenState] = useState<Record<string, { prompt: string; count: number; replace: boolean; loading: boolean }>>({});
+
+  const ensureGenState = (id: string) => {
+    if (!genState[id]) {
+      setGenState((prev) => ({ ...prev, [id]: { prompt: '', count: 10, replace: true, loading: false } }));
+    }
+  };
 
   const addCategory = () => {
     if (categories.length >= MAX_CATEGORIES) {
@@ -126,6 +151,40 @@ const CategoryManager: React.FC<{
     updateField('categories', newCategories);
   };
 
+  const handleGenerate = async (categoryIndex: number) => {
+    const category = categories[categoryIndex];
+    if (!category?.id) return;
+    ensureGenState(category.id);
+    const state = genState[category.id] || { prompt: '', count: 10, replace: true, loading: false };
+    if (!state.prompt.trim()) {
+      toast({ title: 'Enter a prompt to generate items', status: 'warning', duration: 3000 });
+      return;
+    }
+    setGenState((prev) => ({ ...prev, [category.id]: { ...state, loading: true } }));
+    try {
+      const items = await generateCategoryItems({ prompt: state.prompt.trim(), count: state.count });
+      if (!items.length) {
+        toast({ title: 'No items generated', status: 'info', duration: 3000 });
+        return;
+      }
+      const trimmed = items
+        .map((t) => (typeof t === 'string' ? t.trim() : ''))
+        .filter((t) => t.length > 0)
+        .slice(0, MAX_ITEMS_PER_CATEGORY);
+      const newCategories = [...categories];
+      const current = newCategories[categoryIndex];
+      const merged = state.replace ? trimmed : [...(current.items || []), ...trimmed];
+      newCategories[categoryIndex] = { ...current, items: merged.slice(0, MAX_ITEMS_PER_CATEGORY) };
+      updateField('categories', newCategories);
+      toast({ title: 'Items generated', status: 'success', duration: 2000 });
+    } catch (e) {
+      console.error('Generate error', e);
+      toast({ title: 'Generation failed', status: 'error', duration: 4000 });
+    } finally {
+      setGenState((prev) => ({ ...prev, [category.id]: { ...state, loading: false } }));
+    }
+  };
+
   const removeItem = (categoryIndex: number, itemIndex: number) => {
     const category = categories[categoryIndex];
     if (category.items.length <= MIN_ITEMS_PER_CATEGORY) {
@@ -178,7 +237,7 @@ const CategoryManager: React.FC<{
       <FormControl>
         <FormLabel>Categories</FormLabel>
         <Text fontSize="sm" color="gray.600" mb={4}>
-          Create categories and add items that belong in each category
+          Create categories and add items that belong in each category.  Each category will be a basket for collecting the items specific to that category.
         </Text>
         
         <HStack justify="space-between" mb={4}>
@@ -281,6 +340,61 @@ const CategoryManager: React.FC<{
                     />
                   </FormControl>
 
+                  {/* Assistant controls */}
+                  <FormControl>
+                    <FormLabel>Use AI to Generate Items (Optional)</FormLabel>
+                    <HStack align="stretch" spacing={2}>
+                      <Input
+                        placeholder="Describe items (e.g., short a CVC words)"
+                        value={(genState[category.id]?.prompt) || ''}
+                        onChange={(e) => {
+                          ensureGenState(category.id);
+                          setGenState((prev) => ({
+                            ...prev,
+                            [category.id]: { ...(prev[category.id] || { prompt: '', count: 10, replace: true, loading: false }), prompt: e.target.value }
+                          }));
+                        }}
+                      />
+                      <Select
+                        width="110px"
+                        value={(genState[category.id]?.count) ?? 10}
+                        onChange={(e) => {
+                          ensureGenState(category.id);
+                          setGenState((prev) => ({
+                            ...prev,
+                            [category.id]: { ...(prev[category.id] || { prompt: '', count: 10, replace: true, loading: false }), count: Number(e.target.value) }
+                          }));
+                        }}
+                      >
+                        <option value={10}>10</option>
+                        <option value={15}>15</option>
+                        <option value={20}>20</option>
+                        <option value={25}>25</option>
+                      </Select>
+                      <Select
+                        width="130px"
+                        value={(genState[category.id]?.replace) === false ? 'append' : 'replace'}
+                        onChange={(e) => {
+                          ensureGenState(category.id);
+                          setGenState((prev) => ({
+                            ...prev,
+                            [category.id]: { ...(prev[category.id] || { prompt: '', count: 10, replace: true, loading: false }), replace: e.target.value === 'replace' }
+                          }));
+                        }}
+                      >
+                        <option value="replace">Replace</option>
+                        <option value="append">Append</option>
+                      </Select>
+                      <Button
+                        colorScheme="purple"
+                        isLoading={Boolean(genState[category.id]?.loading)}
+                        onClick={() => handleGenerate(categoryIndex)}
+                      >
+                        Generate
+                      </Button>
+                    </HStack>
+                  </FormControl>
+
                   <FormControl>
                     <FormLabel>Items ({category.items.length})</FormLabel>
                     <VStack spacing={2} align="stretch">
@@ -348,7 +462,7 @@ const CategoryManager: React.FC<{
 // Schema Definition
 export const sortCategoriesEggSchema: ConfigSchema = {
   gameType: 'sort-categories-egg',
-  title: 'Sort Categories Egg Reveal',
+  title: 'a Sort Categories Game',
   description: 'Create a drag-and-drop categorization game where students sort items into categories and reveal eggs',
   
   sections: [
@@ -361,8 +475,9 @@ export const sortCategoriesEggSchema: ConfigSchema = {
           label: 'Game Title',
           type: 'text',
           required: true,
-          placeholder: 'Enter game title',
-          defaultValue: 'Sort Categories Egg Reveal Game'
+          placeholder: 'Enter a game title (required)',
+          defaultValue: '',
+          helpText: 'Give your game a short, clear title'
         },
         {
           name: 'description',
@@ -429,9 +544,9 @@ export const sortCategoriesEggSchema: ConfigSchema = {
           label: 'Text-to-Speech Mode',
           type: 'select',
           required: true,
-          defaultValue: 'amazon-polly-phonics',
+          defaultValue: 'disabled',
           options: [
-            { value: 'disabled', label: 'Disabled - No sound' },
+            { value: 'disabled', label: 'No Text-to-Speech Sound' },
             { value: 'amazon-polly-phonics', label: 'Amazon Polly with Phonics (Recommended)' },
             { value: 'amazon-polly-regular', label: 'Amazon Polly with Regular Pronunciation' },
             { value: 'web-speech-phonics', label: 'Web Speech API with Phonics' },

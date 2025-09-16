@@ -42,7 +42,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStartGame, onLoadConfig }) 
             fontFamily="'Comic Neue', sans-serif"
             color="blue.700"
           >
-            Sort Categories Egg Reveal
+            Sort Categories
           </Heading>
           <Text 
             fontSize={{ base: "sm", md: "md" }} 

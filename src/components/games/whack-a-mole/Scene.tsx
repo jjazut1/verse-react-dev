@@ -163,8 +163,8 @@ class Cloud {
     this.mesh = cloudGroup;
     this.mesh.position.copy(position);
     
-    // Scale the entire cloud - reduced by 50%
-    const scale = 0.75 + Math.random() * 0.5; // Range: 0.75-1.25 (down from 1.5-2.5)
+    // Scale the entire cloud - make larger so they are clearly visible
+    const scale = 1.4 + Math.random() * 0.6; // Range: 1.4-2.0
     this.mesh.scale.set(scale, scale, scale);
     
     // Set cloud speed - slower movement
@@ -1389,11 +1389,11 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config, onMo
     cloudsRef.current = []; // Reset clouds array
     console.log("Creating sphere-based clouds...");
     
-    // Create clouds at positions matching the example but higher in the sky
+    // Create clouds at positions visible in current camera frustum
     const cloudPositions = [
-      new THREE.Vector3(-5, 2, -7),  // Lowered from y=3 to y=2
-      new THREE.Vector3(0, 3, -6),   // Lowered from y=4 to y=3
-      new THREE.Vector3(5, 2, -7)    // Lowered from y=3 to y=2
+      new THREE.Vector3(-5, 3.2, -6.2),
+      new THREE.Vector3(0, 4.0, -5.8),
+      new THREE.Vector3(5, 3.2, -6.2)
     ];
     
     cloudPositions.forEach((position, i) => {
@@ -1402,12 +1402,12 @@ const Scene = forwardRef<any, SceneProps>(({ gameActive, onMoleHit, config, onMo
       cloudsRef.current.push(cloud);
     });
     
-    // Add a few extra clouds at even higher positions
+    // Add a few extra clouds within the visible band
     for (let i = 0; i < 2; i++) {
       const position = new THREE.Vector3(
-        -10 + Math.random() * 20,  // -10 to 10
-        2.5 + Math.random() * 2,   // Lowered from 3.5-6 to 2.5-4.5
-        -8 + Math.random() * 3     // Further back: -8 to -5
+        -10 + Math.random() * 20,
+        3.0 + Math.random() * 1.2, // 3.0 - 4.2
+        -6.8 + Math.random() * 1.2 // -6.8 - -5.6
       );
       console.log(`Creating extra cloud at ${position.x}, ${position.y}, ${position.z}`);
       const cloud = new Cloud(scene, position);

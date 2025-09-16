@@ -17,12 +17,11 @@ const RichText: React.FC<{ content: string; fontSize: any }> = ({ content, fontS
         textAlign="center"
         px={2}
         py={0.5}
-        bg="rgba(255,255,255,0.8)"
+        bg="rgba(255,255,255,0.9)"
         borderRadius="md"
-        maxW="90%"
-        whiteSpace="nowrap"
-        overflow="hidden"
-        textOverflow="ellipsis"
+        maxW="100%"
+        whiteSpace="normal"
+        wordBreak="break-word"
         boxShadow="sm"
         fontFamily="'Comic Neue', sans-serif"
       >
@@ -81,12 +80,11 @@ const RichText: React.FC<{ content: string; fontSize: any }> = ({ content, fontS
           textAlign="center"
           px={2}
           py={0.5}
-          bg="rgba(255,255,255,0.8)"
+          bg="rgba(255,255,255,0.9)"
           borderRadius="md"
-          maxW="90%"
-          whiteSpace="nowrap"
-          overflow="hidden"
-          textOverflow="ellipsis"
+          maxW="100%"
+          whiteSpace="normal"
+          wordBreak="break-word"
           boxShadow="sm"
           fontFamily="'Comic Neue', sans-serif"
           display="inline-flex"
@@ -117,12 +115,11 @@ const RichText: React.FC<{ content: string; fontSize: any }> = ({ content, fontS
         textAlign="center"
         px={2}
         py={0.5}
-        bg="rgba(255,255,255,0.8)"
+        bg="rgba(255,255,255,0.9)"
         borderRadius="md"
-        maxW="90%"
-        whiteSpace="nowrap"
-        overflow="hidden"
-        textOverflow="ellipsis"
+        maxW="100%"
+        whiteSpace="normal"
+        wordBreak="break-word"
         boxShadow="sm"
         fontFamily="'Comic Neue', sans-serif"
       >
@@ -224,32 +221,25 @@ const Basket: React.FC<BasketProps> = ({ category, items, onClick }) => {
           }
         }}
       >
-        {/* Items in basket */}
-        <VStack 
-          spacing={0.5} 
-          align="center" 
-          justify="center" 
-          height="100%" 
-          pt={1.5} // Adequate padding for readability
+        {/* Items in basket - wrap horizontally so all items are visible */}
+        <Box
+          display="flex"
+          flexWrap="wrap"
+          alignContent="flex-start"
+          justifyContent="center"
+          gap={1}
+          height="100%"
+          pt={1.5}
           pb={0.5}
           px={1.5}
-          maxHeight="100%"
           overflow="hidden"
         >
-          {items.slice(0, 3).map((item, index) => ( // Limit to 3 items for space
-            <RichText key={index} content={item} fontSize={itemSize} />
+          {items.map((item, index) => (
+            <Box key={index} mr={1} mb={1}>
+              <RichText content={item} fontSize={itemSize} />
+            </Box>
           ))}
-          {items.length > 3 && (
-            <Text 
-              fontSize="2xs" 
-              color="gray.600" 
-              fontStyle="italic"
-              fontFamily="'Comic Neue', sans-serif"
-            >
-              +{items.length - 3} more
-            </Text>
-          )}
-        </VStack>
+        </Box>
       </Box>
     </VStack>
   );

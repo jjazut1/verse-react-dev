@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Outlet, Link as RouterLink, useLocation } from 'react-router-dom';
-import { useToast, Box, Heading, Container, Spinner, Center, Tabs, TabList, Tab, Flex, Text, Alert, AlertIcon, AlertTitle, AlertDescription } from '@chakra-ui/react';
+import { useParams, useNavigate, Outlet, useLocation } from 'react-router-dom';
+import { useToast, Box, Heading, Container, Spinner, Center, Tabs, TabList, Tab, Alert, AlertIcon, AlertTitle, AlertDescription } from '@chakra-ui/react';
+import { collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
 /**
@@ -46,6 +48,58 @@ const ConfigurationRouter = () => {
       setIsNewConfig(false);
     }
   }, [gameType, templateId]);
+
+  // Auto-redirect to blank template when entering a game route without templateId
+  useEffect(() => {
+    const redirectToBlankTemplateIfMissingId = async () => {
+      if (!gameType || templateId) return;
+      try {
+        let typeForQuery: string | null = null;
+        switch (gameType) {
+          case 'whack-a-mole':
+            typeForQuery = 'whack-a-mole';
+            break;
+          case 'sort-categories-egg':
+            typeForQuery = 'sort-categories-egg';
+            break;
+          case 'spinner-wheel':
+            typeForQuery = 'spinner-wheel';
+            break;
+          case 'anagram':
+            typeForQuery = 'anagram';
+            break;
+          case 'sentence-sense':
+            typeForQuery = 'sentence-sense';
+            break;
+          case 'place-value-showdown':
+            typeForQuery = 'place-value-showdown';
+            break;
+          case 'word-volley':
+            typeForQuery = 'word-volley';
+            break;
+          case 'name-it':
+            typeForQuery = 'name-it';
+            break;
+          default:
+            typeForQuery = null;
+        }
+        if (!typeForQuery) return;
+        const qBlank = query(
+          collection(db, 'blankGameTemplates'),
+          where('type', '==', typeForQuery),
+          limit(1)
+        );
+        const snap = await getDocs(qBlank);
+        if (!snap.empty) {
+          const id = snap.docs[0].id;
+          navigate(`/configure/${gameType}/${id}`);
+        }
+      } catch (err) {
+        console.error('Auto-redirect to blank template failed:', err);
+      }
+    };
+    redirectToBlankTemplateIfMissingId();
+  }, [gameType, templateId, navigate]);
 
   // Check if user is authenticated
   useEffect(() => {
@@ -112,15 +166,161 @@ const ConfigurationRouter = () => {
   };
 
   // Handle tab change
-  const handleTabChange = (index: number) => {
-    if (index === 0) navigate('/configure/whack-a-mole');
-    if (index === 1) navigate('/configure/sort-categories-egg');
-    if (index === 2) navigate('/configure/spinner-wheel');
-    if (index === 3) navigate('/configure/anagram');
-    if (index === 4) navigate('/configure/sentence-sense');
-    if (index === 5) navigate('/configure/place-value-showdown');
-    if (index === 6) navigate('/configure/word-volley');
-    if (index === 7) navigate('/configure/name-it');
+  const handleTabChange = async (index: number) => {
+    if (index === 0) {
+      try {
+        const q = query(
+          collection(db, 'blankGameTemplates'),
+          where('type', '==', 'whack-a-mole'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const id = snap.docs[0].id;
+          navigate(`/configure/whack-a-mole/${id}`);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load blank template for Whack-a-Mole:', e);
+      }
+      navigate('/configure/whack-a-mole');
+      return;
+    }
+    if (index === 1) {
+      try {
+        // Option A: Always open the default blank template for Sort Categories
+        const q = query(
+          collection(db, 'blankGameTemplates'),
+          where('type', '==', 'sort-categories-egg'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const id = snap.docs[0].id;
+          navigate(`/configure/sort-categories-egg/${id}`);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load blank template for Sort Categories:', e);
+      }
+      // Fallback to generic route if no template found
+      navigate('/configure/sort-categories-egg');
+      return;
+    }
+    if (index === 2) {
+      try {
+        const q = query(
+          collection(db, 'blankGameTemplates'),
+          where('type', '==', 'spinner-wheel'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const id = snap.docs[0].id;
+          navigate(`/configure/spinner-wheel/${id}`);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load blank template for Spinner Wheel:', e);
+      }
+      navigate('/configure/spinner-wheel');
+      return;
+    }
+    if (index === 3) {
+      try {
+        const q = query(
+          collection(db, 'blankGameTemplates'),
+          where('type', '==', 'anagram'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const id = snap.docs[0].id;
+          navigate(`/configure/anagram/${id}`);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load blank template for Anagram:', e);
+      }
+      navigate('/configure/anagram');
+      return;
+    }
+    if (index === 4) {
+      try {
+        const q = query(
+          collection(db, 'blankGameTemplates'),
+          where('type', '==', 'sentence-sense'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const id = snap.docs[0].id;
+          navigate(`/configure/sentence-sense/${id}`);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load blank template for Sentence Sense:', e);
+      }
+      navigate('/configure/sentence-sense');
+      return;
+    }
+    if (index === 5) {
+      try {
+        const q = query(
+          collection(db, 'blankGameTemplates'),
+          where('type', '==', 'place-value-showdown'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const id = snap.docs[0].id;
+          navigate(`/configure/place-value-showdown/${id}`);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load blank template for Place Value Showdown:', e);
+      }
+      navigate('/configure/place-value-showdown');
+      return;
+    }
+    if (index === 6) {
+      try {
+        const q = query(
+          collection(db, 'blankGameTemplates'),
+          where('type', '==', 'word-volley'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const id = snap.docs[0].id;
+          navigate(`/configure/word-volley/${id}`);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load blank template for Word Volley:', e);
+      }
+      navigate('/configure/word-volley');
+      return;
+    }
+    if (index === 7) {
+      try {
+        const q = query(
+          collection(db, 'blankGameTemplates'),
+          where('type', '==', 'name-it'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const id = snap.docs[0].id;
+          navigate(`/configure/name-it/${id}`);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load blank template for Name It:', e);
+      }
+      navigate('/configure/name-it');
+      return;
+    }
   };
 
   // Display configuration page title and content
@@ -132,7 +332,7 @@ const ConfigurationRouter = () => {
         <Tabs index={getActiveIndex()} onChange={handleTabChange} variant="enclosed" colorScheme="blue">
           <TabList>
             <Tab>Whack-a-Mole</Tab>
-            <Tab>Sort Categories Egg</Tab>
+            <Tab>Sort Categories</Tab>
             <Tab>Spinner Wheel</Tab>
             <Tab>Anagram</Tab>
             <Tab>Sentence Sense</Tab>

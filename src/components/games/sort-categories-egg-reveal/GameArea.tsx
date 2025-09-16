@@ -22,6 +22,7 @@ interface GameAreaProps {
   useAmazonPolly?: boolean;
   textToSpeechMode?: string;
   containerType?: string;
+  soundEnabled?: boolean;
 }
 
 const GameArea: React.FC<GameAreaProps> = ({
@@ -35,7 +36,8 @@ const GameArea: React.FC<GameAreaProps> = ({
   usePhonicsMode = false,
   useAmazonPolly = false,
   textToSpeechMode,
-  containerType = 'eggs'
+  containerType = 'eggs',
+  soundEnabled = true
 }) => {
   // Enhanced responsive values for better landscape support
   const containerPadding = useBreakpointValue({ base: 1, md: 2, lg: 3 });
@@ -52,15 +54,16 @@ const GameArea: React.FC<GameAreaProps> = ({
   // Responsive egg/container sizing
   const eggSize = useBreakpointValue({ base: "35px", md: "45px", lg: "55px" });
   
-  // Responsive basket sizing for better landscape fit
-  const basketWidth = useBreakpointValue({ 
-    base: "90px", 
-    md: "110px", 
-    lg: "130px",
-    xl: "150px"
-  });
-  
   const basketSpacing = useBreakpointValue({ base: 1, md: 2, lg: 3 });
+
+  // Compute responsive basket width so all baskets fit within the game area width
+  const numBaskets = Math.max(1, gameState.baskets.length);
+  // Chakra spacing unit is 4px by default
+  const spacingUnit = typeof basketSpacing === 'number' ? basketSpacing : 2;
+  const pxPerUnit = 4;
+  const gapPx = spacingUnit * pxPerUnit; // gap between baskets in pixels
+  const sidePaddingPx = spacingUnit * pxPerUnit; // horizontal padding of the Flex container
+  const basketWidthCalc = `calc((100% - ${(numBaskets - 1) * gapPx}px - ${2 * sidePaddingPx}px) / ${numBaskets})`;
 
   return (
     <Box 
@@ -127,6 +130,7 @@ const GameArea: React.FC<GameAreaProps> = ({
                 useAmazonPolly={useAmazonPolly}
                 textToSpeechMode={textToSpeechMode}
                 containerType={containerType}
+                soundEnabled={soundEnabled}
               />
             </Box>
           ))}
@@ -142,14 +146,14 @@ const GameArea: React.FC<GameAreaProps> = ({
             align="center"
             px={basketSpacing}
             gap={basketSpacing}
-            flexWrap="wrap" // Allow wrapping if needed
+            flexWrap="nowrap" // Force a single row and compute widths to fit
             maxHeight="28%" // Slightly reduced height for more game space
           >
             {gameState.baskets.map((basket) => (
               <Box 
                 key={basket.id}
-                width={basketWidth}
-                minWidth="80px" // Ensure minimum readable size
+                width={basketWidthCalc}
+                minWidth="0"
                 mb={{ base: 1, md: 0 }} // Reduced margin
                 flex={{ base: "1", md: "0 1 auto" }}
                 className={`basket basket-${basket.id}`} // Keep both classes for compatibility

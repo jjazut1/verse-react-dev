@@ -493,6 +493,9 @@ export const ConfigurationFramework: React.FC<ConfigurationFrameworkProps> = ({
         status: 'success',
         duration: 3000,
       });
+      // After save, route to teacher home
+      navigate('/teacher');
+      setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }), 0);
     } catch (error) {
       console.error('Error saving configuration:', error);
       
@@ -524,7 +527,9 @@ export const ConfigurationFramework: React.FC<ConfigurationFrameworkProps> = ({
     if (onCancel) {
       onCancel();
     } else {
-      safeNavigate('/');
+      // Force navigate, ignoring unsaved-changes prompt for explicit cancel
+      navigate('/teacher');
+      setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }), 0);
     }
   };
 

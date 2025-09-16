@@ -554,5 +554,20 @@ service cloud.firestore {
       // Allow cleanup - anyone can delete results after use
       allow delete: if true;
     }
+
+    // Category Generation (LLM) - Firestore-triggered flow
+    match /categoryGenRequests/{requestId} {
+      // Allow any authenticated user to create a request; backend will validate role
+      allow create: if isAuthenticated();
+      // No client reads needed
+      allow read: if false;
+    }
+
+    match /categoryGenResults/{requestId} {
+      // Cloud Functions writes results
+      allow write: if isServiceAccount();
+      // Allow authenticated clients to read their results
+      allow read: if isAuthenticated();
+    }
   }
 } 

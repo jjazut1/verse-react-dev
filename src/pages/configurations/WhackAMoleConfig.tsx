@@ -68,12 +68,10 @@ const WhackAMoleConfig: React.FC = () => {
           setIsEditing(true); // Regular editing
         }
 
-        // Search multiple collections for the configuration
+        // Only load from user configs and blank templates
         const collections = [
           'userGameConfigs',
-          'gameConfigs', 
-          'blankGameTemplates',
-          'categoryTemplates'
+          'blankGameTemplates'
         ];
 
         let configDoc: WhackAMoleConfigDoc | null = null;
@@ -88,7 +86,7 @@ const WhackAMoleConfig: React.FC = () => {
             if (docSnap.exists()) {
               configDoc = { id: docSnap.id, ...docSnap.data() } as WhackAMoleConfigDoc;
               foundCollection = collectionName;
-              isAdminConfig = collectionName === 'gameConfigs' || collectionName === 'blankGameTemplates' || collectionName === 'categoryTemplates';
+              isAdminConfig = collectionName === 'blankGameTemplates';
               console.log(`✅ Found Whack-a-Mole config in ${collectionName}:`, configDoc);
               break;
             }
@@ -123,12 +121,7 @@ const WhackAMoleConfig: React.FC = () => {
         } else if (isAdminConfig) {
           setIsEditing(false);
           setIsCopyOperation(true);
-          toast({
-            title: "Creating a copy",
-            description: "This is an official template. You'll create a copy that you can customize.",
-            status: "info",
-            duration: 5000,
-          });
+          // Suppress toast for blank templates
         } else if (configDoc.userId && configDoc.userId !== currentUser.uid) {
           setIsEditing(false);
           setIsCopyOperation(true);
@@ -143,8 +136,9 @@ const WhackAMoleConfig: React.FC = () => {
         // Transform the loaded data to match the form structure
         const shouldCopy = isCopy || isAdminConfig || (configDoc.userId && configDoc.userId !== currentUser.uid);
         
+        const shouldPrefixCopy = shouldCopy && foundCollection !== 'blankGameTemplates';
         const formData: any = {
-          title: shouldCopy ? `Copy of ${configDoc.title || 'Whack-a-Mole Game'}` : (configDoc.title || 'Whack-a-Mole Game'),
+          title: shouldPrefixCopy ? `Copy of ${configDoc.title || 'Whack-a-Mole Game'}` : (configDoc.title || 'Whack-a-Mole Game'),
           gameTime: configDoc.gameTime || 30,
           gameSpeed: configDoc.speed || configDoc.gameSpeed || 2,
           instructions: configDoc.instructions || '',

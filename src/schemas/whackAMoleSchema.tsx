@@ -20,10 +20,12 @@ import {
   TabList,
   TabPanels,
   Tab,
-  TabPanel
+  TabPanel,
+  Select
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import SlateEditor from '../components/SlateEditor';
+import { generateCategoryItems } from '../services/categoryAgent';
 import { isEqual } from 'lodash';
 
 // Add Apple-style CSS for styling
@@ -402,6 +404,10 @@ const CategoryManager: React.FC<{
   saveAttempted: boolean;
 }> = ({ formData, updateField, errors, saveAttempted }) => {
   const toast = useToast();
+  const [genPrompt, setGenPrompt] = useState('');
+  const [genCount, setGenCount] = useState<number>(10);
+  const [genReplace, setGenReplace] = useState<boolean>(false);
+  const [genLoading, setGenLoading] = useState<boolean>(false);
   
   // Editor selection state
   const [activeEditorId, setActiveEditorId] = useState<string | null>(null);
@@ -470,6 +476,41 @@ const CategoryManager: React.FC<{
   }
 
   const categories: Category[] = safeCategoryData;
+
+  const handleGenerate = async (which: 'whack' | 'avoid') => {
+    if (!genPrompt.trim()) {
+      toast({ title: 'Enter a prompt to generate words', status: 'warning', duration: 2500 });
+      return;
+    }
+    setGenLoading(true);
+    try {
+      const raw = await generateCategoryItems({ prompt: genPrompt.trim(), count: genCount, mode: 'items' });
+      const trimmed = (raw || [])
+        .map((t: any) => (typeof t === 'string' ? t.trim() : ''))
+        .filter((t: string) => t.length > 0)
+        .slice(0, 50);
+      if (trimmed.length === 0) {
+        toast({ title: 'No words generated', status: 'info', duration: 2000 });
+        return;
+      }
+      const targetIndex = which === 'whack' ? 0 : 1;
+      const baseItems = genReplace ? [] : (categories[targetIndex]?.items || []);
+      const generated = trimmed.map((w: string) => ({ id: generateId(), content: w, text: w }));
+      const updatedCategories = [...categories];
+      updatedCategories[targetIndex] = {
+        ...updatedCategories[targetIndex],
+        items: [...baseItems, ...generated].slice(0, 50)
+      };
+      updateField('categories', updatedCategories);
+      toast({ title: 'Words generated', status: 'success', duration: 1500 });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Whack-a-Mole generate failed', e);
+      toast({ title: 'Generation failed', status: 'error', duration: 3000 });
+    } finally {
+      setGenLoading(false);
+    }
+  };
 
   // Handler functions for item management
   const handleItemContentChange = (categoryIndex: number, itemIndex: number, content: any) => {
@@ -677,6 +718,26 @@ const CategoryManager: React.FC<{
                 </VStack>
                 
                 <Box mb={4}>
+                  <FormLabel>Use AI to Generate Words (Optional)</FormLabel>
+                  <HStack align="stretch" spacing={2} mb={3}>
+                    <Input
+                      placeholder="Describe words (e.g., short a CVC words)"
+                      value={genPrompt}
+                      onChange={(e) => setGenPrompt(e.target.value)}
+                    />
+                    <Select width="110px" value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={20}>20</option>
+                    </Select>
+                    <Select width="130px" value={genReplace ? 'replace' : 'append'} onChange={(e) => setGenReplace(e.target.value === 'replace')}>
+                      <option value="append">Append</option>
+                      <option value="replace">Replace</option>
+                    </Select>
+                    <Button colorScheme="green" isLoading={genLoading} onClick={() => handleGenerate('whack')}>
+                      Generate
+                    </Button>
+                  </HStack>
                   <FormLabel>Items</FormLabel>
                   <Text fontSize="sm" color="gray.600" mb={3}>
                     Enter items to be displayed on moles that players should hit. (Minimum 1 Item)
@@ -780,6 +841,26 @@ const CategoryManager: React.FC<{
                 </VStack>
                 
                 <Box mb={4}>
+                  <FormLabel>Use AI to Generate Words (Optional)</FormLabel>
+                  <HStack align="stretch" spacing={2} mb={3}>
+                    <Input
+                      placeholder="Describe words to avoid (e.g., not short a CVC words)"
+                      value={genPrompt}
+                      onChange={(e) => setGenPrompt(e.target.value)}
+                    />
+                    <Select width="110px" value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={20}>20</option>
+                    </Select>
+                    <Select width="130px" value={genReplace ? 'replace' : 'append'} onChange={(e) => setGenReplace(e.target.value === 'replace')}>
+                      <option value="append">Append</option>
+                      <option value="replace">Replace</option>
+                    </Select>
+                    <Button colorScheme="red" isLoading={genLoading} onClick={() => handleGenerate('avoid')}>
+                      Generate
+                    </Button>
+                  </HStack>
                   <FormLabel>Items</FormLabel>
                   <Text fontSize="sm" color="gray.600" mb={3}>
                     Enter items to be displayed on moles that players should avoid hitting. (Minimum 1 Item)

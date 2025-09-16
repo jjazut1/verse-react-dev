@@ -15,7 +15,6 @@ const PlaceValueShowdownConfig: React.FC = () => {
   
   const [initialData, setInitialData] = useState<any>({});
   const [isEditing, setIsEditing] = useState(false);
-  const [isCopyOperation, setIsCopyOperation] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleCancel = () => {
@@ -33,12 +32,10 @@ const PlaceValueShowdownConfig: React.FC = () => {
       try {
         const isCopy = new URLSearchParams(window.location.search).get('copy') === 'true';
         
-        // Collections to search through in order
+        // Only load from user configs and blank templates
         const collections = [
           { name: 'userGameConfigs', ref: 'userGameConfigs' },
-          { name: 'gameConfigs', ref: 'gameConfigs' },
-          { name: 'blankGameTemplates', ref: 'blankGameTemplates' },
-          { name: 'categoryTemplates', ref: 'categoryTemplates' }
+          { name: 'blankGameTemplates', ref: 'blankGameTemplates' }
         ];
         
         let docSnap = null;
@@ -51,7 +48,7 @@ const PlaceValueShowdownConfig: React.FC = () => {
           if (tempDocSnap.exists()) {
             docSnap = tempDocSnap;
             foundCollection = collection.name;
-            isAdminConfig = collection.name === 'gameConfigs' || collection.name === 'blankGameTemplates' || collection.name === 'categoryTemplates';
+            isAdminConfig = collection.name === 'blankGameTemplates';
             break;
           }
         }
@@ -62,34 +59,19 @@ const PlaceValueShowdownConfig: React.FC = () => {
           // Check if this is a copy operation or user doesn't have permission
           if (isCopy) {
             setIsEditing(false);
-            toast({
-              title: "Creating a copy",
-              description: "Creating a new copy of this Place Value Showdown configuration.",
-              status: "info",
-              duration: 5000,
-            });
+            // no toast
           } else if (isAdminConfig || data.userId !== currentUser?.uid) {
             setIsEditing(false);
-            setIsCopyOperation(true); // Treat as copy if user doesn't own it or it's an admin config
-            toast({
-              title: "Creating a copy",
-              description: isAdminConfig ? 
-                "This is an official template. You'll create a copy that you can customize." :
-                "You're not the owner of this configuration, so you'll create a copy instead.",
-              status: "info",
-              duration: 5000,
-            });
+            // suppress toast for blank templates
           } else {
             setIsEditing(true);
           }
           
-          // Populate initial data - if copy, append "Copy of " to title
+          const shouldPrefixCopy = (isCopy || isAdminConfig || data.userId !== currentUser?.uid) && (foundCollection !== 'blankGameTemplates');
           const loadedData = {
             ...data,
-            title: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? 
-              `Copy of ${data.title || 'Untitled Place Value Showdown'}` : 
-              (data.title || ''),
-            share: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? false : data.share, // Reset share to false for copies
+            title: shouldPrefixCopy ? `Copy of ${data.title || 'Untitled Place Value Showdown'}` : (data.title || ''),
+            share: (isCopy || isAdminConfig || data.userId !== currentUser?.uid) ? false : data.share,
           };
           
           setInitialData(loadedData);

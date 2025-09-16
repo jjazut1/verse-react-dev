@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { ConfigSchema } from '../components/common/ConfigurationFramework';
 import { serverTimestamp } from 'firebase/firestore';
 import {
@@ -14,19 +14,15 @@ import {
   Alert,
   AlertIcon,
   AlertDescription,
-  Badge,
+  
   Flex,
   Select,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
-  Switch,
-  Textarea,
+  useToast,
+  
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import SlateEditor from '../components/SlateEditor';
+import { generateCategoryItems } from '../services/categoryAgent';
 
 // Generate unique IDs
 const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -80,6 +76,7 @@ const WheelItemsManager: React.FC<{
   errors: Record<string, string>;
   saveAttempted: boolean;
 }> = ({ formData, updateField, errors, saveAttempted }) => {
+  const toast = useToast();
   
   // Initialize items field SYNCHRONOUSLY before component renders (following Anagram pattern)
   if (!formData.items || formData.items.length === 0) {
@@ -134,6 +131,43 @@ const WheelItemsManager: React.FC<{
   }, [formData.items, updateField]); // Only depend on formData.items, not entire formData
 
   const items = formData?.items || [];
+  const [genPrompt, setGenPrompt] = React.useState('');
+  const [genCount, setGenCount] = React.useState<number>(10);
+  const [genReplace, setGenReplace] = React.useState<boolean>(false);
+  const [genLoading, setGenLoading] = React.useState<boolean>(false);
+
+  const handleGenerate = async () => {
+    if (!genPrompt.trim()) {
+      toast({ title: 'Enter a prompt to generate items', status: 'warning', duration: 2500 });
+      return;
+    }
+    setGenLoading(true);
+    try {
+      const raw = await generateCategoryItems({ prompt: genPrompt.trim(), count: genCount, mode: 'items' });
+      const trimmed = (raw || [])
+        .map((t: any) => (typeof t === 'string' ? t.trim() : ''))
+        .filter((t: string) => t.length > 0)
+        .slice(0, 20);
+      if (trimmed.length === 0) {
+        toast({ title: 'No items generated', status: 'info', duration: 2000 });
+        return;
+      }
+      const base = genReplace ? [] : items;
+      const themeColor = (idx: number) => getItemColor((base.length + idx) % Math.max(1, (formData?.customColors || colorThemes.primaryColors).length));
+      const generated = trimmed.map((text: string, idx: number) => ({ id: generateId(), text, color: themeColor(idx) }));
+      const updated = [...base, ...generated].slice(0, 20);
+      updateField('items', updated);
+      formData.items = updated;
+      currentWheelItems = updated;
+      toast({ title: 'Items generated', status: 'success', duration: 1500 });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('SpinnerWheel generate failed', e);
+      toast({ title: 'Generation failed', status: 'error', duration: 3000 });
+    } finally {
+      setGenLoading(false);
+    }
+  };
   
   const addItem = () => {
     const newItem = {
@@ -250,6 +284,28 @@ const WheelItemsManager: React.FC<{
           Add items that will appear on the spinner wheel
         </Text>
       </FormControl>
+
+      {/* AI Assistant */}
+      <FormControl>
+        <FormLabel>Use AI to Generate Items (Optional)</FormLabel>
+        <HStack align="stretch" spacing={2}>
+          <Input
+            placeholder="Describe items (e.g., 2nd grade vocabulary - colors, animals)"
+            value={genPrompt}
+            onChange={(e) => setGenPrompt(e.target.value)}
+          />
+          <Select width="110px" value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}>
+            <option value={10}>10</option>
+            <option value={15}>15</option>
+            <option value={20}>20</option>
+          </Select>
+          <Select width="130px" value={genReplace ? 'replace' : 'append'} onChange={(e) => setGenReplace(e.target.value === 'replace')}>
+            <option value="append">Append</option>
+            <option value="replace">Replace</option>
+          </Select>
+          <Button colorScheme="purple" isLoading={genLoading} onClick={handleGenerate}>Generate</Button>
+        </HStack>
+      </FormControl>
       
       <VStack spacing={3} align="stretch">
         {items.map((item: any, index: number) => (
@@ -346,6 +402,7 @@ const WheelItemsManager: React.FC<{
       </VStack>
       
       {/* Validation Errors */}
+      {/* Validation Errors handled by framework; keeping UI defensive rendering */}
       {errors?.items && (
         <Alert status="error">
           <AlertIcon />
@@ -362,7 +419,7 @@ const AppearanceManager: React.FC<{
   updateField: (fieldName: string, value: any) => void;
   errors: Record<string, string>;
   saveAttempted: boolean;
-}> = ({ formData, updateField, errors, saveAttempted }) => {
+}> = ({ formData, updateField }) => {
   
   // Initialize appearance fields SYNCHRONOUSLY before component renders
   if (!formData.wheelTheme) {
