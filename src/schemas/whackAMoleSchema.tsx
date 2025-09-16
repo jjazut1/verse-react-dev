@@ -404,10 +404,16 @@ const CategoryManager: React.FC<{
   saveAttempted: boolean;
 }> = ({ formData, updateField, errors, saveAttempted }) => {
   const toast = useToast();
-  const [genPrompt, setGenPrompt] = useState('');
-  const [genCount, setGenCount] = useState<number>(10);
-  const [genReplace, setGenReplace] = useState<boolean>(false);
-  const [genLoading, setGenLoading] = useState<boolean>(false);
+  // Separate AI generator state per tab
+  const [genWhackPrompt, setGenWhackPrompt] = useState('');
+  const [genWhackCount, setGenWhackCount] = useState<number>(10);
+  const [genWhackReplace, setGenWhackReplace] = useState<boolean>(false);
+  const [genWhackLoading, setGenWhackLoading] = useState<boolean>(false);
+
+  const [genAvoidPrompt, setGenAvoidPrompt] = useState('');
+  const [genAvoidCount, setGenAvoidCount] = useState<number>(10);
+  const [genAvoidReplace, setGenAvoidReplace] = useState<boolean>(false);
+  const [genAvoidLoading, setGenAvoidLoading] = useState<boolean>(false);
   
   // Editor selection state
   const [activeEditorId, setActiveEditorId] = useState<string | null>(null);
@@ -475,13 +481,17 @@ const CategoryManager: React.FC<{
   const categories: Category[] = safeCategoryData;
 
   const handleGenerate = async (which: 'whack' | 'avoid') => {
-    if (!genPrompt.trim()) {
+    const prompt = which === 'whack' ? genWhackPrompt : genAvoidPrompt;
+    const count = which === 'whack' ? genWhackCount : genAvoidCount;
+    const replace = which === 'whack' ? genWhackReplace : genAvoidReplace;
+
+    if (!prompt.trim()) {
       toast({ title: 'Enter a prompt to generate words', status: 'warning', duration: 2500 });
       return;
     }
-    setGenLoading(true);
+    which === 'whack' ? setGenWhackLoading(true) : setGenAvoidLoading(true);
     try {
-      const raw = await generateCategoryItems({ prompt: genPrompt.trim(), count: genCount, mode: 'items' });
+      const raw = await generateCategoryItems({ prompt: prompt.trim(), count, mode: 'items' });
       const trimmed = (raw || [])
         .map((t: any) => (typeof t === 'string' ? t.trim() : ''))
         .filter((t: string) => t.length > 0)
@@ -491,7 +501,7 @@ const CategoryManager: React.FC<{
         return;
       }
       const targetIndex = which === 'whack' ? 0 : 1;
-      const baseItems = genReplace ? [] : (categories[targetIndex]?.items || []);
+      const baseItems = replace ? [] : (categories[targetIndex]?.items || []);
       const generated = trimmed.map((w: string) => ({ id: generateId(), content: w, text: w }));
       const updatedCategories = [...categories];
       updatedCategories[targetIndex] = {
@@ -505,7 +515,7 @@ const CategoryManager: React.FC<{
       console.error('Whack-a-Mole generate failed', e);
       toast({ title: 'Generation failed', status: 'error', duration: 3000 });
     } finally {
-      setGenLoading(false);
+      which === 'whack' ? setGenWhackLoading(false) : setGenAvoidLoading(false);
     }
   };
 
@@ -709,19 +719,19 @@ const CategoryManager: React.FC<{
                   <HStack align="stretch" spacing={2} mb={3}>
                     <Input
                       placeholder="Describe words (e.g., short a CVC words)"
-                      value={genPrompt}
-                      onChange={(e) => setGenPrompt(e.target.value)}
+                      value={genWhackPrompt}
+                      onChange={(e) => setGenWhackPrompt(e.target.value)}
                     />
-                    <Select width="110px" value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}>
+                    <Select width="110px" value={genWhackCount} onChange={(e) => setGenWhackCount(Number(e.target.value))}>
                       <option value={10}>10</option>
                       <option value={15}>15</option>
                       <option value={20}>20</option>
                     </Select>
-                    <Select width="130px" value={genReplace ? 'replace' : 'append'} onChange={(e) => setGenReplace(e.target.value === 'replace')}>
+                    <Select width="130px" value={genWhackReplace ? 'replace' : 'append'} onChange={(e) => setGenWhackReplace(e.target.value === 'replace')}>
                       <option value="append">Append</option>
                       <option value="replace">Replace</option>
                     </Select>
-                    <Button colorScheme="green" isLoading={genLoading} onClick={() => handleGenerate('whack')}>
+                    <Button colorScheme="green" isLoading={genWhackLoading} onClick={() => handleGenerate('whack')}>
                       Generate
                     </Button>
                   </HStack>
@@ -832,19 +842,19 @@ const CategoryManager: React.FC<{
                   <HStack align="stretch" spacing={2} mb={3}>
                     <Input
                       placeholder="Describe words to avoid (e.g., not short a CVC words)"
-                      value={genPrompt}
-                      onChange={(e) => setGenPrompt(e.target.value)}
+                      value={genAvoidPrompt}
+                      onChange={(e) => setGenAvoidPrompt(e.target.value)}
                     />
-                    <Select width="110px" value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}>
+                    <Select width="110px" value={genAvoidCount} onChange={(e) => setGenAvoidCount(Number(e.target.value))}>
                       <option value={10}>10</option>
                       <option value={15}>15</option>
                       <option value={20}>20</option>
                     </Select>
-                    <Select width="130px" value={genReplace ? 'replace' : 'append'} onChange={(e) => setGenReplace(e.target.value === 'replace')}>
+                    <Select width="130px" value={genAvoidReplace ? 'replace' : 'append'} onChange={(e) => setGenAvoidReplace(e.target.value === 'replace')}>
                       <option value="append">Append</option>
                       <option value="replace">Replace</option>
                     </Select>
-                    <Button colorScheme="red" isLoading={genLoading} onClick={() => handleGenerate('avoid')}>
+                    <Button colorScheme="red" isLoading={genAvoidLoading} onClick={() => handleGenerate('avoid')}>
                       Generate
                     </Button>
                   </HStack>
