@@ -461,10 +461,19 @@ const TeacherDashboard = () => {
   const getTemplateDisplayTitle = (template: any): string => {
     const raw = String(template?.title || '').trim();
     const isPlaceholder = raw.length === 0 || /enter\s+.*title/i.test(raw);
-    if (template?.type === 'anagram' && isPlaceholder) {
-      return 'Anagram Game';
-    }
-    return raw || 'Untitled';
+    if (!isPlaceholder) return raw;
+    const type = String(template?.type || '').toLowerCase();
+    const defaults: Record<string, string> = {
+      'anagram': 'Anagram Game',
+      'sort-categories-egg': 'Sort Categories Game',
+      'spinner-wheel': 'Spinner Wheel',
+      'sentence-sense': 'Sentence Sense',
+      'place-value-showdown': 'Place Value Showdown',
+      'whack-a-mole': 'Whack-a-Mole Game',
+      'word-volley': 'Word Volley Game',
+      'name-it': 'Name It Game'
+    };
+    return defaults[type] || 'Untitled';
   };
 
   // Fetch students when the Students tab is selected
