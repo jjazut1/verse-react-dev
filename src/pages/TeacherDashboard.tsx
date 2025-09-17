@@ -1535,14 +1535,15 @@ const TeacherDashboard = () => {
       <div>
         <div
           style={{
-            display: 'flex',
-            borderBottom: '1px solid #E2E8F0',
-            marginBottom: '12px',
-            position: 'sticky',
-            top: 0,
-            zIndex: 6,
-            background: 'white'
-          }}
+          display: 'flex',
+          borderBottom: '1px solid #E2E8F0',
+          marginBottom: '12px',
+          position: 'sticky',
+          // Sit below the global app header (~56px)
+          top: 56,
+          zIndex: 100,
+          background: 'white'
+           }}
         >
           <div
             onClick={() => setActiveTab('create')}
@@ -1619,8 +1620,9 @@ const TeacherDashboard = () => {
             {/* Sticky Sub-Navbar for Create sections */}
             <div style={{
               position: 'sticky',
-              top: 40,
-              zIndex: 5,
+              // Below the primary tab bar (~56 + ~32 = ~88-100)
+              top: 100,
+              zIndex: 99,
               background: 'white',
               padding: '4px 0',
               borderBottom: '1px solid #E2E8F0',
@@ -1649,7 +1651,7 @@ const TeacherDashboard = () => {
               </div>
             </div>
             {/* Start Creating Section - Moved to top */}
-            <div id="start-creating" style={{ marginBottom: '48px', scrollMarginTop: 128 }}>
+            <div id="start-creating" style={{ marginBottom: '48px', scrollMarginTop: 180 }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
@@ -1797,7 +1799,7 @@ const TeacherDashboard = () => {
             </div>
 
             {/* My Created Games Section */}
-            <div id="my-created" style={{ marginBottom: '48px', scrollMarginTop: 128 }}>
+            <div id="my-created" style={{ marginBottom: '48px', scrollMarginTop: 180 }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
@@ -2319,7 +2321,7 @@ const TeacherDashboard = () => {
             </div>
 
             {/* Public Games Section */}
-            <div id="public-games" style={{ marginBottom: '48px', scrollMarginTop: 128 }}>
+            <div id="public-games" style={{ marginBottom: '48px', scrollMarginTop: 180 }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
