@@ -16,7 +16,7 @@ export const placeValueShowdownSchema: ConfigSchema = {
           label: 'Title',
           type: 'text',
           required: true,
-          placeholder: 'Enter game title',
+          placeholder: '',
           defaultValue: 'Place Value Showdown'
         },
         {
