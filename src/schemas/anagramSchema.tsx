@@ -392,6 +392,7 @@ export const anagramSchema: ConfigSchema = {
     const config = {
       title: safeFormData.title || 'Anagram Game',
       type: 'anagram' as const,
+    schemaVersion: 'v1',
       description: `Anagram game with ${anagrams.length} ${anagrams.length === 1 ? 'puzzle' : 'puzzles'}`,
       difficulty: 'medium' as const,
       timeLimit: 300,

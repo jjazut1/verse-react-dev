@@ -559,15 +559,21 @@ service cloud.firestore {
     match /categoryGenRequests/{requestId} {
       // Allow any authenticated user to create a request; backend will validate role
       allow create: if isAuthenticated();
-      // No client reads needed
+      // Disallow listing; no reads by clients
+      allow get: if false;
+      allow list: if false;
       allow read: if false;
     }
 
     match /categoryGenResults/{requestId} {
       // Cloud Functions writes results
       allow write: if isServiceAccount();
-      // Allow authenticated clients to read their results
-      allow read: if isAuthenticated();
+      // Allow authenticated clients to read their specific result doc by ID
+      allow get: if isAuthenticated();
+      // Block listing entire collection
+      allow list: if false;
+      // Disallow other reads
+      allow read: if false;
     }
   }
 } 

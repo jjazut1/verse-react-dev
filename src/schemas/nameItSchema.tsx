@@ -82,6 +82,7 @@ export const nameItSchema: ConfigSchema = {
       title: formData.title || 'Name It Game',
       description: `Name It pattern recognition game - ${formData.difficulty || 'medium'} difficulty`,
       type: 'name-it' as const,
+      schemaVersion: 'v1',
       gameTime: formData.gameTime || 300,
       difficulty: formData.difficulty || 'medium',
       enableWebRTC: Boolean(formData.enableWebRTC),

@@ -1,17 +1,19 @@
 import React from 'react';
-import { Box, VStack, Heading, Center, Text, useBreakpointValue } from '@chakra-ui/react';
+import { Box, VStack, Heading, Center, Text, useBreakpointValue, Button } from '@chakra-ui/react';
 import { SpinnerWheelProps } from './types';
 import { useGameLogic } from './useGameLogic';
 import { WheelRenderer } from './WheelRenderer';
 import { ZoomedControls } from './ZoomedControls';
 import { GameControls } from './GameControls';
 import PWAGameHeader from '../PWAGameHeader';
+import { useNavigate } from 'react-router-dom';
 
 const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   onGameComplete,
   config
 }) => {
   const gameLogic = useGameLogic(onGameComplete, config);
+  const navigate = useNavigate();
   
   // Responsive values for different screen sizes
   const wheelSize = useBreakpointValue({ 
@@ -57,6 +59,13 @@ const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
       overflow={gameLogic.isZoomed ? "visible" : "auto"} // Allow overflow when zoomed for proper centering
     >
       <PWAGameHeader gameTitle="Spinner Wheel" variant="compact" />
+
+      {/* Persistent Home button overlay (visible in both zoom states) */}
+      <Box position="fixed" top={{ base: '60px', md: '64px' }} left={{ base: 2, md: 4 }} zIndex={2000}>
+        <Button size="sm" colorScheme="blue" borderRadius="full" onClick={() => { navigate('/student'); window.scrollTo(0, 0); }}>
+          🏠 Home
+        </Button>
+      </Box>
       
       <Box
         flex="1"

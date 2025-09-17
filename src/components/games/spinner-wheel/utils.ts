@@ -10,6 +10,9 @@ export const colorThemes: ColorTheme = {
   desert: ['#F4A460', '#D2B48C', '#F5F5DC', '#A0522D', '#B7410E', '#FF8C00', '#E2725B', '#C3B091'],
   ocean: ['#ADD8E6', '#87CEEB', '#00BFFF', '#40E0D0', '#008080', '#00FFFF', '#4682B4'],
   sunset: ['#FFC0CB', '#FF7F50', '#FFA500', '#FFD700', '#FFFF00', '#FF6347', '#DDA0DD', '#E6E6FA'],
+  // Additional themes to match schema values
+  forest: ['#2D5016', '#3F6C23', '#4F7C2F', '#5F8A3A', '#6F9946', '#7FA752', '#8FB65E', '#9FC46A'],
+  earthTones: ['#8B4513', '#A0522D', '#CD853F', '#DEB887', '#F4A460', '#D2691E', '#BC8F8F', '#F5DEB3'],
   custom: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']
 };
 
@@ -95,7 +98,14 @@ export const getSegmentAtPointer = (currentRotation: number, currentItems: Spinn
 
 // Get item colors based on theme
 export const getItemColors = (items: SpinnerWheelItem[], theme: string = 'primaryColors', customColors?: string[]): SpinnerWheelItem[] => {
-  const themeColors = theme === 'custom' && customColors ? customColors : colorThemes[theme as keyof ColorTheme];
+  let themeColors = theme === 'custom' && customColors ? customColors : (colorThemes as any)[theme];
+  if (!themeColors) {
+    // Fallbacks for legacy/mismatched keys
+    if (theme === 'forest') themeColors = (colorThemes as any).forest;
+    else if (theme === 'earthTones') themeColors = (colorThemes as any).earthTones;
+    // Final fallback
+    if (!themeColors) themeColors = colorThemes.primaryColors as any;
+  }
   return items.map((item, index) => ({
     ...item,
     color: themeColors[index % themeColors.length]

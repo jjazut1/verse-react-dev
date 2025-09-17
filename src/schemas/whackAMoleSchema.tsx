@@ -1263,6 +1263,7 @@ export const whackAMoleSchema: ConfigSchema = {
     // Create final config object with all required fields
     const config = {
       type: 'whack-a-mole' as const,
+      schemaVersion: 'v1',
       title: safeFormData.title || 'Whack-a-Mole Game',
       gameTime: gameTime,
       pointsPerHit: pointsPerHit,
