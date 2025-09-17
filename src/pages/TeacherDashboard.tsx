@@ -457,6 +457,16 @@ const TeacherDashboard = () => {
     }
   }, [activeTab, fetchGameTemplates]);
 
+  // Normalize template card titles for the Start Creating grid
+  const getTemplateDisplayTitle = (template: any): string => {
+    const raw = String(template?.title || '').trim();
+    const isPlaceholder = raw.length === 0 || /enter\s+.*title/i.test(raw);
+    if (template?.type === 'anagram' && isPlaceholder) {
+      return 'Anagram Game';
+    }
+    return raw || 'Untitled';
+  };
+
   // Fetch students when the Students tab is selected
   useEffect(() => {
     if (activeTab === 'students' && currentUser) {
@@ -926,7 +936,14 @@ const TeacherDashboard = () => {
             ) : icon}
           </div>
           <div>
-            <h3 style={{ fontWeight: 'bold', marginBottom: '4px' }}>{template.title}</h3>
+            <h3 style={{ 
+              fontSize: '18px', 
+              fontWeight: '600', 
+              marginBottom: '16px',
+              color: '#2D3748'
+            }}>
+              {getTemplateDisplayTitle(template)}
+            </h3>
             <p style={{ color: '#666', fontSize: '14px' }}>Type: {template.type}</p>
           </div>
         </div>
@@ -1694,7 +1711,7 @@ const TeacherDashboard = () => {
                         marginBottom: '16px',
                         color: '#2D3748'
                       }}>
-                        {template.title}
+                        {getTemplateDisplayTitle(template)}
                       </h3>
                       
                       <div style={{
