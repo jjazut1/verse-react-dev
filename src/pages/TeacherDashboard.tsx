@@ -1643,7 +1643,7 @@ const TeacherDashboard = () => {
               </div>
             </div>
             {/* Start Creating Section - Moved to top */}
-            <div id="start-creating" style={{ marginBottom: '48px', scrollMarginTop: 88 }}>
+            <div id="start-creating" style={{ marginBottom: '48px', scrollMarginTop: 128 }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
@@ -1791,7 +1791,7 @@ const TeacherDashboard = () => {
             </div>
 
             {/* My Created Games Section */}
-            <div id="my-created" style={{ marginBottom: '48px', scrollMarginTop: 88 }}>
+            <div id="my-created" style={{ marginBottom: '48px', scrollMarginTop: 128 }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
@@ -2313,7 +2313,7 @@ const TeacherDashboard = () => {
             </div>
 
             {/* Public Games Section */}
-            <div id="public-games" style={{ marginBottom: '48px', scrollMarginTop: 88 }}>
+            <div id="public-games" style={{ marginBottom: '48px', scrollMarginTop: 128 }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
