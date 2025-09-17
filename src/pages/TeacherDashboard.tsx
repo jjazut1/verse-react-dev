@@ -1655,26 +1655,36 @@ const TeacherDashboard = () => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         margin: '0 auto 16px',
-                        fontSize: '32px'
+                        fontSize: '32px',
+                        position: 'relative',
+                        overflow: 'hidden'
                       }}>
-                        {template.thumbnail ? (
+                        {/* Default emoji fallback always rendered */}
+                        <div aria-hidden="true">
+                          {template.type === 'whack-a-mole' ? '🔨' : 
+                           template.type === 'spinner-wheel' ? '🎡' : 
+                           template.type === 'anagram' ? '🧩' : 
+                           template.type === 'sentence-sense' ? '📝' :
+                           template.type === 'place-value-showdown' ? '🎯' :
+                           template.type === 'word-volley' ? '🏓' : '🥚'}
+                        </div>
+                        {template.thumbnail && (
                           <img 
                             src={template.thumbnail} 
                             alt={template.title} 
                             style={{ 
+                              position: 'absolute',
+                              inset: 0,
                               width: '100%', 
                               height: '100%', 
                               objectFit: 'cover', 
                               borderRadius: '12px' 
                             }}
+                            onError={(e) => {
+                              // Hide broken images so emoji fallback shows
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
                           />
-                        ) : (
-                          template.type === 'whack-a-mole' ? '🔨' : 
-                          template.type === 'spinner-wheel' ? '🎡' : 
-                          template.type === 'anagram' ? '🧩' : 
-                          template.type === 'sentence-sense' ? '📝' :
-                          template.type === 'place-value-showdown' ? '🎯' :
-                          template.type === 'word-volley' ? '🏓' : '🥚'
                         )}
                       </div>
                       
