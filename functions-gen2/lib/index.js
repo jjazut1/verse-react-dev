@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cleanupOldCategoryGenDocs = exports.generateCategoryItems = exports.processCategoryGenRequest = exports.processTTSRequest = exports.fixStudentPasswordFlag = exports.checkStudentPasswordStatus = exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.OPENAI_API_KEY = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
+exports.backfillSchemaVersion = exports.cleanupOldCategoryGenDocs = exports.generateCategoryItems = exports.processCategoryGenRequest = exports.processTTSRequest = exports.processAdminTask = exports.getAssignmentManifest = exports.fixStudentPasswordFlag = exports.checkStudentPasswordStatus = exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.OPENAI_API_KEY = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
@@ -583,6 +583,106 @@ exports.fixStudentPasswordFlag = functions.https.onCall(async (request) => {
         throw new functions.https.HttpsError('internal', 'Failed to fix student password flag');
     }
 });
+// Assignment manifest for mobile apps: minimal, stable DTO
+exports.getAssignmentManifest = (0, https_1.onCall)({
+    region: 'us-central1'
+}, async (request) => {
+    var _a, _b, _c;
+    const uid = (_a = request.auth) === null || _a === void 0 ? void 0 : _a.uid;
+    const email = ((_c = (_b = request.auth) === null || _b === void 0 ? void 0 : _b.token) === null || _c === void 0 ? void 0 : _c.email) ? String(request.auth.token.email).toLowerCase() : undefined;
+    if (!uid) {
+        throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+    try {
+        const db = admin.firestore();
+        let docs = [];
+        // Prefer studentId match
+        const byUid = await db.collection('assignments').where('studentId', '==', uid).get();
+        if (!byUid.empty) {
+            docs = byUid.docs;
+        }
+        else if (email) {
+            // Fallback to email match
+            const byEmail = await db.collection('assignments').where('studentEmail', '==', email).get();
+            docs = byEmail.docs;
+        }
+        const items = docs.map((d) => {
+            var _a, _b;
+            const a = d.data();
+            return {
+                id: d.id,
+                configId: a.gameId || a.configId || null,
+                type: a.gameType || null,
+                title: a.gameTitle || a.gameName || null,
+                status: a.status || 'pending',
+                dueDate: a.dueDate ? a.dueDate.toDate().toISOString() : (a.deadline ? a.deadline.toDate().toISOString() : null),
+                timesRequired: (_a = a.timesRequired) !== null && _a !== void 0 ? _a : 1,
+                completedCount: (_b = a.completedCount) !== null && _b !== void 0 ? _b : 0
+            };
+        });
+        return { success: true, items };
+    }
+    catch (error) {
+        firebase_functions_1.logger.error('getAssignmentManifest error', error);
+        throw new functions.https.HttpsError('internal', (error === null || error === void 0 ? void 0 : error.message) || 'Failed to load assignments');
+    }
+});
+// Firestore-triggered Admin Task processor (avoids IAM public invoker)
+exports.processAdminTask = (0, firestore_1.onDocumentCreated)({
+    document: 'adminTasks/{taskId}'
+}, async (event) => {
+    var _a;
+    const db = admin.firestore();
+    const taskId = event.params.taskId;
+    const data = ((_a = event.data) === null || _a === void 0 ? void 0 : _a.data()) || {};
+    const { type, uid } = data;
+    try {
+        if (!type || !uid) {
+            console.error('adminTasks missing type or uid');
+            return;
+        }
+        // Verify admin role
+        const userDoc = await db.collection('users').doc(uid).get();
+        const role = userDoc.exists ? userDoc.data().role : undefined;
+        if (role !== 'admin') {
+            await db.collection('adminTasks').doc(taskId).update({
+                status: 'error',
+                error: 'Permission denied',
+                processedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return;
+        }
+        if (type === 'backfillSchemaVersion') {
+            let updated = 0;
+            const collections = ['userGameConfigs', 'blankGameTemplates'];
+            for (const col of collections) {
+                const snap = await db.collection(col).get();
+                const batch = db.batch();
+                snap.forEach((doc) => {
+                    const d = doc.data();
+                    if (!('schemaVersion' in d)) {
+                        batch.update(doc.ref, { schemaVersion: 'v1', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+                        updated++;
+                    }
+                });
+                await batch.commit();
+            }
+            await db.collection('adminTasks').doc(taskId).update({
+                status: 'success',
+                result: { updated },
+                processedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
+    }
+    catch (error) {
+        console.error('processAdminTask error', error);
+        await admin.firestore().collection('adminTasks').doc(taskId).set({
+            status: 'error',
+            error: (error === null || error === void 0 ? void 0 : error.message) || String(error),
+            processedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    }
+});
 // Text-to-Speech function using Amazon Polly - Firestore Trigger (No CORS issues)
 exports.processTTSRequest = (0, firestore_1.onDocumentCreated)({
     document: 'ttsRequests/{requestId}',
@@ -989,5 +1089,38 @@ exports.cleanupOldCategoryGenDocs = (0, scheduler_1.onSchedule)({ schedule: 'eve
     catch (e) {
         console.error('cleanupOldCategoryGenDocs error', e);
     }
+});
+// Admin-only backfill to add schemaVersion to existing configs
+exports.backfillSchemaVersion = (0, https_1.onCall)({
+    region: 'us-central1'
+}, async (request) => {
+    var _a, _b;
+    const uid = (_a = request.auth) === null || _a === void 0 ? void 0 : _a.uid;
+    if (!uid) {
+        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+    }
+    const userDoc = await admin.firestore().collection('users').doc(uid).get();
+    const role = userDoc.exists ? userDoc.data().role : undefined;
+    if (role !== 'admin') {
+        throw new functions.https.HttpsError('permission-denied', 'Admin only');
+    }
+    const db = admin.firestore();
+    const collections = ['userGameConfigs', 'blankGameTemplates'];
+    let updated = 0;
+    for (const col of collections) {
+        const snap = await db.collection(col).get();
+        const batch = db.batch();
+        snap.forEach((doc) => {
+            const data = doc.data();
+            if (!('schemaVersion' in data)) {
+                batch.update(doc.ref, { schemaVersion: 'v1', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+                updated++;
+            }
+        });
+        if (((_b = batch._ops) === null || _b === void 0 ? void 0 : _b.length) || updated > 0) {
+            await batch.commit();
+        }
+    }
+    return { success: true, updated };
 });
 //# sourceMappingURL=index.js.map

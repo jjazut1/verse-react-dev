@@ -2533,3 +2533,52 @@ For questions, support, or feature requests:
 - Functions-gen2: processCategoryGenRequest supports modes 'items', 'sentences', 'word_defs' with robust fallback parsing.
 - categoryAgent: Firestore-triggered request/response with mode support.
 - Bug fixes: spinner router errors, schema validations, casing for anagram words.
+
+## Assignment Manifest (Mobile) — v1
+
+- Endpoint: Firebase Callable `getAssignmentManifest` (region `us-central1`)
+- Auth: Firebase Auth required (student)
+- Request: none
+- Response: `{ success: true, items: AssignmentItem[] }`
+- AssignmentItem fields:
+  - `id: string`
+  - `configId: string | null`
+  - `type: string` (e.g., `sort-categories-egg`, `whack-a-mole`, `spinner-wheel`, `anagram`, `sentence-sense`, `place-value-showdown`, `word-volley`, `name-it`)
+  - `title: string | null`
+  - `status: string` (e.g., `pending`, `in_progress`, `completed`)
+  - `dueDate: string | null` (ISO 8601)
+  - `timesRequired: number`
+  - `completedCount: number`
+- Semantics: Results are scoped to the authenticated student (first by `studentId == uid`, fallback to `studentEmail`).
+- Versioning: Contract is stable for v1. Any breaking changes will be introduced under a new function name.
+
+Example:
+```json
+{
+  "success": true,
+  "items": [
+    {
+      "id": "a1b2c3",
+      "configId": "XyZ123",
+      "type": "spinner-wheel",
+      "title": "Short A Wheel",
+      "status": "pending",
+      "dueDate": "2025-09-30T23:59:59.000Z",
+      "timesRequired": 2,
+      "completedCount": 1
+    }
+  ]
+}
+```
+
+## Schema Versioning
+
+All saved game configurations now include `schemaVersion: "v1"` (backfilled across existing docs). New configs are written with v1 automatically. The app is pinned to v1.
+
+### Release Notes
+
+- 2025-09-17: Mobile readiness
+  - Added `schemaVersion: "v1"` to all game schemas and backfilled existing configs
+  - Introduced `getAssignmentManifest` callable for mobile (stable v1 contract)
+  - Hardened Firestore rules for AI collections (no listing; authenticated get only on results)
+  - Added `processAdminTask` Firestore-triggered function for admin maintenance tasks

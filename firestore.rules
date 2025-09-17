@@ -19,6 +19,15 @@ service cloud.firestore {
         resource.data.role == "teacher";
     }
 
+    // Admin tasks (Firestore-triggered)
+    match /adminTasks/{taskId} {
+      // Only admins can create admin tasks
+      allow create: if isAdmin();
+      // Allow service accounts to read/update task status
+      allow read, update: if isServiceAccount();
+      // No deletes from clients
+      allow delete: if false;
+    }
     function isAdmin() {
       return isAuthenticated() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
