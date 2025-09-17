@@ -452,6 +452,7 @@ export const sentenceSenseSchema: ConfigSchema = {
     const config = {
       title: safeFormData.title || 'Sentence Sense Game',
       type: 'sentence-sense' as const,
+    schemaVersion: 'v1',
       description: `Sentence arrangement game with ${sentences.length} ${sentences.length === 1 ? 'sentence' : 'sentences'}`,
       difficulty: 'medium' as const,
       timeLimit: 300,

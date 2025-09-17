@@ -1,4 +1,5 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions";
@@ -684,6 +685,47 @@ export const fixStudentPasswordFlag = functions.https.onCall(async (request) => 
   }
 });
 
+// Assignment manifest for mobile apps: minimal, stable DTO
+export const getAssignmentManifest = onCall({
+  region: 'us-central1'
+}, async (request) => {
+  const uid = request.auth?.uid;
+  const email = request.auth?.token?.email ? String(request.auth.token.email).toLowerCase() : undefined;
+  if (!uid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+  try {
+    const db = admin.firestore();
+    let docs: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>[] = [];
+    // Prefer studentId match
+    const byUid = await db.collection('assignments').where('studentId', '==', uid).get();
+    if (!byUid.empty) {
+      docs = byUid.docs;
+    } else if (email) {
+      // Fallback to email match
+      const byEmail = await db.collection('assignments').where('studentEmail', '==', email).get();
+      docs = byEmail.docs;
+    }
+    const items = docs.map((d) => {
+      const a: any = d.data();
+      return {
+        id: d.id,
+        configId: a.gameId || a.configId || null,
+        type: a.gameType || null,
+        title: a.gameTitle || a.gameName || null,
+        status: a.status || 'pending',
+        dueDate: a.dueDate ? a.dueDate.toDate().toISOString() : (a.deadline ? a.deadline.toDate().toISOString() : null),
+        timesRequired: a.timesRequired ?? 1,
+        completedCount: a.completedCount ?? 0
+      };
+    });
+    return { success: true, items };
+  } catch (error: any) {
+    logger.error('getAssignmentManifest error', error);
+    throw new functions.https.HttpsError('internal', error?.message || 'Failed to load assignments');
+  }
+});
+
 // Text-to-Speech function using Amazon Polly - Firestore Trigger (No CORS issues)
 export const processTTSRequest = onDocumentCreated({
   document: 'ttsRequests/{requestId}',
@@ -827,9 +869,9 @@ export const processCategoryGenRequest = onDocumentCreated({
 
     // Call OpenAI-compatible API
     const apiKey = OPENAI_API_KEY.value();
-    const requestedCount = Math.max(1, Math.min(25, Number(count) || 10));
     const isSentenceMode = String(mode || '').toLowerCase() === 'sentences';
     const isWordDefMode = String(mode || '').toLowerCase() === 'word_defs';
+    const requestedCount = Math.max(1, Math.min(isSentenceMode ? 1 : 25, Number(count) || 10));
     const system = isSentenceMode
       ? 'You generate classroom-safe, age-appropriate simple sentences only. Output JSON array of complete sentence strings, no explanations.'
       : isWordDefMode
@@ -910,6 +952,9 @@ export const processCategoryGenRequest = onDocumentCreated({
       }
     }
 
+    // Profanity filter
+    const profanity = [/\b(?:fuck|shit|bitch|asshole|bastard|slut|dick|cunt)\b/i];
+    const isClean = (s: string) => !profanity.some((re) => re.test(s));
     // Normalize
     const seen = new Set<string>();
     if (isWordDefMode) {
@@ -921,7 +966,7 @@ export const processCategoryGenRequest = onDocumentCreated({
           return null;
         })
         .filter(Boolean)
-        .filter((o: any) => o.word.length > 0 && o.definition.length > 0)
+        .filter((o: any) => o.word.length > 0 && o.definition.length > 0 && isClean(o.word) && isClean(o.definition))
         .filter((o: any) => {
           const key = o.word.toLowerCase();
           if (seen.has(key)) return false;
@@ -934,6 +979,7 @@ export const processCategoryGenRequest = onDocumentCreated({
         .map((s) => (typeof s === 'string' ? s.trim() : ''))
         .map((s) => s.replace(/^\s*\d+[\.)-]?\s*/, '').replace(/^[-•\*]\s*/, ''))
         .filter((s) => s.length > 0 && (isSentenceMode ? s.split(/\s+/).length >= 2 && s.length <= 220 : s.length <= 60))
+        .filter((s) => isClean(s))
         .filter((s) => {
           const key = s.toLowerCase();
           if (seen.has(key)) return false;
@@ -943,11 +989,15 @@ export const processCategoryGenRequest = onDocumentCreated({
         .slice(0, requestedCount);
     }
 
+    const now = admin.firestore.Timestamp.now();
+    const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + 24 * 60 * 60 * 1000);
     await admin.firestore().doc(`categoryGenResults/${requestId}`).set({
       success: true,
       items,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt,
     });
+    try { await admin.firestore().doc(`categoryGenRequests/${requestId}`).delete(); } catch {}
   } catch (error: any) {
     console.error('processCategoryGenRequest error', error);
     await admin.firestore().doc(`categoryGenResults/${requestId}`).set({
@@ -1058,9 +1108,12 @@ export const generateCategoryItems = onCall({
 
     // Normalize: trim, dedupe, filter length, clamp
     const seen = new Set<string>();
+    const profanity = [/\b(?:fuck|shit|bitch|asshole|bastard|slut|dick|cunt)\b/i];
+    const isClean = (s: string) => !profanity.some((re) => re.test(s));
     items = items
       .map((s) => (typeof s === 'string' ? s.trim() : ''))
       .filter((s) => s.length > 0 && s.length <= 30)
+      .filter((s) => isClean(s))
       .filter((s) => {
         const key = s.toLowerCase();
         if (seen.has(key)) return false;
@@ -1079,5 +1132,59 @@ export const generateCategoryItems = onCall({
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', error?.message || 'Generation failed');
   }
+});
+
+// Daily cleanup of old gen request/result docs
+export const cleanupOldCategoryGenDocs = onSchedule({ schedule: 'every 24 hours' }, async () => {
+  const db = admin.firestore();
+  const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
+  try {
+    const [reqSnap, resSnap, resExpSnap] = await Promise.all([
+      db.collection('categoryGenRequests').where('timestamp', '<', cutoff).get(),
+      db.collection('categoryGenResults').where('timestamp', '<', cutoff).get(),
+      db.collection('categoryGenResults').where('expiresAt', '<', admin.firestore.Timestamp.now()).get(),
+    ]);
+    const batch = db.batch();
+    reqSnap.forEach((d) => batch.delete(d.ref));
+    resSnap.forEach((d) => batch.delete(d.ref));
+    resExpSnap.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  } catch (e) {
+    console.error('cleanupOldCategoryGenDocs error', e);
+  }
+});
+
+// Admin-only backfill to add schemaVersion to existing configs
+export const backfillSchemaVersion = onCall({
+  region: 'us-central1'
+}, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+  const userDoc = await admin.firestore().collection('users').doc(uid).get();
+  const role = userDoc.exists ? (userDoc.data() as any).role : undefined;
+  if (role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Admin only');
+  }
+
+  const db = admin.firestore();
+  const collections = ['userGameConfigs', 'blankGameTemplates'];
+  let updated = 0;
+  for (const col of collections) {
+    const snap = await db.collection(col).get();
+    const batch = db.batch();
+    snap.forEach((doc) => {
+      const data = doc.data();
+      if (!('schemaVersion' in data)) {
+        batch.update(doc.ref, { schemaVersion: 'v1', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        updated++;
+      }
+    });
+    if ((batch as any)._ops?.length || updated > 0) {
+      await batch.commit();
+    }
+  }
+  return { success: true, updated };
 });
 

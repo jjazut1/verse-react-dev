@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateCategoryItems = exports.processCategoryGenRequest = exports.processTTSRequest = exports.fixStudentPasswordFlag = exports.checkStudentPasswordStatus = exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.OPENAI_API_KEY = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
+exports.cleanupOldCategoryGenDocs = exports.generateCategoryItems = exports.processCategoryGenRequest = exports.processTTSRequest = exports.fixStudentPasswordFlag = exports.checkStudentPasswordStatus = exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.OPENAI_API_KEY = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
+const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
 const firebase_functions_1 = require("firebase-functions");
@@ -709,9 +710,9 @@ exports.processCategoryGenRequest = (0, firestore_1.onDocumentCreated)({
         }
         // Call OpenAI-compatible API
         const apiKey = exports.OPENAI_API_KEY.value();
-        const requestedCount = Math.max(1, Math.min(25, Number(count) || 10));
         const isSentenceMode = String(mode || '').toLowerCase() === 'sentences';
         const isWordDefMode = String(mode || '').toLowerCase() === 'word_defs';
+        const requestedCount = Math.max(1, Math.min(isSentenceMode ? 1 : 25, Number(count) || 10));
         const system = isSentenceMode
             ? 'You generate classroom-safe, age-appropriate simple sentences only. Output JSON array of complete sentence strings, no explanations.'
             : isWordDefMode
@@ -792,6 +793,9 @@ exports.processCategoryGenRequest = (0, firestore_1.onDocumentCreated)({
                 items = normalizeLines(text);
             }
         }
+        // Profanity filter
+        const profanity = [/\b(?:fuck|shit|bitch|asshole|bastard|slut|dick|cunt)\b/i];
+        const isClean = (s) => !profanity.some((re) => re.test(s));
         // Normalize
         const seen = new Set();
         if (isWordDefMode) {
@@ -803,7 +807,7 @@ exports.processCategoryGenRequest = (0, firestore_1.onDocumentCreated)({
                 return null;
             })
                 .filter(Boolean)
-                .filter((o) => o.word.length > 0 && o.definition.length > 0)
+                .filter((o) => o.word.length > 0 && o.definition.length > 0 && isClean(o.word) && isClean(o.definition))
                 .filter((o) => {
                 const key = o.word.toLowerCase();
                 if (seen.has(key))
@@ -818,6 +822,7 @@ exports.processCategoryGenRequest = (0, firestore_1.onDocumentCreated)({
                 .map((s) => (typeof s === 'string' ? s.trim() : ''))
                 .map((s) => s.replace(/^\s*\d+[\.)-]?\s*/, '').replace(/^[-•\*]\s*/, ''))
                 .filter((s) => s.length > 0 && (isSentenceMode ? s.split(/\s+/).length >= 2 && s.length <= 220 : s.length <= 60))
+                .filter((s) => isClean(s))
                 .filter((s) => {
                 const key = s.toLowerCase();
                 if (seen.has(key))
@@ -827,11 +832,18 @@ exports.processCategoryGenRequest = (0, firestore_1.onDocumentCreated)({
             })
                 .slice(0, requestedCount);
         }
+        const now = admin.firestore.Timestamp.now();
+        const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + 24 * 60 * 60 * 1000);
         await admin.firestore().doc(`categoryGenResults/${requestId}`).set({
             success: true,
             items,
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            expiresAt,
         });
+        try {
+            await admin.firestore().doc(`categoryGenRequests/${requestId}`).delete();
+        }
+        catch (_f) { }
     }
     catch (error) {
         console.error('processCategoryGenRequest error', error);
@@ -932,9 +944,12 @@ exports.generateCategoryItems = (0, https_1.onCall)({
         catch (_f) { }
         // Normalize: trim, dedupe, filter length, clamp
         const seen = new Set();
+        const profanity = [/\b(?:fuck|shit|bitch|asshole|bastard|slut|dick|cunt)\b/i];
+        const isClean = (s) => !profanity.some((re) => re.test(s));
         items = items
             .map((s) => (typeof s === 'string' ? s.trim() : ''))
             .filter((s) => s.length > 0 && s.length <= 30)
+            .filter((s) => isClean(s))
             .filter((s) => {
             const key = s.toLowerCase();
             if (seen.has(key))
@@ -953,6 +968,26 @@ exports.generateCategoryItems = (0, https_1.onCall)({
         if (error instanceof functions.https.HttpsError)
             throw error;
         throw new functions.https.HttpsError('internal', (error === null || error === void 0 ? void 0 : error.message) || 'Generation failed');
+    }
+});
+// Daily cleanup of old gen request/result docs
+exports.cleanupOldCategoryGenDocs = (0, scheduler_1.onSchedule)({ schedule: 'every 24 hours' }, async () => {
+    const db = admin.firestore();
+    const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
+    try {
+        const [reqSnap, resSnap, resExpSnap] = await Promise.all([
+            db.collection('categoryGenRequests').where('timestamp', '<', cutoff).get(),
+            db.collection('categoryGenResults').where('timestamp', '<', cutoff).get(),
+            db.collection('categoryGenResults').where('expiresAt', '<', admin.firestore.Timestamp.now()).get(),
+        ]);
+        const batch = db.batch();
+        reqSnap.forEach((d) => batch.delete(d.ref));
+        resSnap.forEach((d) => batch.delete(d.ref));
+        resExpSnap.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+    }
+    catch (e) {
+        console.error('cleanupOldCategoryGenDocs error', e);
     }
 });
 //# sourceMappingURL=index.js.map

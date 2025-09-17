@@ -657,6 +657,7 @@ export const sortCategoriesEggSchema: ConfigSchema = {
     const config = {
       title: safeFormData.title || 'Sort Categories Egg Reveal Game',
       type: 'sort-categories-egg' as const,
+      schemaVersion: 'v1',
       description: safeFormData.description || `Categorization game with ${categories.length} categories`,
       instructions: safeFormData.instructions || '',
       categories: categories,

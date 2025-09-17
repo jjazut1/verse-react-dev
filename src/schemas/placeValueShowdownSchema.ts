@@ -145,6 +145,7 @@ export const placeValueShowdownSchema: ConfigSchema = {
     return {
       title: formData.title,
       type: 'place-value-showdown',
+    schemaVersion: 'v1',
       description: `Place value game with ${formData.numberOfCards} digits${formData.includeDecimal ? ` + ${formData.decimalPlaces} decimal places` : ''}, aiming for ${formData.objective} number. First to ${formData.winningScore} points wins!`,
       difficulty: 'medium',
       timeLimit: 300,

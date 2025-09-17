@@ -626,6 +626,7 @@ const generateConfig = (formData: any, currentUser?: any): SpinnerWheelConfig =>
     type: 'spinner-wheel' as const,
     description: `Interactive spinner wheel with ${processedItems.length} ${processedItems.length === 1 ? 'item' : 'items'}`,
     items: processedItems,
+    schemaVersion: 'v1',
     removeOnSelect: Boolean(safeFormData.removeOnSelect),
     wheelTheme: safeFormData.wheelTheme,
     customColors: safeFormData.customColors,

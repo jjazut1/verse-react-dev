@@ -396,6 +396,7 @@ const generateConfig = (formData: Partial<WordVolleyFormData>, user: any) => {
   return {
     title: safeFormData.title,
     type: 'word-volley' as const,
+    schemaVersion: 'v1',
     description: safeFormData.description,
     timeLimit: safeFormData.gameDuration * 60, // Convert minutes to seconds
     targetScore: Math.max(cleanTargetWords.length, cleanNonTargetWords.length) * 10,
