@@ -1537,7 +1537,7 @@ const TeacherDashboard = () => {
           style={{
           display: 'flex',
           borderBottom: '1px solid #E2E8F0',
-          marginBottom: '12px',
+          marginBottom: '0',
           position: 'sticky',
           // Sit below the global app header (~56px)
           top: 56,
@@ -1620,8 +1620,8 @@ const TeacherDashboard = () => {
             {/* Sticky Sub-Navbar for Create sections */}
             <div style={{
               position: 'sticky',
-              // Below the primary tab bar (~56 + ~32 = ~88-100)
-              top: 100,
+              // Sit flush under the primary tab bar (header ~56px + primary ~40px ≈ 96px)
+              top: 96,
               zIndex: 99,
               background: 'white',
               padding: '4px 0',
