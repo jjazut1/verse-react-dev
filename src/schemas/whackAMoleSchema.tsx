@@ -4,7 +4,6 @@ import { serverTimestamp } from 'firebase/firestore';
 import {
   VStack,
   HStack,
-  FormControl,
   FormLabel,
   Input,
   Button,
@@ -13,7 +12,6 @@ import {
   IconButton,
   Heading,
   Badge,
-  Collapse,
   Flex,
   useToast,
   Tabs,
@@ -267,8 +265,7 @@ const EditorSelectionContext = createContext<EditorSelectionContextType>({
   setLastSelectionPath: () => {}
 });
 
-// Use the editor selection context
-const useEditorSelection = () => useContext(EditorSelectionContext);
+// (Removed unused hook that returned the editor selection context)
 
 // Utility function to generate a unique ID
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -400,9 +397,7 @@ const deleteItemFromCategory = (
 const CategoryManager: React.FC<{
   formData: any;
   updateField: (fieldName: string, value: any) => void;
-  errors: Record<string, string>;
-  saveAttempted: boolean;
-}> = ({ formData, updateField, errors, saveAttempted }) => {
+}> = ({ formData, updateField }) => {
   const toast = useToast();
   // Separate AI generator state per tab
   const [genWhackPrompt, setGenWhackPrompt] = useState('');
@@ -636,7 +631,7 @@ const CategoryManager: React.FC<{
   };
 
   // Handle editor focus event
-  const handleEditorFocus = (editorId: string) => (event: React.FocusEvent<HTMLDivElement>) => {
+  const handleEditorFocus = (editorId: string) => () => {
     setActiveEditorId(editorId);
     // Find the category and item index based on the editor ID
     for (let categoryIndex = 0; categoryIndex < categories.length; categoryIndex++) {

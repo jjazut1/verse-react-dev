@@ -726,6 +726,61 @@ export const getAssignmentManifest = onCall({
   }
 });
 
+// Firestore-triggered Admin Task processor (avoids IAM public invoker)
+export const processAdminTask = onDocumentCreated({
+  document: 'adminTasks/{taskId}'
+}, async (event) => {
+  const db = admin.firestore();
+  const taskId = event.params.taskId;
+  const data = event.data?.data() || {};
+  const { type, uid } = data as any;
+  try {
+    if (!type || !uid) {
+      console.error('adminTasks missing type or uid');
+      return;
+    }
+    // Verify admin role
+    const userDoc = await db.collection('users').doc(uid).get();
+    const role = userDoc.exists ? (userDoc.data() as any).role : undefined;
+    if (role !== 'admin') {
+      await db.collection('adminTasks').doc(taskId).update({
+        status: 'error',
+        error: 'Permission denied',
+        processedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return;
+    }
+    if (type === 'backfillSchemaVersion') {
+      let updated = 0;
+      const collections = ['userGameConfigs', 'blankGameTemplates'];
+      for (const col of collections) {
+        const snap = await db.collection(col).get();
+        const batch = db.batch();
+        snap.forEach((doc) => {
+          const d = doc.data();
+          if (!('schemaVersion' in d)) {
+            batch.update(doc.ref, { schemaVersion: 'v1', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+            updated++;
+          }
+        });
+        await batch.commit();
+      }
+      await db.collection('adminTasks').doc(taskId).update({
+        status: 'success',
+        result: { updated },
+        processedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  } catch (error: any) {
+    console.error('processAdminTask error', error);
+    await admin.firestore().collection('adminTasks').doc(taskId).set({
+      status: 'error',
+      error: error?.message || String(error),
+      processedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  }
+});
+
 // Text-to-Speech function using Amazon Polly - Firestore Trigger (No CORS issues)
 export const processTTSRequest = onDocumentCreated({
   document: 'ttsRequests/{requestId}',
