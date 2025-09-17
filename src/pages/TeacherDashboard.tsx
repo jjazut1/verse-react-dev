@@ -1610,8 +1610,40 @@ const TeacherDashboard = () => {
 
         {activeTab === 'create' && (
           <div>
+            {/* Sticky Sub-Navbar for Create sections */}
+            <div style={{
+              position: 'sticky',
+              top: 64,
+              zIndex: 5,
+              background: 'white',
+              padding: '8px 0',
+              borderBottom: '1px solid #E2E8F0',
+              marginBottom: '12px'
+            }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[
+                  { id: 'start-creating', label: 'Start Creating' },
+                  { id: 'my-created', label: 'My Created Games' },
+                  { id: 'public-games', label: 'Public Games' }
+                ].map(link => (
+                  <a
+                    key={link.id}
+                    href={`#${link.id}`}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 999,
+                      background: '#F3E8FF',
+                      color: '#553C9A',
+                      fontSize: 14,
+                      textDecoration: 'none',
+                      border: '1px solid #E9D8FD'
+                    }}
+                  >{link.label}</a>
+                ))}
+              </div>
+            </div>
             {/* Start Creating Section - Moved to top */}
-            <div style={{ marginBottom: '48px' }}>
+            <div id="start-creating" style={{ marginBottom: '48px', scrollMarginTop: 88 }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
@@ -1759,7 +1791,7 @@ const TeacherDashboard = () => {
             </div>
 
             {/* My Created Games Section */}
-            <div style={{ marginBottom: '48px' }}>
+            <div id="my-created" style={{ marginBottom: '48px', scrollMarginTop: 88 }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
@@ -2281,7 +2313,7 @@ const TeacherDashboard = () => {
             </div>
 
             {/* Public Games Section */}
-            <div style={{ marginBottom: '48px' }}>
+            <div id="public-games" style={{ marginBottom: '48px', scrollMarginTop: 88 }}>
               <h2 style={{ 
                 fontSize: '24px', 
                 fontWeight: 'bold', 
