@@ -1533,15 +1533,21 @@ const TeacherDashboard = () => {
       </h1>
 
       <div>
-        <div style={{ 
-          display: 'flex', 
-          borderBottom: '1px solid #E2E8F0', 
-          marginBottom: '24px'
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            borderBottom: '1px solid #E2E8F0',
+            marginBottom: '12px',
+            position: 'sticky',
+            top: 0,
+            zIndex: 6,
+            background: 'white'
+          }}
+        >
           <div
             onClick={() => setActiveTab('create')}
             style={{
-              padding: '12px 24px',
+              padding: '8px 16px',
               position: 'relative',
               cursor: 'pointer',
               color: activeTab === 'create' ? '#4299E1' : '#718096',
@@ -1559,7 +1565,7 @@ const TeacherDashboard = () => {
           <div
             onClick={() => setActiveTab('assignments')}
             style={{
-              padding: '12px 24px',
+              padding: '8px 16px',
               position: 'relative',
               cursor: 'pointer',
               color: activeTab === 'assignments' ? '#4299E1' : '#718096',
@@ -1577,7 +1583,7 @@ const TeacherDashboard = () => {
           <div
             onClick={() => setActiveTab('students')}
             style={{
-              padding: '12px 24px',
+              padding: '8px 16px',
               position: 'relative',
               cursor: 'pointer',
               color: activeTab === 'students' ? '#4299E1' : '#718096',
@@ -1613,12 +1619,12 @@ const TeacherDashboard = () => {
             {/* Sticky Sub-Navbar for Create sections */}
             <div style={{
               position: 'sticky',
-              top: 64,
+              top: 40,
               zIndex: 5,
               background: 'white',
-              padding: '8px 0',
+              padding: '4px 0',
               borderBottom: '1px solid #E2E8F0',
-              marginBottom: '12px'
+              marginBottom: '8px'
             }}>
               <div style={{ display: 'flex', gap: 8 }}>
                 {[
@@ -1630,11 +1636,11 @@ const TeacherDashboard = () => {
                     key={link.id}
                     href={`#${link.id}`}
                     style={{
-                      padding: '6px 10px',
+                      padding: '4px 10px',
                       borderRadius: 999,
                       background: '#F3E8FF',
                       color: '#553C9A',
-                      fontSize: 14,
+                      fontSize: 13,
                       textDecoration: 'none',
                       border: '1px solid #E9D8FD'
                     }}
