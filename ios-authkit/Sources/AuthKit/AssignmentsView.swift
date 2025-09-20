@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 public struct AssignmentsView: View {
     @State private var assignments: [Assignment] = []
@@ -8,6 +9,8 @@ public struct AssignmentsView: View {
     @State private var presented: Assignment?
 
     public init() {}
+
+    @State private var greetingTitle: String = "Assignments"
 
     public var body: some View {
         VStack(spacing: 12) {
@@ -50,7 +53,9 @@ public struct AssignmentsView: View {
             }
             .padding(.horizontal, 16)
         }
-        .navigationTitle("Assignments")
+        .navigationTitle(greetingTitle)
+        .navigationBarTitleDisplayMode(.large)
+        .onAppear { greetingTitle = makeGreeting() }
         .task { await load() }
         .refreshable { await load() }
         .fullScreenCover(item: $presented) { a in
@@ -104,6 +109,23 @@ public struct AssignmentsView: View {
         defer { isLoading = false }
         do { assignments = try await service.listForCurrentUser() }
         catch { self.error = error.localizedDescription }
+    }
+
+    private func makeGreeting() -> String {
+        let base: [String] = [
+            "Hello",
+            "Good Day",
+            "Welcome Back",
+            "Keep Going",
+            "Great to See You",
+            "You’ve Got This"
+        ]
+        let name: String = {
+            if let display = Auth.auth().currentUser?.displayName, !display.isEmpty { return display }
+            if let email = Auth.auth().currentUser?.email, let prefix = email.split(separator: "@").first { return String(prefix) }
+            return "Student"
+        }()
+        return "\(base.randomElement() ?? "Hello"), \(name)"
     }
 }
 
