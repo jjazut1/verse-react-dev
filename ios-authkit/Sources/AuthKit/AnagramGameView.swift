@@ -51,7 +51,8 @@ public struct AnagramGameView: View {
 
     public var body: some View {
         ZStack {
-            LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemBackground), Color(UIColor.secondarySystemBackground)]), startPoint: .top, endPoint: .bottom)
+            // Light blue play surface
+            Color(red: 0.93, green: 0.96, blue: 1.0)
                 .ignoresSafeArea()
 
             ScrollView {
@@ -111,9 +112,6 @@ public struct AnagramGameView: View {
                             }
                             .padding(.vertical, 16)
                             .padding(.horizontal, 20)
-                            .background(RoundedRectangle(cornerRadius: 16).fill(Color(UIColor.systemBackground)))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.15)))
-                            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
                             .frame(maxWidth: 700)
                             Spacer(minLength: 0)
                         }
