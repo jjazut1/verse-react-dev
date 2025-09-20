@@ -116,18 +116,18 @@ public struct AssignmentsView: View {
             GamePresentationView(assignment: a)
         }
         // Bottom-left greeting overlay in landscape (compact vertical size class)
-        .overlay(alignment: .bottomLeading) {
+        .overlay(alignment: .bottomTrailing) {
             if isCompact {
                 HStack {
+                    Spacer(minLength: 0)
                     Text(greetingTitle)
                         .font(.callout.weight(.semibold))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(.ultraThinMaterial)
                         .cornerRadius(10)
-                    Spacer(minLength: 0)
                 }
-                .padding(.leading, 16)
+                .padding(.trailing, 16)
                 .padding(.bottom, tabBarInset() + 6)
             }
         }
