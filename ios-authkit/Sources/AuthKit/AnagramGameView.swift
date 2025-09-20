@@ -61,54 +61,59 @@ public struct AnagramGameView: View {
                     if let cfg = config, currentIndex < cfg.items.count {
                         let item = cfg.items[currentIndex]
 
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text(cfg.title)
-                                .font(.title3).bold()
-                                .padding(.horizontal, 4)
+                        HStack { // center container horizontally
+                            Spacer(minLength: 0)
+                            VStack(alignment: .leading, spacing: 14) {
+                                Text(cfg.title)
+                                    .font(.title3).bold()
+                                    .padding(.horizontal, 4)
 
-                            Text("Scrambled Letters").font(.caption).foregroundColor(.secondary)
-                            flowGrid(scrambled, fromScrambled: true)
+                                Text("Scrambled Letters").font(.caption).foregroundColor(.secondary)
+                                flowGrid(scrambled, fromScrambled: true)
 
-                            Text("Your Answer").font(.caption).foregroundColor(.secondary)
-                            flowGrid(answer, fromScrambled: false)
+                                Text("Your Answer").font(.caption).foregroundColor(.secondary)
+                                flowGrid(answer, fromScrambled: false)
 
-                            if cfg.showDefinitions, let def = item.definition, !def.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                DisclosureGroup(isExpanded: $showDefinition) {
-                                    definitionView(def)
-                                } label: {
-                                    Text("Definition").font(.subheadline).bold()
+                                if cfg.showDefinitions, let def = item.definition, !def.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    DisclosureGroup(isExpanded: $showDefinition) {
+                                        definitionView(def)
+                                    } label: {
+                                        Text("Definition").font(.subheadline).bold()
+                                    }
+                                    .padding(12)
+                                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.systemBackground)))
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2)))
                                 }
-                                .padding(12)
-                                .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.systemBackground)))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2)))
-                            }
 
-                            HStack(spacing: 12) {
-                                if cfg.showHints {
-                                    Button(showHint ? "Hint Shown" : "Show Hint") { showHint = true }
-                                        .buttonStyle(.bordered)
-                                        .disabled(showHint)
+                                HStack(spacing: 12) {
+                                    if cfg.showHints {
+                                        Button(showHint ? "Hint Shown" : "Show Hint") { showHint = true }
+                                            .buttonStyle(.bordered)
+                                            .disabled(showHint)
+                                    }
+                                    if cfg.enableTTS {
+                                        Button("Speak Word") { speak(item.original) }
+                                            .buttonStyle(.bordered)
+                                    }
+                                    Button("Reset") { resetWord() }
+                                        .buttonStyle(.borderedProminent)
                                 }
-                                if cfg.enableTTS {
-                                    Button("Speak Word") { speak(item.original) }
-                                        .buttonStyle(.bordered)
+
+                                if showHint {
+                                    Text("💡 First letter: \(item.original.first.map{String($0)} ?? "")")
+                                        .foregroundColor(.orange)
+                                        .font(.footnote)
                                 }
-                                Button("Reset") { resetWord() }
-                                    .buttonStyle(.borderedProminent)
-                            }
 
-                            if showHint {
-                                Text("💡 First letter: \(item.original.first.map{String($0)} ?? "")")
-                                    .foregroundColor(.orange)
-                                    .font(.footnote)
+                                Text("Misses: \(misses)").font(.footnote).foregroundColor(.secondary)
                             }
-
-                            Text("Misses: \(misses)").font(.footnote).foregroundColor(.secondary)
+                            .padding(16)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Color(UIColor.systemBackground)))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.15)))
+                            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+                            .frame(maxWidth: 700)
+                            Spacer(minLength: 0)
                         }
-                        .padding(16)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Color(UIColor.systemBackground)))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.15)))
-                        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
                     } else if config != nil {
                         VStack(spacing: 12) {
                             Image(systemName: "checkmark.seal.fill").foregroundColor(.green).font(.largeTitle)
@@ -164,20 +169,27 @@ public struct AnagramGameView: View {
 
     // MARK: - UI helpers
     private func flowGrid(_ letters: [String], fromScrambled: Bool) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+        GeometryReader { geo in
+            let count = max(letters.count, 1)
+            let spacing: CGFloat = 8
+            // Compute tile so that all letters fit in one line within available width
+            let tile = max(28, floor((geo.size.width - spacing * CGFloat(count - 1)) / CGFloat(count)))
+
+            HStack(spacing: spacing) {
                 ForEach(Array(letters.enumerated()), id: \.offset) { idx, ch in
                     let isEmpty = ch.isEmpty
                     Text(isEmpty ? " " : ch)
-                        .font(.title3).bold()
-                        .frame(width: 48, height: 48)
+                        .font(.system(size: tile * 0.42, weight: .bold))
+                        .frame(width: tile, height: tile)
                         .background(isEmpty ? Color.gray.opacity(0.15) : Color.white)
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(fromScrambled ? Color.blue.opacity(0.6) : Color.green.opacity(0.6), lineWidth: 2))
                         .cornerRadius(10)
                         .onTapGesture { tapLetter(index: idx, fromScrambled: fromScrambled) }
                 }
             }
+            .frame(width: geo.size.width, height: tile)
         }
+        .frame(height: 56) // reasonable default; actual height set inside based on tile
     }
 
     private func tapLetter(index: Int, fromScrambled: Bool) {
