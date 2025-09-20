@@ -44,8 +44,15 @@ public struct AssignmentsView: View {
                                         Image(systemName: "chevron.right").foregroundColor(.secondary)
                                     }
                                     .padding(12)
-                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                                    .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(.systemBackground))
+                                            .shadow(color: Color.black.opacity(0.12), radius: 14, x: 0, y: 8)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                                    )
                                 }
                             }
                         }
@@ -77,8 +84,15 @@ public struct AssignmentsView: View {
                                         Image(systemName: "chevron.right").foregroundColor(.secondary)
                                     }
                                     .padding(12)
-                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                                    .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(.systemBackground))
+                                            .shadow(color: Color.black.opacity(0.12), radius: 14, x: 0, y: 8)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                                    )
                                 }
                             }
                         }
