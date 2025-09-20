@@ -108,6 +108,21 @@ LuminateLearn is a comprehensive educational platform designed for K-12 teachers
 
 ## 🚀 Recent Enhancements (January 2025)
 
+### iOS Native App Direction (September 2025)
+
+We evaluated a hybrid approach (hosting React games inside an iOS `WKWebView` with a JavaScript bridge). We have now reverted that experiment and are moving to a native-only SwiftUI direction for the iOS app:
+
+- Web app remains unchanged and independent; no native bridge is required.
+- iOS uses Firebase Auth/Firestore and loads teacher-created configs directly.
+- Games will be ported to SwiftUI for best UX, offline support, and platform features.
+- Temporary placeholder screens exist for non‑ported games; assignments route to native implementations when available.
+
+Changes included in this repo:
+- Removed iOS bridge code from `src/pages/GameByToken.tsx` (no `LUMI_NATIVE` or `notifyNativeComplete`).
+- Kept all existing web flows (assignment tokens, attempts, high scores) untouched.
+
+If you previously added links with `native=ios`, they are harmless and can remain; they are ignored by the web app.
+
 ### **🎲 MAJOR MULTIPLAYER GAME SYSTEM** (January 2025 - Latest) ✨
 
 #### **🏆 NAME IT GAME - REAL-TIME MULTIPLAYER BREAKTHROUGH**
