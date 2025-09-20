@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseAuth
+import FirebaseFirestore
 
 public struct AssignmentsView: View {
     @State private var assignments: [Assignment] = []
@@ -91,7 +92,7 @@ public struct AssignmentsView: View {
         }
         .navigationTitle(greetingTitle)
         .navigationBarTitleDisplayMode(.large)
-        .onAppear { greetingTitle = makeGreeting() }
+        .onAppear { Task { await loadGreeting() } }
         .task { await load() }
         .refreshable { await load() }
         .fullScreenCover(item: $presented) { a in
@@ -162,6 +163,34 @@ public struct AssignmentsView: View {
             return "Student"
         }()
         return "\(base.randomElement() ?? "Hello"), \(name)"
+    }
+
+    private func loadGreeting() async {
+        let base: [String] = [
+            "Hello",
+            "Good Day",
+            "Welcome Back",
+            "Keep Going",
+            "Great to See You",
+            "You’ve Got This"
+        ]
+        let salutation = base.randomElement() ?? "Hello"
+        guard let email = Auth.auth().currentUser?.email else {
+            greetingTitle = makeGreeting()
+            return
+        }
+        let lower = email.lowercased()
+        do {
+            let db = Firestore.firestore()
+            let snap = try await db.collection("users").whereField("email", isEqualTo: lower).limit(to: 1).getDocuments()
+            if let doc = snap.documents.first, let name = doc.data()["name"] as? String, !name.isEmpty {
+                greetingTitle = "\(salutation), \(name)"
+                return
+            }
+        } catch {
+            // Fall back silently
+        }
+        greetingTitle = makeGreeting()
     }
 }
 
