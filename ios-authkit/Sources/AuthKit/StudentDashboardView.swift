@@ -23,6 +23,9 @@ public struct StudentDashboardView: View {
                     HighScoresMiniView()
                         .tabItem { Label("High Scores", systemImage: "trophy") }
                         .tag(2)
+                    NavigationView { AccountView() }
+                        .tabItem { Label("Account", systemImage: "person.crop.circle") }
+                        .tag(3)
                 }
                 .onAppear { configureTabBarAppearance() }
                 .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -60,6 +63,21 @@ public struct StudentEmailSignInView: View {
             _ = try await Auth.auth().signIn(withEmail: email.trimmingCharacters(in: .whitespaces), password: password)
             onSignedIn()
         } catch { self.error = error.localizedDescription }
+    }
+}
+
+// Lightweight Account placeholder – aligns with a dedicated tab in landscape
+public struct AccountView: View {
+    @State private var info: String? = nil
+    public init() {}
+    public var body: some View {
+        VStack(spacing: 12) {
+            Text("Account").font(.title2.bold())
+            if let info { Text(info).font(.footnote).foregroundColor(.secondary) }
+            Text("Profile and settings coming soon.")
+        }
+        .padding()
+        .navigationTitle("Account")
     }
 }
 
