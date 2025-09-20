@@ -58,6 +58,7 @@ public struct AssignmentsView: View {
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
+                        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 120) }
                     } else {
                         List {
                             if isLoading { ProgressView() }
@@ -98,6 +99,7 @@ public struct AssignmentsView: View {
                         }
                         .listStyle(.plain)
                         .background(Color.clear)
+                        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 120) }
                     }
             }
             .padding(.horizontal, 16)
