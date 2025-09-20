@@ -23,9 +23,7 @@ public struct StudentDashboardView: View {
                     HighScoresMiniView()
                         .tabItem { Label("High Scores", systemImage: "trophy") }
                         .tag(2)
-                    NavigationView { AccountView() }
-                        .tabItem { Label("Account", systemImage: "person.crop.circle") }
-                        .tag(3)
+                    // Removed Account tab per revert
                 }
                 .onAppear { configureTabBarAppearance() }
                 .ignoresSafeArea(.keyboard, edges: .bottom)

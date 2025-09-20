@@ -55,7 +55,7 @@ public struct AssignmentsView: View {
                                 .listRowSeparator(.hidden)
                             }
                         }
-                        .listStyle(.insetGrouped)
+                        .listStyle(.plain)
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
                         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: tabBarInset()) }
@@ -97,7 +97,7 @@ public struct AssignmentsView: View {
                                 .modifier(HideSeparatorIfAvailable())
                             }
                         }
-                        .listStyle(.insetGrouped)
+                        .listStyle(.plain)
                         .background(Color.clear)
                         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: tabBarInset()) }
                     }
