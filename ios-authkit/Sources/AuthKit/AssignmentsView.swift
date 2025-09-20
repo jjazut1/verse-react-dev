@@ -18,38 +18,74 @@ public struct AssignmentsView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 24)
                     .fill(Color(.systemGray6))
-                List {
-                    if isLoading { ProgressView() }
-                    if let error { Text(error).foregroundColor(.red) }
-                    ForEach(assignments) { a in
-                        Button { presented = a } label: {
-                            HStack(alignment: .center, spacing: 12) {
-                                Image(systemName: icon(for: a.gameType))
-                                    .foregroundColor(.blue)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(a.title).font(.headline)
-                                    HStack(spacing: 6) {
-                                        Text(a.gameType).font(.caption).foregroundColor(.secondary)
-                                        if let due = a.dueAt { Text("Due \(formatted(due))").font(.caption2).foregroundColor(.orange) }
+                Group {
+                    if #available(iOS 16.0, *) {
+                        List {
+                            if isLoading { ProgressView() }
+                            if let error { Text(error).foregroundColor(.red) }
+                            ForEach(assignments) { a in
+                                Button { presented = a } label: {
+                                    HStack(alignment: .center, spacing: 12) {
+                                        Image(systemName: icon(for: a.gameType))
+                                            .foregroundColor(.blue)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(a.title).font(.headline)
+                                            HStack(spacing: 6) {
+                                                Text(a.gameType).font(.caption).foregroundColor(.secondary)
+                                                if let due = a.dueAt { Text("Due \(formatted(due))").font(.caption2).foregroundColor(.orange) }
+                                            }
+                                            if let done = a.completedCount, let total = a.timesRequired, total > 0 {
+                                                ProgressView(value: Double(done), total: Double(total))
+                                                    .progressViewStyle(.linear)
+                                            }
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right").foregroundColor(.secondary)
                                     }
-                                    if let done = a.completedCount, let total = a.timesRequired, total > 0 {
-                                        ProgressView(value: Double(done), total: Double(total))
-                                            .progressViewStyle(.linear)
-                                    }
+                                    .padding(12)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                                    .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right").foregroundColor(.secondary)
                             }
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
+                    } else {
+                        List {
+                            if isLoading { ProgressView() }
+                            if let error { Text(error).foregroundColor(.red) }
+                            ForEach(assignments) { a in
+                                Button { presented = a } label: {
+                                    HStack(alignment: .center, spacing: 12) {
+                                        Image(systemName: icon(for: a.gameType))
+                                            .foregroundColor(.blue)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(a.title).font(.headline)
+                                            HStack(spacing: 6) {
+                                                Text(a.gameType).font(.caption).foregroundColor(.secondary)
+                                                if let due = a.dueAt { Text("Due \(formatted(due))").font(.caption2).foregroundColor(.orange) }
+                                            }
+                                            if let done = a.completedCount, let total = a.timesRequired, total > 0 {
+                                                ProgressView(value: Double(done), total: Double(total))
+                                                    .progressViewStyle(.linear)
+                                            }
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right").foregroundColor(.secondary)
+                                    }
+                                    .padding(12)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                                    .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
+                                }
+                            }
+                        }
+                        .listStyle(.plain)
+                        .background(Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
                     }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
             }
             .padding(.horizontal, 16)
         }
