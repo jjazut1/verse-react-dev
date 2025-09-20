@@ -1,17 +1,69 @@
 import SwiftUI
+import FirebaseAuth
 
 public struct StudentDashboardView: View {
     @State private var selectedTab = 0
     public init() {}
     public var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationView { AssignmentsView() }
-                .tabItem { Label("Assignments", systemImage: "list.bullet.rectangle") }
-                .tag(0)
-            HighScoresMiniView()
-                .tabItem { Label("High Scores", systemImage: "trophy") }
-                .tag(1)
+        Group {
+            if Auth.auth().currentUser == nil {
+                SignInView(onSignedIn: {})
+            } else {
+                TabView(selection: $selectedTab) {
+                    NavigationView { AssignmentsView() }
+                        .tabItem { Label("Assignments", systemImage: "list.bullet.rectangle") }
+                        .tag(0)
+                    NavigationView { PublicGamesView() }
+                        .tabItem { Label("Explore", systemImage: "gamecontroller") }
+                        .tag(1)
+                    HighScoresMiniView()
+                        .tabItem { Label("High Scores", systemImage: "trophy") }
+                        .tag(2)
+                }
+            }
         }
+    }
+}
+
+// Lightweight email sign-in page (separate view)
+public struct SignInView: View {
+    var onSignedIn: () -> Void
+    @State private var email = ""
+    @State private var password = ""
+    @State private var error: String?
+    public var body: some View {
+        VStack(spacing: 16) {
+            Text("Welcome").font(.largeTitle.bold())
+            if let error { Text(error).foregroundColor(.red) }
+            TextField("Email", text: $email)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .keyboardType(.emailAddress)
+                .padding(12).background(.white).cornerRadius(10)
+            SecureField("Password", text: $password)
+                .padding(12).background(.white).cornerRadius(10)
+            Button("Sign In") { Task { await signIn() } }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding()
+        .background(Color(red: 0.93, green: 0.96, blue: 1.0).ignoresSafeArea())
+    }
+    private func signIn() async {
+        do {
+            _ = try await Auth.auth().signIn(withEmail: email.trimmingCharacters(in: .whitespaces), password: password)
+            onSignedIn()
+        } catch { self.error = error.localizedDescription }
+    }
+}
+
+// Placeholder explore page for public games
+public struct PublicGamesView: View {
+    public init() {}
+    public var body: some View {
+        ScrollView { VStack(alignment: .leading, spacing: 12) { Text("Browse public games (coming soon)") } }
+            .padding()
+            .background(Color(red: 0.93, green: 0.96, blue: 1.0).ignoresSafeArea())
+            .navigationTitle("Explore")
     }
 }
 
