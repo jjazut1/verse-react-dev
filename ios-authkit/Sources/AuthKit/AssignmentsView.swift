@@ -5,6 +5,7 @@ public struct AssignmentsView: View {
     @State private var error: String?
     @State private var isLoading = false
     private let service = AssignmentService()
+    @State private var presented: Assignment?
 
     public init() {}
 
@@ -13,7 +14,9 @@ public struct AssignmentsView: View {
             if isLoading { ProgressView() }
             if let error { Text(error).foregroundColor(.red) }
             ForEach(assignments) { a in
-                NavigationLink(destination: destination(for: a)) {
+                Button {
+                    presented = a
+                } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(a.title).font(.headline)
                         Text(a.gameType).font(.caption).foregroundColor(.secondary)
@@ -24,16 +27,33 @@ public struct AssignmentsView: View {
         .navigationTitle("Assignments")
         .task { await load() }
         .refreshable { await load() }
+        .fullScreenCover(item: $presented) { a in
+            GamePresentationView(assignment: a)
+        }
     }
 
-    // Decide native vs web at tap time
-    private func destination(for a: Assignment) -> some View {
-        if a.gameType == "anagram", let configRef = a.configRef {
-            return AnyView(AnagramGameView(assignmentId: a.id, configRef: configRef))
-        } else if a.gameType == "place-value-showdown", let configRef = a.configRef {
-            return AnyView(PlaceValueShowdownGameView(assignmentId: a.id, configRef: configRef))
-        } else {
-            return AnyView(ComingSoonGameView(gameType: a.gameType))
+    // Full screen presenter
+    private struct GamePresentationView: View {
+        let assignment: Assignment
+        @Environment(\.dismiss) private var dismiss
+        var body: some View {
+            NavigationView {
+                Group {
+                    if assignment.gameType == "anagram", let ref = assignment.configRef {
+                        AnagramGameView(assignmentId: assignment.id, configRef: ref)
+                    } else if assignment.gameType == "place-value-showdown", let ref = assignment.configRef {
+                        PlaceValueShowdownGameView(assignmentId: assignment.id, configRef: ref)
+                    } else {
+                        ComingSoonGameView(gameType: assignment.gameType)
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { dismiss() }
+                    }
+                }
+            }
+            .navigationViewStyle(StackNavigationViewStyle())
         }
     }
 
