@@ -101,6 +101,10 @@ public struct AssignmentsView: View {
                     }
             }
             .padding(.horizontal, 16)
+            .safeAreaInset(edge: .bottom) {
+                // Spacer to prevent bottom tab bar overlapping the last assignment row (landscape)
+                Color.clear.frame(height: 110)
+            }
         }
         .navigationTitle(greetingTitle)
         .navigationBarTitleDisplayMode(.large)
