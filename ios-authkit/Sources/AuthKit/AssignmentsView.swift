@@ -12,6 +12,8 @@ public struct AssignmentsView: View {
     public init() {}
 
     @State private var greetingTitle: String = "Assignments"
+    @Environment(\.verticalSizeClass) private var vSize
+    private var isCompact: Bool { vSize == .compact }
 
     public var body: some View {
         VStack(spacing: 12) {
@@ -105,13 +107,29 @@ public struct AssignmentsView: View {
             .padding(.horizontal, 16)
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 0) }
         }
-        .navigationTitle(greetingTitle)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationTitle(isCompact ? "" : greetingTitle)
+        .navigationBarTitleDisplayMode(isCompact ? .inline : .large)
         .onAppear { Task { await loadGreeting() } }
         .task { await load() }
         .refreshable { await load() }
         .fullScreenCover(item: $presented) { a in
             GamePresentationView(assignment: a)
+        }
+        // Bottom-left greeting overlay in landscape (compact vertical size class)
+        .overlay(alignment: .bottomLeading) {
+            if isCompact {
+                HStack {
+                    Text(greetingTitle)
+                        .font(.callout.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(10)
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, 16)
+                .padding(.bottom, tabBarInset() + 6)
+            }
         }
     }
 
