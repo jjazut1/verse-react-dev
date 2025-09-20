@@ -15,7 +15,8 @@ struct AnagramConfigModel {
     let items: [Item]
 
     static func from(dict: [String: Any]) -> AnagramConfigModel? {
-        guard let type = dict["type"] as? String, type == "anagram" else { return nil }
+        // Be permissive: if type exists and is not anagram, bail; otherwise proceed
+        if let type = dict["type"] as? String, type != "anagram" { return nil }
         let title = (dict["title"] as? String) ?? "Anagram"
         let showHints = (dict["enableHints"] as? Bool) ?? (dict["showHints"] as? Bool ?? true)
         let showDefinitions = (dict["showDefinitions"] as? Bool) ?? false
@@ -75,9 +76,9 @@ public struct AnagramGameView: View {
                                 Text("Your Answer").font(.caption).foregroundColor(.secondary)
                                 flowGrid(answer, fromScrambled: false)
 
-                                if cfg.showDefinitions, let def = item.definition, !def.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            if cfg.showDefinitions, let def = item.definition, !def.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                     DisclosureGroup(isExpanded: $showDefinition) {
-                                        definitionView(def)
+                                    definitionView(def)
                                     } label: {
                                         Text("Definition").font(.subheadline).bold()
                                     }
@@ -248,15 +249,19 @@ public struct AnagramGameView: View {
     }
 
     private func definitionView(_ html: String) -> some View {
-        let attributed: AttributedString = {
-            if let data = html.data(using: .utf8),
-               let ns = try? NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.html], documentAttributes: nil) {
-                return AttributedString(ns)
-            }
-            return AttributedString(html)
-        }()
-        return Text(attributed).font(.callout)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        // Some definitions may already be plain text without HTML tags
+        if html.range(of: "<[^>]+>", options: .regularExpression) == nil {
+            return AnyView(Text(html).font(.callout).frame(maxWidth: .infinity, alignment: .leading))
+        }
+
+        if let data = html.data(using: .utf8),
+           let ns = try? NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.html,
+                                                                .characterEncoding: String.Encoding.utf8.rawValue],
+                                           documentAttributes: nil) {
+            let attributed = AttributedString(ns)
+            return AnyView(Text(attributed).font(.callout).frame(maxWidth: .infinity, alignment: .leading))
+        }
+        return AnyView(Text(html).font(.callout).frame(maxWidth: .infinity, alignment: .leading))
     }
 
     private func speak(_ text: String) {
