@@ -15,11 +15,8 @@ public struct AssignmentsView: View {
 
     public var body: some View {
         VStack(spacing: 12) {
-            // Navigation title is provided by the parent NavigationView
-            ZStack {
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(Color(.systemGray6))
-                Group {
+            // List of assignments
+            Group {
                     if #available(iOS 16.0, *) {
                         List {
                             if isLoading { ProgressView() }
@@ -54,12 +51,13 @@ public struct AssignmentsView: View {
                                             .stroke(Color.black.opacity(0.06), lineWidth: 1)
                                     )
                                 }
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                             }
                         }
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
                     } else {
                         List {
                             if isLoading { ProgressView() }
@@ -94,13 +92,13 @@ public struct AssignmentsView: View {
                                             .stroke(Color.black.opacity(0.06), lineWidth: 1)
                                     )
                                 }
+                                .listRowBackground(Color.clear)
+                                .modifier(HideSeparatorIfAvailable())
                             }
                         }
                         .listStyle(.plain)
                         .background(Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
                     }
-                }
             }
             .padding(.horizontal, 16)
         }
@@ -223,6 +221,17 @@ public struct AssignmentsView: View {
     private func cardFill(for a: Assignment) -> Color {
         if isOverdue(a) { return Color(red: 1.0, green: 0.95, blue: 0.95) }
         return Color(.systemBackground)
+    }
+
+    // iOS 15 fallback to hide separators
+    private struct HideSeparatorIfAvailable: ViewModifier {
+        func body(content: Content) -> some View {
+            if #available(iOS 16.0, *) {
+                content.listRowSeparator(.hidden)
+            } else {
+                content
+            }
+        }
     }
 }
 
