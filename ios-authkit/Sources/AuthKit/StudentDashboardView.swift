@@ -20,6 +20,7 @@ public struct StudentDashboardView: View {
                         .tabItem { Label("High Scores", systemImage: "trophy") }
                         .tag(2)
                 }
+                .onAppear { configureTabBarForLandscapeStickiness() }
             }
         }
     }
@@ -53,6 +54,18 @@ public struct StudentEmailSignInView: View {
             _ = try await Auth.auth().signIn(withEmail: email.trimmingCharacters(in: .whitespaces), password: password)
             onSignedIn()
         } catch { self.error = error.localizedDescription }
+    }
+}
+
+// MARK: - UITabBar appearance (stick to bottom in landscape)
+import UIKit
+private func configureTabBarForLandscapeStickiness() {
+    let appearance = UITabBarAppearance()
+    appearance.configureWithOpaqueBackground()
+    appearance.backgroundColor = UIColor.systemBackground
+    UITabBar.appearance().standardAppearance = appearance
+    if #available(iOS 15.0, *) {
+        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
 }
 
