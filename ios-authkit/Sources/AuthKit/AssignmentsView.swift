@@ -13,7 +13,7 @@ public struct AssignmentsView: View {
         List {
             if isLoading { ProgressView() }
             if let error { Text(error).foregroundColor(.red) }
-            Section(header: Text("Assignments").font(.largeTitle.bold()).padding(.vertical, 8)) {
+            Section(header: EmptyView()) {
                 ForEach(assignments) { a in
                     Button { presented = a } label: {
                         HStack(alignment: .center, spacing: 12) {
@@ -21,14 +21,23 @@ public struct AssignmentsView: View {
                                 .foregroundColor(.blue)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(a.title).font(.headline)
-                                Text(a.gameType).font(.caption).foregroundColor(.secondary)
+                                HStack(spacing: 6) {
+                                    Text(a.gameType).font(.caption).foregroundColor(.secondary)
+                                    if let due = a.dueAt {
+                                        Text("Due \(formatted(due))").font(.caption2).foregroundColor(.orange)
+                                    }
+                                }
+                                if let done = a.completedCount, let total = a.timesRequired, total > 0 {
+                                    ProgressView(value: Double(done), total: Double(total))
+                                        .progressViewStyle(.linear)
+                                }
                             }
                             Spacer()
                             Image(systemName: "chevron.right").foregroundColor(.secondary)
                         }
                         .padding(12)
                         .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
                     }
                 }
             }
@@ -74,6 +83,12 @@ public struct AssignmentsView: View {
         case "spinner-wheel": return "dial.max"
         default: return "gamecontroller"
         }
+    }
+
+    private func formatted(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.dateStyle = .medium
+        return df.string(from: date)
     }
 
     private func load() async {
