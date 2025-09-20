@@ -10,17 +10,23 @@ public struct StudentDashboardView: View {
                 StudentEmailSignInView(onSignedIn: {})
             } else {
                 TabView(selection: $selectedTab) {
-                    NavigationView { AssignmentsView() }
-                        .tabItem { Label("Assignments", systemImage: "list.bullet.rectangle") }
-                        .tag(0)
-                    NavigationView { PublicGamesView() }
-                        .tabItem { Label("Explore", systemImage: "gamecontroller") }
-                        .tag(1)
+                    NavigationView {
+                        AssignmentsView()
+                    }
+                    .tabItem { Label("Assignments", systemImage: "list.bullet.rectangle") }
+                    .tag(0)
+                    NavigationView {
+                        PublicGamesView()
+                    }
+                    .tabItem { Label("Explore", systemImage: "gamecontroller") }
+                    .tag(1)
                     HighScoresMiniView()
                         .tabItem { Label("High Scores", systemImage: "trophy") }
                         .tag(2)
                 }
-                .onAppear { configureTabBarForLandscapeStickiness() }
+                .onAppear { configureTabBarAppearance() }
+                .ignoresSafeArea(.keyboard, edges: .bottom)
+                .modifier(TabBarBackgroundVisible())
             }
         }
     }
@@ -57,15 +63,26 @@ public struct StudentEmailSignInView: View {
     }
 }
 
-// MARK: - UITabBar appearance (stick to bottom in landscape)
+// MARK: - Tab bar appearance helpers
 import UIKit
-private func configureTabBarForLandscapeStickiness() {
+private func configureTabBarAppearance() {
     let appearance = UITabBarAppearance()
     appearance.configureWithOpaqueBackground()
     appearance.backgroundColor = UIColor.systemBackground
+    UITabBar.appearance().isTranslucent = false
     UITabBar.appearance().standardAppearance = appearance
     if #available(iOS 15.0, *) {
         UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+}
+
+private struct TabBarBackgroundVisible: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content.toolbarBackground(.visible, for: .tabBar)
+        } else {
+            content
+        }
     }
 }
 
@@ -75,7 +92,7 @@ public struct PublicGamesView: View {
     public var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 12) { Text("Browse public games (coming soon)") } }
             .padding()
-            .background(Color(red: 0.93, green: 0.96, blue: 1.0).ignoresSafeArea())
+            .background(Color(red: 0.93, green: 0.96, blue: 1.0))
             .navigationTitle("Explore")
     }
 }
@@ -129,5 +146,4 @@ struct HighScoresMiniView: View {
         catch let e { errorMessage = e.localizedDescription }
     }
 }
-
 

@@ -58,7 +58,7 @@ public struct AssignmentsView: View {
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
-                        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 120) }
+                        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: tabBarInset()) }
                     } else {
                         List {
                             if isLoading { ProgressView() }
@@ -99,14 +99,11 @@ public struct AssignmentsView: View {
                         }
                         .listStyle(.plain)
                         .background(Color.clear)
-                        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 120) }
+                        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: tabBarInset()) }
                     }
             }
             .padding(.horizontal, 16)
-            .safeAreaInset(edge: .bottom) {
-                // Spacer to prevent bottom tab bar overlapping the last assignment row (landscape)
-                Color.clear.frame(height: 110)
-            }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 0) }
         }
         .navigationTitle(greetingTitle)
         .navigationBarTitleDisplayMode(.large)
@@ -238,6 +235,21 @@ public struct AssignmentsView: View {
                 content
             }
         }
+    }
+    // Dynamic inset sized for tab bar in both portrait/landscape and devices
+    private func tabBarInset() -> CGFloat {
+        #if os(iOS)
+        let window = UIApplication.shared
+            .connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.keyWindow
+        let bottomSafe = window?.safeAreaInsets.bottom ?? 0
+        let isLandscape = UIDevice.current.orientation.isValidInterfaceOrientation ? UIDevice.current.orientation.isLandscape : (UIScreen.main.bounds.width > UIScreen.main.bounds.height)
+        let likelyTabBar: CGFloat = isLandscape ? 54 : 88
+        return likelyTabBar + bottomSafe + 8
+        #else
+        return 100
+        #endif
     }
 }
 
