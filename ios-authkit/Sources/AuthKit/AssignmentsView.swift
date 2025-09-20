@@ -10,37 +10,45 @@ public struct AssignmentsView: View {
     public init() {}
 
     public var body: some View {
-        List {
-            if isLoading { ProgressView() }
-            if let error { Text(error).foregroundColor(.red) }
-            Section(header: EmptyView()) {
-                ForEach(assignments) { a in
-                    Button { presented = a } label: {
-                        HStack(alignment: .center, spacing: 12) {
-                            Image(systemName: icon(for: a.gameType))
-                                .foregroundColor(.blue)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(a.title).font(.headline)
-                                HStack(spacing: 6) {
-                                    Text(a.gameType).font(.caption).foregroundColor(.secondary)
-                                    if let due = a.dueAt {
-                                        Text("Due \(formatted(due))").font(.caption2).foregroundColor(.orange)
+        VStack(spacing: 12) {
+            // Navigation title is provided by the parent NavigationView
+            ZStack {
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color(.systemGray6))
+                List {
+                    if isLoading { ProgressView() }
+                    if let error { Text(error).foregroundColor(.red) }
+                    ForEach(assignments) { a in
+                        Button { presented = a } label: {
+                            HStack(alignment: .center, spacing: 12) {
+                                Image(systemName: icon(for: a.gameType))
+                                    .foregroundColor(.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(a.title).font(.headline)
+                                    HStack(spacing: 6) {
+                                        Text(a.gameType).font(.caption).foregroundColor(.secondary)
+                                        if let due = a.dueAt { Text("Due \(formatted(due))").font(.caption2).foregroundColor(.orange) }
+                                    }
+                                    if let done = a.completedCount, let total = a.timesRequired, total > 0 {
+                                        ProgressView(value: Double(done), total: Double(total))
+                                            .progressViewStyle(.linear)
                                     }
                                 }
-                                if let done = a.completedCount, let total = a.timesRequired, total > 0 {
-                                    ProgressView(value: Double(done), total: Double(total))
-                                        .progressViewStyle(.linear)
-                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundColor(.secondary)
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right").foregroundColor(.secondary)
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
                         }
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-                        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 24))
             }
+            .padding(.horizontal, 16)
         }
         .navigationTitle("Assignments")
         .task { await load() }
