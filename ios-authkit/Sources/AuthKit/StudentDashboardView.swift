@@ -7,7 +7,7 @@ public struct StudentDashboardView: View {
     public var body: some View {
         Group {
             if Auth.auth().currentUser == nil {
-                SignInView(onSignedIn: {})
+                StudentEmailSignInView(onSignedIn: {})
             } else {
                 TabView(selection: $selectedTab) {
                     NavigationView { AssignmentsView() }
@@ -26,7 +26,7 @@ public struct StudentDashboardView: View {
 }
 
 // Lightweight email sign-in page (separate view)
-public struct SignInView: View {
+public struct StudentEmailSignInView: View {
     var onSignedIn: () -> Void
     @State private var email = ""
     @State private var password = ""
