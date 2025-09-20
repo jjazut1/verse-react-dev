@@ -1,4 +1,4 @@
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
@@ -778,6 +778,42 @@ export const processAdminTask = onDocumentCreated({
       error: error?.message || String(error),
       processedAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+  }
+});
+
+// Cascade delete attempts when an assignment is deleted
+export const deleteAttemptsOnAssignmentDelete = onDocumentDeleted({
+  document: 'assignments/{assignmentId}'
+}, async (event) => {
+  const db = admin.firestore();
+  const assignmentId = event.params.assignmentId;
+  try {
+    const snap = await db.collection('attempts').where('assignmentId', '==', assignmentId).get();
+    if (snap.empty) return;
+    const writer = db.bulkWriter();
+    snap.forEach((d) => writer.delete(d.ref));
+    await writer.close();
+    logger.info(`Cascade deleted ${snap.size} attempts for assignment ${assignmentId}`);
+  } catch (e) {
+    logger.error('deleteAttemptsOnAssignmentDelete error', e);
+  }
+});
+
+// Cascade delete high scores when a user game configuration is deleted
+export const deleteHighScoresOnConfigDelete = onDocumentDeleted({
+  document: 'userGameConfigs/{configId}'
+}, async (event) => {
+  const db = admin.firestore();
+  const configId = event.params.configId;
+  try {
+    const snap = await db.collection('highScores').where('configId', '==', configId).get();
+    if (snap.empty) return;
+    const writer = db.bulkWriter();
+    snap.forEach((d) => writer.delete(d.ref));
+    await writer.close();
+    logger.info(`Cascade deleted ${snap.size} highScores for config ${configId}`);
+  } catch (e) {
+    logger.error('deleteHighScoresOnConfigDelete error', e);
   }
 });
 

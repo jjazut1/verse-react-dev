@@ -386,6 +386,44 @@ service cloud.firestore {
          resource.data.teacherId == request.auth.uid &&
          request.resource.data.teacherId == request.auth.uid);
     }
+
+    // Per-user assignments (student-facing list and status updates)
+    match /users/{userId}/assignments/{assignmentId} {
+      // Students can read their own assignments
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+
+      // Teachers/Admins can create assignments for students
+      allow create: if isTeacherOrAdmin() && request.resource.data.userId == userId;
+
+      // Students can only update limited status fields on their own docs
+      allow update: if isAuthenticated() &&
+        request.auth.uid == userId &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'lastCompletedAt', 'completedCount']);
+
+      // Teachers/Admins can update/delete
+      allow update, delete: if isTeacherOrAdmin();
+    }
+
+    // Per-user game results (student writes; teacher/admin reads elsewhere)
+    match /users/{userId}/results/{resultId} {
+      // Students can create/update their own results
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+
+      // Students can read their own results
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+
+      // Teachers/Admins can read results for dashboards via aggregated collections (not here)
+    }
+
+    // Guest session logs (anonymous users only)
+    match /guestSessions/{uid}/{sessionId} {
+      allow create, update, read: if isAuthenticated() &&
+        request.auth.uid == uid &&
+        request.auth.token.firebase != null &&
+        request.auth.token.firebase.sign_in_provider == 'anonymous';
+      allow delete: if false;
+    }
     
     // Sort Categories Egg collection
     match /sortCategoriesEgg/{configId} {

@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { updateAssignment, createAttempt, getAssignmentByToken } from '../services/assignmentService';
 import { getDoc, doc, Timestamp, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { useAuth } from '../contexts/AuthContext';
-import { usePWA } from '../hooks/usePWA';
+// import { useAuth } from '../contexts/AuthContext';
+// import { usePWA } from '../hooks/usePWA';
 import { usePWANavigation } from '../hooks/usePWANavigation';
 import { usePWAMessageAck } from '../hooks/usePWAMessageAck';
 import { useSinglePWAWindow } from '../hooks/useSinglePWAWindow';
-import { Assignment } from '../types';
-import LoadingSpinner from '../components/LoadingSpinner';
+// import { Assignment } from '../types';
+// import LoadingSpinner from '../components/LoadingSpinner';
 
 // Game components (import as needed)
 import SentenceSenseAdapter from '../components/games/sentence-sense/SentenceSenseAdapter';
@@ -37,9 +37,9 @@ const GameByToken: React.FC<Props> = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || '';
   const navigate = useNavigate();
-  const location = useLocation();
-  const { currentUser: authContextUser } = useAuth(); // Rename to avoid conflict
-  const { isInstalled } = usePWA(); // Add PWA detection
+  // const location = useLocation();
+  // const { currentUser: authContextUser } = useAuth(); // Rename to avoid conflict
+  // const { isInstalled } = usePWA(); // Add PWA detection
   
   // Special flag for email link access which skips authentication
   const [isEmailLinkAccess, setIsEmailLinkAccess] = useState(false);
@@ -52,7 +52,7 @@ const GameByToken: React.FC<Props> = () => {
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studentName, setStudentName] = useState('');
-  const [studentNameSubmitted, setStudentNameSubmitted] = useState(true);
+  const [, setStudentNameSubmitted] = useState(true);
   const [saveError, setSaveError] = useState<string | null>(null);
   
   // Authentication state
@@ -64,13 +64,13 @@ const GameByToken: React.FC<Props> = () => {
   const [showAuthForm, setShowAuthForm] = useState(false);
   
   // ✅ AUTH STABILITY: Prevent auth changes from unmounting game during play
-  const [stableUserForGame, setStableUserForGame] = useState<any>(null);
+  const [, setStableUserForGame] = useState<any>(null);
   const [authLocked, setAuthLocked] = useState(false);
   
   // Add a state to track if reload is needed after high score modal
-  const [pendingReload, setPendingReload] = useState(false);
+  const [, setPendingReload] = useState(false);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
-  const [isHighScoreProcessing, setIsHighScoreProcessing] = useState(false);
+  const [, setIsHighScoreProcessing] = useState(false);
   
   // ✅ DEBUGGING: Track state changes that could cause unmount/remount
   useEffect(() => {
@@ -1058,8 +1058,6 @@ const GameByToken: React.FC<Props> = () => {
               config={gameConfig}
               onGameComplete={handleGameComplete}
               playerName={studentName}
-              onHighScoreProcessStart={handleHighScoreProcessStart}
-              onHighScoreProcessComplete={handleHighScoreProcessComplete}
             />
           );
         case 'whack-a-mole':
@@ -1105,8 +1103,6 @@ const GameByToken: React.FC<Props> = () => {
               config={gameConfig}
               onGameComplete={handleGameComplete}
               playerName={studentName}
-              onHighScoreProcessStart={handleHighScoreProcessStart}
-              onHighScoreProcessComplete={handleHighScoreProcessComplete}
             />
           );
         case 'word-volley':

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.backfillSchemaVersion = exports.cleanupOldCategoryGenDocs = exports.generateCategoryItems = exports.processCategoryGenRequest = exports.processTTSRequest = exports.processAdminTask = exports.getAssignmentManifest = exports.fixStudentPasswordFlag = exports.checkStudentPasswordStatus = exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.OPENAI_API_KEY = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
+exports.backfillSchemaVersion = exports.cleanupOldCategoryGenDocs = exports.generateCategoryItems = exports.processCategoryGenRequest = exports.processTTSRequest = exports.deleteHighScoresOnConfigDelete = exports.deleteAttemptsOnAssignmentDelete = exports.processAdminTask = exports.getAssignmentManifest = exports.fixStudentPasswordFlag = exports.checkStudentPasswordStatus = exports.processEmailLinkAuth = exports.authenticateEmailLinkUser = exports.sendPasswordSetupEmail = exports.sendAssignmentEmail = exports.OPENAI_API_KEY = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.APP_URL = exports.SENDER_EMAIL = exports.SENDGRID_API_KEY = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
@@ -681,6 +681,44 @@ exports.processAdminTask = (0, firestore_1.onDocumentCreated)({
             error: (error === null || error === void 0 ? void 0 : error.message) || String(error),
             processedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+    }
+});
+// Cascade delete attempts when an assignment is deleted
+exports.deleteAttemptsOnAssignmentDelete = (0, firestore_1.onDocumentDeleted)({
+    document: 'assignments/{assignmentId}'
+}, async (event) => {
+    const db = admin.firestore();
+    const assignmentId = event.params.assignmentId;
+    try {
+        const snap = await db.collection('attempts').where('assignmentId', '==', assignmentId).get();
+        if (snap.empty)
+            return;
+        const writer = db.bulkWriter();
+        snap.forEach((d) => writer.delete(d.ref));
+        await writer.close();
+        firebase_functions_1.logger.info(`Cascade deleted ${snap.size} attempts for assignment ${assignmentId}`);
+    }
+    catch (e) {
+        firebase_functions_1.logger.error('deleteAttemptsOnAssignmentDelete error', e);
+    }
+});
+// Cascade delete high scores when a user game configuration is deleted
+exports.deleteHighScoresOnConfigDelete = (0, firestore_1.onDocumentDeleted)({
+    document: 'userGameConfigs/{configId}'
+}, async (event) => {
+    const db = admin.firestore();
+    const configId = event.params.configId;
+    try {
+        const snap = await db.collection('highScores').where('configId', '==', configId).get();
+        if (snap.empty)
+            return;
+        const writer = db.bulkWriter();
+        snap.forEach((d) => writer.delete(d.ref));
+        await writer.close();
+        firebase_functions_1.logger.info(`Cascade deleted ${snap.size} highScores for config ${configId}`);
+    }
+    catch (e) {
+        firebase_functions_1.logger.error('deleteHighScoresOnConfigDelete error', e);
     }
 });
 // Text-to-Speech function using Amazon Polly - Firestore Trigger (No CORS issues)
