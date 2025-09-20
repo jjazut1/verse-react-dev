@@ -245,8 +245,9 @@ public struct AssignmentsView: View {
             .first?.keyWindow
         let bottomSafe = window?.safeAreaInsets.bottom ?? 0
         let isLandscape = UIDevice.current.orientation.isValidInterfaceOrientation ? UIDevice.current.orientation.isLandscape : (UIScreen.main.bounds.width > UIScreen.main.bounds.height)
-        let likelyTabBar: CGFloat = isLandscape ? 54 : 88
-        return likelyTabBar + bottomSafe + 8
+        // Reduced spacer: ~44 in landscape, ~54 in portrait (+ safe area + small padding)
+        let likelyTabBar: CGFloat = isLandscape ? 44 : 54
+        return likelyTabBar + bottomSafe + 6
         #else
         return 100
         #endif
