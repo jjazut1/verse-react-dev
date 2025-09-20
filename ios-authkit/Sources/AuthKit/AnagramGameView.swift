@@ -107,7 +107,8 @@ public struct AnagramGameView: View {
 
                                 Text("Misses: \(misses)").font(.footnote).foregroundColor(.secondary)
                             }
-                            .padding(16)
+                            .padding(.vertical, 16)
+                            .padding(.horizontal, 20)
                             .background(RoundedRectangle(cornerRadius: 16).fill(Color(UIColor.systemBackground)))
                             .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.15)))
                             .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
@@ -173,7 +174,10 @@ public struct AnagramGameView: View {
             let count = max(letters.count, 1)
             let spacing: CGFloat = 8
             // Compute tile so that all letters fit in one line within available width
-            let tile = max(28, floor((geo.size.width - spacing * CGFloat(count - 1)) / CGFloat(count)))
+            let widthTile = floor((geo.size.width - spacing * CGFloat(count - 1)) / CGFloat(count))
+            let minTile: CGFloat = 28
+            let maxTile: CGFloat = 64 // cap to preserve vertical padding on tall screens
+            let tile = max(minTile, min(widthTile, maxTile))
 
             HStack(spacing: spacing) {
                 ForEach(Array(letters.enumerated()), id: \.offset) { idx, ch in
@@ -189,7 +193,7 @@ public struct AnagramGameView: View {
             }
             .frame(width: geo.size.width, height: tile)
         }
-        .frame(height: 56) // reasonable default; actual height set inside based on tile
+        .frame(minHeight: 40)
     }
 
     private func tapLetter(index: Int, fromScrambled: Bool) {
