@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 // Minimal Swift anagram game based on userGameConfigs schema
 struct AnagramConfigModel {
@@ -9,6 +10,7 @@ struct AnagramConfigModel {
     }
     let title: String
     let showHints: Bool
+    let showDefinitions: Bool
     let enableTTS: Bool
     let items: [Item]
 
@@ -16,13 +18,14 @@ struct AnagramConfigModel {
         guard let type = dict["type"] as? String, type == "anagram" else { return nil }
         let title = (dict["title"] as? String) ?? "Anagram"
         let showHints = (dict["enableHints"] as? Bool) ?? (dict["showHints"] as? Bool ?? true)
+        let showDefinitions = (dict["showDefinitions"] as? Bool) ?? false
         let enableTTS = (dict["enableTextToSpeech"] as? Bool) ?? true
         let arr = (dict["anagrams"] as? [[String: Any]] ?? []).map { m in
             Item(id: (m["id"] as? String) ?? UUID().uuidString,
                  original: (m["original"] as? String) ?? "",
                  definition: m["definition"] as? String)
         }.filter { !$0.original.isEmpty }
-        return AnagramConfigModel(title: title, showHints: showHints, enableTTS: enableTTS, items: arr)
+        return AnagramConfigModel(title: title, showHints: showHints, showDefinitions: showDefinitions, enableTTS: enableTTS, items: arr)
     }
 }
 
@@ -36,8 +39,10 @@ public struct AnagramGameView: View {
     @State private var answer: [String] = []
     @State private var misses: Int = 0
     @State private var showHint = false
+    @State private var showDefinition = false
     private let configService = UserGameConfigService()
     private let resultsService = ResultsService()
+    private let speechSynth = AVSpeechSynthesizer()
 
     public init(assignmentId: String, configRef: String) {
         self.assignmentId = assignmentId
@@ -45,36 +50,81 @@ public struct AnagramGameView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 16) {
-            Text(config?.title ?? "Anagram").font(.title2).bold()
-            if let error { Text(error).foregroundColor(.red) }
+        ZStack {
+            LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemBackground), Color(UIColor.secondarySystemBackground)]), startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
 
-            if let cfg = config, currentIndex < cfg.items.count {
-                let item = cfg.items[currentIndex]
-                VStack(spacing: 12) {
-                    Text("Scrambled Letters").font(.caption).foregroundColor(.secondary)
-                    flowGrid(scrambled, fromScrambled: true)
-                    Text("Your Answer").font(.caption).foregroundColor(.secondary)
-                    flowGrid(answer, fromScrambled: false)
-                    HStack(spacing: 12) {
-                        if cfg.showHints { Button(showHint ? "Hint Shown" : "Show Hint") { showHint = true } .disabled(showHint) }
-                        Button("Reset") { resetWord() }
+            ScrollView {
+                VStack(spacing: 20) {
+                    if let error { Text(error).foregroundColor(.red) }
+
+                    if let cfg = config, currentIndex < cfg.items.count {
+                        let item = cfg.items[currentIndex]
+
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text(cfg.title)
+                                .font(.title3).bold()
+                                .padding(.horizontal, 4)
+
+                            Text("Scrambled Letters").font(.caption).foregroundColor(.secondary)
+                            flowGrid(scrambled, fromScrambled: true)
+
+                            Text("Your Answer").font(.caption).foregroundColor(.secondary)
+                            flowGrid(answer, fromScrambled: false)
+
+                            if cfg.showDefinitions, let def = item.definition, !def.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                DisclosureGroup(isExpanded: $showDefinition) {
+                                    definitionView(def)
+                                } label: {
+                                    Text("Definition").font(.subheadline).bold()
+                                }
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.systemBackground)))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2)))
+                            }
+
+                            HStack(spacing: 12) {
+                                if cfg.showHints {
+                                    Button(showHint ? "Hint Shown" : "Show Hint") { showHint = true }
+                                        .buttonStyle(.bordered)
+                                        .disabled(showHint)
+                                }
+                                if cfg.enableTTS {
+                                    Button("Speak Word") { speak(item.original) }
+                                        .buttonStyle(.bordered)
+                                }
+                                Button("Reset") { resetWord() }
+                                    .buttonStyle(.borderedProminent)
+                            }
+
+                            if showHint {
+                                Text("💡 First letter: \(item.original.first.map{String($0)} ?? "")")
+                                    .foregroundColor(.orange)
+                                    .font(.footnote)
+                            }
+
+                            Text("Misses: \(misses)").font(.footnote).foregroundColor(.secondary)
+                        }
+                        .padding(16)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color(UIColor.systemBackground)))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.15)))
+                        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+                    } else if config != nil {
+                        VStack(spacing: 12) {
+                            Image(systemName: "checkmark.seal.fill").foregroundColor(.green).font(.largeTitle)
+                            Text("Great job! Saving your result...")
+                        }
+                        .padding(.top, 40)
+                    } else {
+                        ProgressView().padding(.top, 40)
                     }
-                    if showHint { Text("First letter: \(item.original.first.map{String($0)} ?? "")").foregroundColor(.orange) }
-                    Text("Misses: \(misses)").font(.footnote).foregroundColor(.secondary)
                 }
-            } else if config != nil {
-                VStack(spacing: 12) {
-                    Image(systemName: "checkmark.seal.fill").foregroundColor(.green).font(.largeTitle)
-                    Text("Great job! Saving your result...")
-                }
-            } else {
-                ProgressView()
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
             }
-            Spacer()
         }
-        .padding()
         .navigationTitle("Anagram")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await loadConfig() }
     }
 
@@ -120,10 +170,10 @@ public struct AnagramGameView: View {
                     let isEmpty = ch.isEmpty
                     Text(isEmpty ? " " : ch)
                         .font(.title3).bold()
-                        .frame(width: 44, height: 44)
+                        .frame(width: 48, height: 48)
                         .background(isEmpty ? Color.gray.opacity(0.15) : Color.white)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(fromScrambled ? Color.blue.opacity(0.6) : Color.green.opacity(0.6), lineWidth: 2))
-                        .cornerRadius(6)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(fromScrambled ? Color.blue.opacity(0.6) : Color.green.opacity(0.6), lineWidth: 2))
+                        .cornerRadius(10)
                         .onTapGesture { tapLetter(index: idx, fromScrambled: fromScrambled) }
                 }
             }
@@ -180,6 +230,27 @@ public struct AnagramGameView: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    private func definitionView(_ html: String) -> some View {
+        let attributed: AttributedString = {
+            if let data = html.data(using: .utf8),
+               let ns = try? NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.html], documentAttributes: nil) {
+                return AttributedString(ns)
+            }
+            return AttributedString(html)
+        }()
+        return Text(attributed).font(.callout)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func speak(_ text: String) {
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.rate = 0.45
+        utterance.pitchMultiplier = 1.0
+        utterance.volume = 0.9
+        speechSynth.stopSpeaking(at: .immediate)
+        speechSynth.speak(utterance)
     }
 }
 
