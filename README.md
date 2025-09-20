@@ -123,6 +123,33 @@ Changes included in this repo:
 
 If you previously added links with `native=ios`, they are harmless and can remain; they are ignored by the web app.
 
+#### iOS Native Game Port Roadmap
+
+- Phase 1 (Now)
+  - Anagram (complete): fully native SwiftUI implementation.
+  - Place Value Showdown (in progress): SwiftUI skeleton committed; implement full gameplay, scoring, and polish.
+  - Shared services in place: Auth, Assignment fetch, Results parity writes (attempts, assignment updates).
+
+- Phase 2 (Next)
+  - Sentence Sense: reuse existing `userGameConfigs` schema; implement drag-and-drop sentence ordering, TTS, and miss-based scoring.
+  - Sort Categories Egg Reveal: category/item model, drag-and-drop, reveal animations.
+
+- Phase 3
+  - Spinner Wheel: wheel physics, themes, rich text items.
+  - Word Volley: physics engine and pre-rendered text for crisp visuals.
+
+- Phase 4
+  - Whack-a-Mole (3D): evaluate SceneKit/RealityKit port or keep web-only if cost/benefit is unfavorable.
+
+Milestones & Technical Notes
+- Config compatibility: load teacher-created configs from `userGameConfigs/*` unchanged.
+- Results & attempts: continue parity with web app collections (`users/{uid}/results`, `attempts`, assignment status updates).
+- Offline: enable Firestore persistence; cache active assignment config and last results.
+- Accessibility: Dynamic Type support; VoiceOver labels; high contrast; reduced motion preferences.
+- Audio/TTS: unify speech rate/pitch/voice options; local fallback when Web Speech API is not applicable.
+- High scores: adopt or omit per game (education-first); use unified service when needed.
+- QA: basic unit tests for services; gameplay snapshot tests; device testing on iPad/iPhone.
+
 ### **🎲 MAJOR MULTIPLAYER GAME SYSTEM** (January 2025 - Latest) ✨
 
 #### **🏆 NAME IT GAME - REAL-TIME MULTIPLAYER BREAKTHROUGH**
