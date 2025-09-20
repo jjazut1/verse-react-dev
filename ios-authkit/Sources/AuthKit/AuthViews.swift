@@ -132,13 +132,7 @@ struct SignedInView: View {
     @EnvironmentObject var auth: AuthService
     @State private var info: String?
     var body: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 8) {
-                Text("Signed In").font(.headline)
-                if let user = auth.user, user.isAnonymous {
-                    Text("Guest").font(.caption2).padding(4).background(Color(.secondarySystemBackground)).cornerRadius(4)
-                }
-            }
+        VStack(spacing: 12) {
             if auth.unprovisionedFallback {
                 Text("Your account isn’t provisioned; public access only.")
                     .font(.footnote)
@@ -151,9 +145,15 @@ struct SignedInView: View {
             }
             VerificationBanner(requireVerification: requireVerification)
             StudentDashboardView()
-                .frame(maxHeight: 400)
-            AccountPanel(info: $info)
-            Button("Sign Out", action: onSignOut)
+            HStack {
+                Spacer()
+                Menu {
+                    AccountPanel(info: $info)
+                    Button("Sign Out", action: onSignOut)
+                } label: {
+                    Label("Account", systemImage: "person.crop.circle")
+                }
+            }
             if let info { Text(info).font(.caption).foregroundColor(.secondary) }
         }.padding()
     }

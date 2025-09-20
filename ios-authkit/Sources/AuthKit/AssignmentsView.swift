@@ -13,13 +13,22 @@ public struct AssignmentsView: View {
         List {
             if isLoading { ProgressView() }
             if let error { Text(error).foregroundColor(.red) }
-            ForEach(assignments) { a in
-                Button {
-                    presented = a
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(a.title).font(.headline)
-                        Text(a.gameType).font(.caption).foregroundColor(.secondary)
+            Section(header: Text("Assignments").font(.largeTitle.bold()).padding(.vertical, 8)) {
+                ForEach(assignments) { a in
+                    Button { presented = a } label: {
+                        HStack(alignment: .center, spacing: 12) {
+                            Image(systemName: icon(for: a.gameType))
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(a.title).font(.headline)
+                                Text(a.gameType).font(.caption).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundColor(.secondary)
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
                     }
                 }
             }
@@ -54,6 +63,16 @@ public struct AssignmentsView: View {
                 }
             }
             .navigationViewStyle(StackNavigationViewStyle())
+        }
+    }
+
+    private func icon(for type: String) -> String {
+        switch type {
+        case "anagram": return "textformat.abc"
+        case "place-value-showdown": return "number"
+        case "sort-categories-egg": return "square.grid.2x2"
+        case "spinner-wheel": return "dial.max"
+        default: return "gamecontroller"
         }
     }
 
