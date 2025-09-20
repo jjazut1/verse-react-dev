@@ -24,7 +24,7 @@ public struct AssignmentsView: View {
                         List {
                             if isLoading { ProgressView() }
                             if let error { Text(error).foregroundColor(.red) }
-                            ForEach(assignments) { a in
+                            ForEach(visibleAssignments()) { a in
                                 Button { presented = a } label: {
                                     HStack(alignment: .center, spacing: 12) {
                                         Image(systemName: icon(for: a.gameType))
@@ -33,7 +33,7 @@ public struct AssignmentsView: View {
                                             Text(a.title).font(.headline)
                                             HStack(spacing: 6) {
                                                 Text(a.gameType).font(.caption).foregroundColor(.secondary)
-                                                if let due = a.dueAt { Text("Due \(formatted(due))").font(.caption2).foregroundColor(.orange) }
+                                                if let due = a.dueAt { Text("Due \(formatted(due))").font(.caption2).foregroundColor(isOverdue(a) ? .red : .orange) }
                                             }
                                             if let done = a.completedCount, let total = a.timesRequired, total > 0 {
                                                 ProgressView(value: Double(done), total: Double(total))
@@ -46,7 +46,7 @@ public struct AssignmentsView: View {
                                     .padding(12)
                                     .background(
                                         RoundedRectangle(cornerRadius: 16)
-                                            .fill(Color(.systemBackground))
+                                            .fill(cardFill(for: a))
                                             .shadow(color: Color.black.opacity(0.12), radius: 14, x: 0, y: 8)
                                     )
                                     .overlay(
@@ -64,7 +64,7 @@ public struct AssignmentsView: View {
                         List {
                             if isLoading { ProgressView() }
                             if let error { Text(error).foregroundColor(.red) }
-                            ForEach(assignments) { a in
+                            ForEach(visibleAssignments()) { a in
                                 Button { presented = a } label: {
                                     HStack(alignment: .center, spacing: 12) {
                                         Image(systemName: icon(for: a.gameType))
@@ -73,7 +73,7 @@ public struct AssignmentsView: View {
                                             Text(a.title).font(.headline)
                                             HStack(spacing: 6) {
                                                 Text(a.gameType).font(.caption).foregroundColor(.secondary)
-                                                if let due = a.dueAt { Text("Due \(formatted(due))").font(.caption2).foregroundColor(.orange) }
+                                                if let due = a.dueAt { Text("Due \(formatted(due))").font(.caption2).foregroundColor(isOverdue(a) ? .red : .orange) }
                                             }
                                             if let done = a.completedCount, let total = a.timesRequired, total > 0 {
                                                 ProgressView(value: Double(done), total: Double(total))
@@ -86,7 +86,7 @@ public struct AssignmentsView: View {
                                     .padding(12)
                                     .background(
                                         RoundedRectangle(cornerRadius: 16)
-                                            .fill(Color(.systemBackground))
+                                            .fill(cardFill(for: a))
                                             .shadow(color: Color.black.opacity(0.12), radius: 14, x: 0, y: 8)
                                     )
                                     .overlay(
@@ -205,6 +205,24 @@ public struct AssignmentsView: View {
             // Fall back silently
         }
         greetingTitle = makeGreeting()
+    }
+
+    // MARK: - Filtering, visuals
+    private func visibleAssignments() -> [Assignment] {
+        assignments.filter { a in
+            guard let done = a.completedCount, let total = a.timesRequired, total > 0 else { return true }
+            return done < total
+        }
+    }
+
+    private func isOverdue(_ a: Assignment) -> Bool {
+        guard let due = a.dueAt else { return false }
+        return due < Date()
+    }
+
+    private func cardFill(for a: Assignment) -> Color {
+        if isOverdue(a) { return Color(red: 1.0, green: 0.95, blue: 0.95) }
+        return Color(.systemBackground)
     }
 }
 
