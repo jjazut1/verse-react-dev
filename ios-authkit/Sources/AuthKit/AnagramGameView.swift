@@ -98,6 +98,8 @@ public struct AnagramGameView: View {
                                     Button("Reset") { resetWord() }
                                         .buttonStyle(.borderedProminent)
                                 }
+                                .padding(.top, 8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
 
                                 if showHint {
                                     Text("💡 First letter: \(item.original.first.map{String($0)} ?? "")")
@@ -170,30 +172,29 @@ public struct AnagramGameView: View {
 
     // MARK: - UI helpers
     private func flowGrid(_ letters: [String], fromScrambled: Bool) -> some View {
-        GeometryReader { geo in
-            let count = max(letters.count, 1)
-            let spacing: CGFloat = 8
-            // Compute tile so that all letters fit in one line within available width
-            let widthTile = floor((geo.size.width - spacing * CGFloat(count - 1)) / CGFloat(count))
-            let minTile: CGFloat = 28
-            let maxTile: CGFloat = 64 // cap to preserve vertical padding on tall screens
-            let tile = max(minTile, min(widthTile, maxTile))
+        let count = max(letters.count, 1)
+        let spacing: CGFloat = 8
+        let screenW = UIScreen.main.bounds.width
+        // Estimated content width = min(card, screen - outer paddings)
+        let containerWidth = min(700, screenW - 32) - 40 // 32: Scroll padding, 40: card inner padding
+        let widthTile = floor((containerWidth - spacing * CGFloat(count - 1)) / CGFloat(count))
+        let minTile: CGFloat = 28
+        let maxTile: CGFloat = 64
+        let tile = max(minTile, min(widthTile, maxTile))
 
-            HStack(spacing: spacing) {
-                ForEach(Array(letters.enumerated()), id: \.offset) { idx, ch in
-                    let isEmpty = ch.isEmpty
-                    Text(isEmpty ? " " : ch)
-                        .font(.system(size: tile * 0.42, weight: .bold))
-                        .frame(width: tile, height: tile)
-                        .background(isEmpty ? Color.gray.opacity(0.15) : Color.white)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(fromScrambled ? Color.blue.opacity(0.6) : Color.green.opacity(0.6), lineWidth: 2))
-                        .cornerRadius(10)
-                        .onTapGesture { tapLetter(index: idx, fromScrambled: fromScrambled) }
-                }
+        return HStack(spacing: spacing) {
+            ForEach(Array(letters.enumerated()), id: \.offset) { idx, ch in
+                let isEmpty = ch.isEmpty
+                Text(isEmpty ? " " : ch)
+                    .font(.system(size: tile * 0.42, weight: .bold))
+                    .frame(width: tile, height: tile)
+                    .background(isEmpty ? Color.gray.opacity(0.15) : Color.white)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(fromScrambled ? Color.blue.opacity(0.6) : Color.green.opacity(0.6), lineWidth: 2))
+                    .cornerRadius(10)
+                    .onTapGesture { tapLetter(index: idx, fromScrambled: fromScrambled) }
             }
-            .frame(width: geo.size.width, height: tile)
         }
-        .frame(minHeight: 40)
+        .frame(maxWidth: .infinity, minHeight: tile, alignment: .center)
     }
 
     private func tapLetter(index: Int, fromScrambled: Bool) {
