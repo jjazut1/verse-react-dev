@@ -151,7 +151,9 @@ struct SignedInView: View {
                     AccountPanel(info: $info)
                     Button("Sign Out", action: onSignOut)
                 } label: {
-                    Label("Account", systemImage: "person.crop.circle")
+                    Label("Account", systemImage: "person.crop.circle.fill")
+                        .imageScale(.large)
+                        .foregroundColor(.blue)
                 }
             }
             if let info { Text(info).font(.caption).foregroundColor(.secondary) }

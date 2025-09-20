@@ -10,6 +10,8 @@ public struct Assignment: Codable, Sendable, Identifiable {
     public var token: String?
     public var status: String?
     public var dueAt: Date?
+    public var completedCount: Int?
+    public var timesRequired: Int?
 }
 
 public final class AssignmentService: @unchecked Sendable {
@@ -36,7 +38,9 @@ public final class AssignmentService: @unchecked Sendable {
                     configRef: doc["configRef"] as? String,
                     token: doc["token"] as? String,
                     status: doc["status"] as? String,
-                    dueAt: (doc["dueAt"] as? Timestamp)?.dateValue()
+                    dueAt: (doc["dueAt"] as? Timestamp)?.dateValue(),
+                    completedCount: (doc["completedCount"] as? Int) ?? (doc["completedCount"] as? NSNumber)?.intValue,
+                    timesRequired: (doc["timesRequired"] as? Int) ?? (doc["timesRequired"] as? NSNumber)?.intValue
                 )
                 result[a.id] = a
             }
@@ -68,7 +72,9 @@ public final class AssignmentService: @unchecked Sendable {
             let dueAt = (doc["deadline"] as? Timestamp)?.dateValue()
             let status = doc["status"] as? String
             let token = doc["token"] as? String
-            let a = Assignment(id: id, title: title, gameType: gameType, configRef: configRef, token: token, status: status, dueAt: dueAt)
+            let completedCount = (doc["completedCount"] as? Int) ?? (doc["completedCount"] as? NSNumber)?.intValue
+            let timesRequired = (doc["timesRequired"] as? Int) ?? (doc["timesRequired"] as? NSNumber)?.intValue
+            let a = Assignment(id: id, title: title, gameType: gameType, configRef: configRef, token: token, status: status, dueAt: dueAt, completedCount: completedCount, timesRequired: timesRequired)
             result[id] = a
         }
 
