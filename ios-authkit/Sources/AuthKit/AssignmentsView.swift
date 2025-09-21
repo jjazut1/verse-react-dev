@@ -3,13 +3,15 @@ import FirebaseAuth
 import FirebaseFirestore
 
 public struct AssignmentsView: View {
+    public typealias TabSelect = (Int) -> Void
     @State private var assignments: [Assignment] = []
     @State private var error: String?
     @State private var isLoading = false
     private let service = AssignmentService()
     @State private var presented: Assignment?
 
-    public init() {}
+    private var onSelectTab: TabSelect?
+    public init(onSelectTab: TabSelect? = nil) { self.onSelectTab = onSelectTab }
 
     @State private var greetingTitle: String = "Assignments"
     @Environment(\.verticalSizeClass) private var vSize
@@ -58,9 +60,7 @@ public struct AssignmentsView: View {
                             }
                         }
                         .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
-                        .background(Color.clear)
-                        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: tabBarInset()) }
+                        .frame(maxHeight: .infinity, alignment: .top)
                     } else {
                         List {
                             if isLoading { ProgressView() }
@@ -100,13 +100,12 @@ public struct AssignmentsView: View {
                             }
                         }
                         .listStyle(.plain)
-                        .background(Color.clear)
-                        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: tabBarInset()) }
+                        .frame(maxHeight: .infinity, alignment: .top)
                     }
             }
             .padding(.horizontal, 16)
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 0) }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .navigationTitle(isCompact ? "" : greetingTitle)
         .navigationBarTitleDisplayMode(isCompact ? .inline : .large)
         .onAppear { Task { await loadGreeting() } }
@@ -115,22 +114,7 @@ public struct AssignmentsView: View {
         .fullScreenCover(item: $presented) { a in
             GamePresentationView(assignment: a)
         }
-        // Bottom-left greeting overlay in landscape (compact vertical size class)
-        .overlay(alignment: .bottomTrailing) {
-            if isCompact {
-                HStack {
-                    Spacer(minLength: 0)
-                    Text(greetingTitle)
-                        .font(.callout.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(10)
-                }
-                .padding(.trailing, 16)
-                .padding(.bottom, tabBarInset() + 6)
-            }
-        }
+        // Custom bar moved to StudentDashboardView to avoid duplication/interference with List layout
     }
 
     // Full screen presenter
@@ -269,6 +253,29 @@ public struct AssignmentsView: View {
         #else
         return 100
         #endif
+    }
+}
+
+private struct TabPillButton: View {
+    let label: String
+    let systemImage: String
+    let isSelected: Bool
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                Text(label)
+                    .font(.subheadline.weight(.semibold))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .foregroundColor(isSelected ? .blue : .primary)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(isSelected ? Color.blue.opacity(0.12) : Color.clear)
+            )
+        }
     }
 }
 

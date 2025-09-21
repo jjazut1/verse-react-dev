@@ -3,6 +3,7 @@ import FirebaseAuth
 
 public struct StudentDashboardView: View {
     @State private var selectedTab = 0
+    @Environment(\.verticalSizeClass) private var vSize
     public init() {}
     public var body: some View {
         Group {
@@ -10,24 +11,21 @@ public struct StudentDashboardView: View {
                 StudentEmailSignInView(onSignedIn: {})
             } else {
                 TabView(selection: $selectedTab) {
-                    NavigationView {
-                        AssignmentsView()
-                    }
+                    NavigationView { AssignmentsView() }
                     .tabItem { Label("Assignments", systemImage: "list.bullet.rectangle") }
                     .tag(0)
-                    NavigationView {
-                        PublicGamesView()
-                    }
-                    .tabItem { Label("Explore", systemImage: "gamecontroller") }
-                    .tag(1)
+                    NavigationView { PublicGamesView() }
+                        .tabItem { Label("Explore", systemImage: "gamecontroller") }
+                        .tag(1)
                     HighScoresMiniView()
                         .tabItem { Label("High Scores", systemImage: "trophy") }
                         .tag(2)
                     // Removed Account tab per revert
                 }
                 .onAppear { configureTabBarAppearance() }
-                .ignoresSafeArea(.keyboard, edges: .bottom)
+                // Keep default safe-area behavior
                 .modifier(TabBarBackgroundVisible())
+                // Use only the system tab bar (remove custom bar and do not hide it)
             }
         }
     }
@@ -63,6 +61,8 @@ public struct StudentEmailSignInView: View {
         } catch { self.error = error.localizedDescription }
     }
 }
+
+// (Custom tab bar removed per latest design)
 
 // Lightweight Account placeholder – aligns with a dedicated tab in landscape
 public struct AccountView: View {
@@ -102,64 +102,4 @@ private struct TabBarBackgroundVisible: ViewModifier {
     }
 }
 
-// Placeholder explore page for public games
-public struct PublicGamesView: View {
-    public init() {}
-    public var body: some View {
-        ScrollView { VStack(alignment: .leading, spacing: 12) { Text("Browse public games (coming soon)") } }
-            .padding()
-            .background(Color(red: 0.93, green: 0.96, blue: 1.0))
-            .navigationTitle("Explore")
-    }
-}
-
-struct HighScoresMiniView: View {
-    @State private var gameType: String = "anagram"
-    @State private var entries: [HighScoreEntry] = []
-    @State private var errorMessage: String?
-    private let service = HighScoreService()
-
-    private let gameTypes = [
-        "anagram",
-        "sort-categories-egg",
-        "spinner-wheel",
-        "sentence-sense",
-        "place-value-showdown",
-        "word-volley",
-        "name-it",
-        "whack-a-mole"
-    ]
-
-    var body: some View {
-        NavigationView {
-            List {
-                Section {
-                    Picker("Game", selection: $gameType) {
-                        ForEach(gameTypes, id: \.self) { Text($0) }
-                    }
-                    .pickerStyle(.segmented)
-                }
-                if let errorMessage { Text(errorMessage).foregroundColor(.red) }
-                ForEach(entries) { e in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(e.playerName).font(.headline)
-                            Text(e.gameType).font(.caption).foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        Text("\(e.score)")
-                    }
-                }
-            }
-            .navigationTitle("High Scores")
-        }
-        .onAppear { Task { await load() } }
-        .onChange(of: gameType) { _ in Task { await load() } }
-    }
-
-    private func load() async {
-        do { entries = try await service.top(forGameType: gameType) ; errorMessage = nil }
-        catch let e { errorMessage = e.localizedDescription }
-    }
-}
-
+// PublicGamesView and HighScoresMiniView now live in their own files to avoid redeclarations
