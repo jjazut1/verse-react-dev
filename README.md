@@ -2624,3 +2624,22 @@ All saved game configurations now include `schemaVersion: "v1"` (backfilled acro
   - Introduced `getAssignmentManifest` callable for mobile (stable v1 contract)
   - Hardened Firestore rules for AI collections (no listing; authenticated get only on results)
   - Added `processAdminTask` Firestore-triggered function for admin maintenance tasks
+
+### iOS Explore: Public Games (September 2025)
+
+- New Explore tab in the iOS app lists all community‑shared games from `userGameConfigs` where `share == true`.
+- Tapping a row routes to the native SwiftUI game when available:
+  - `anagram` → `AnagramGameView`
+  - `place-value-showdown` → `PlaceValueShowdownGameView`
+  - Others show a placeholder (`ComingSoonGameView`).
+- The app reads configs directly by Firestore path; no changes required to the web app.
+
+Firestore indexes (optional but recommended):
+- To sort public games by recency: Collection `userGameConfigs`
+  - Field 1: `share` Ascending (for equality filter)
+  - Field 2: `updatedAt` Descending (for order)
+- High Scores top list: Collection `highScores`
+  - Field 1: `gameType` Ascending
+  - Field 2: `score` Descending
+
+Note: The iOS app gracefully falls back to unsorted public games if the `userGameConfigs` index is not present.
