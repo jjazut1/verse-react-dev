@@ -233,8 +233,8 @@ export const sendPasswordSetupEmail = onDocumentCreated(
 
     try {
       // First, create or get the Firebase Auth user
-      let authUser;
-      let actualAuthUid;
+      let authUser: admin.auth.UserRecord | undefined;
+      let actualAuthUid: string;
       
       try {
         // Try to get existing user by email
