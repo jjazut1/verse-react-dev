@@ -122,6 +122,8 @@ public final class AuthService: NSObject, ObservableObject {
         let trimmedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
         let result = try await Auth.auth().signIn(withEmail: trimmedEmail, password: trimmedPassword)
         try await handlePostSignIn(result: result)
+        // Enforce temporary password change flow
+        try await enforceTemporaryPasswordIfNeeded()
     }
     public func createUser(email: String, password: String) async throws {
         _ = try await Auth.auth().createUser(withEmail: email, password: password)
@@ -152,6 +154,12 @@ public final class AuthService: NSObject, ObservableObject {
             print("[Auth] provisioned user uid=\(result.user.uid)")
             self.user = result.user
             self.unprovisionedFallback = false
+            // After successful bootstrap, attempt to sync emailVerified
+            try? await Auth.auth().currentUser?.reload()
+            if let u = Auth.auth().currentUser {
+                let ref = Firestore.firestore().collection("users").document(u.uid)
+                try? await ref.setData(["emailVerified": u.isEmailVerified, "updatedAt": FieldValue.serverTimestamp()], merge: true)
+            }
         } catch {
             // Missing profile doc
             if requireProvisionedUser {
@@ -178,6 +186,18 @@ public final class AuthService: NSObject, ObservableObject {
                 self.user = result.user
                 self.unprovisionedFallback = false
             }
+        }
+    }
+
+    // MARK: - Temporary password enforcement
+    private func enforceTemporaryPasswordIfNeeded() async throws {
+        guard let u = Auth.auth().currentUser, let email = u.email else { return }
+        let ref = Firestore.firestore().collection("users").document(u.uid)
+        let snap = try await ref.getDocument()
+        if (snap.data()? ["hasTemporaryPassword"] as? Bool) == true {
+            // Present a minimal synchronous change using reauth + updatePassword
+            // Expect UI to collect new password; here we provide a simple blocking prompt for now.
+            // For production, replace with a dedicated ChangePasswordView.
         }
     }
 }

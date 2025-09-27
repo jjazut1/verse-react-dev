@@ -34,7 +34,9 @@ public final class ProfileService: @unchecked Sendable {
         ]
         if let email = authUser.email { updates["email"] = email }
         if let name = authUser.displayName, (snap.data()? ["name"] as? String)?.isEmpty ?? true { updates["name"] = name }
-        // Provider links
+        // Sync emailVerified flag (Firestore is advisory; Auth is source of truth)
+        updates["emailVerified"] = authUser.isEmailVerified
+        // Provider links (normalized)
         let providers = Set(authUser.providerData.map { $0.providerID.replacingOccurrences(of: ".com", with: "") })
         updates["providerLinks"] = Array(providers)
 

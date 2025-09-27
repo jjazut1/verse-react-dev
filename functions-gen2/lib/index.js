@@ -161,6 +161,9 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
         return;
     }
     const { email: studentEmail, name: studentName, displayName } = userData;
+    const normalizedEmail = String(studentEmail || '').toLowerCase();
+    const db = admin.firestore();
+    let profileRef = db.collection('users').doc(userId);
     firebase_functions_1.logger.info('🔵 sendPasswordSetupEmail triggered for new student:', studentEmail);
     if (!studentEmail) {
         firebase_functions_1.logger.error('Missing required student email:', { studentEmail });
@@ -182,41 +185,53 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
         let actualAuthUid;
         try {
             // Try to get existing user by email
-            authUser = await admin.auth().getUserByEmail(studentEmail);
+            authUser = await admin.auth().getUserByEmail(normalizedEmail);
             actualAuthUid = authUser.uid;
             firebase_functions_1.logger.info('Found existing Firebase Auth user for:', studentEmail);
             firebase_functions_1.logger.info('Existing Auth UID:', actualAuthUid);
-            // Update Firestore document to link to existing Auth user
-            await admin.firestore().collection('users').doc(userId).update({
-                authUid: actualAuthUid,
-                linkedToAuth: true,
-                emailVerified: authUser.emailVerified,
-                hasTemporaryPassword: true,
-                temporaryPasswordSet: true,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            firebase_functions_1.logger.info('✅ Updated Firestore document to link with existing Auth user');
+            // Ensure Firestore document path matches Auth UID; migrate if different
+            if (actualAuthUid !== userId) {
+                const oldSnap = await profileRef.get();
+                const newRef = db.collection('users').doc(actualAuthUid);
+                await db.runTransaction(async (tx) => {
+                    const oldData = oldSnap.exists ? oldSnap.data() : {};
+                    const merged = Object.assign(Object.assign({}, oldData), { authUid: actualAuthUid, linkedToAuth: true, email: normalizedEmail || (oldData === null || oldData === void 0 ? void 0 : oldData.email), updatedAt: admin.firestore.FieldValue.serverTimestamp(), migratedFrom: userId });
+                    tx.set(newRef, merged, { merge: true });
+                    if (oldSnap.exists)
+                        tx.delete(profileRef);
+                });
+                profileRef = newRef;
+                userId = actualAuthUid;
+                firebase_functions_1.logger.info('✅ Migrated user doc to auth UID path', { userId });
+            }
+            else {
+                await profileRef.set({
+                    authUid: actualAuthUid,
+                    linkedToAuth: true,
+                    emailVerified: authUser.emailVerified,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                firebase_functions_1.logger.info('✅ Updated Firestore document to link with existing Auth user');
+            }
         }
         catch (error) {
             if (error.code === 'auth/user-not-found') {
                 // Create new Firebase Auth user with the same UID as the Firestore document
                 authUser = await admin.auth().createUser({
                     uid: userId, // Use the same UID as the Firestore document
-                    email: studentEmail,
+                    email: normalizedEmail,
                     displayName: finalStudentName,
                     emailVerified: false
                 });
                 actualAuthUid = userId; // New user gets the Firestore document ID as their UID
                 firebase_functions_1.logger.info('✅ Created Firebase Auth user with UID:', actualAuthUid);
                 // Update the Firestore document with authentication linking fields
-                await admin.firestore().collection('users').doc(userId).update({
+                await profileRef.set({
                     authUid: actualAuthUid,
                     linkedToAuth: true,
                     emailVerified: false,
-                    hasTemporaryPassword: true,
-                    temporaryPasswordSet: true,
                     updatedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
+                }, { merge: true });
                 firebase_functions_1.logger.info('✅ Updated Firestore document with auth linking fields');
             }
             else {
@@ -239,6 +254,13 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
         });
         firebase_functions_1.logger.info('Generated temporary password for:', studentEmail);
         firebase_functions_1.logger.info('Temporary password set successfully for Auth UID:', actualAuthUid);
+        // Ensure profile reflects temp-password state
+        await profileRef.set({
+            hasTemporaryPassword: true,
+            temporaryPasswordSet: true,
+            email: normalizedEmail,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
         // Create email content
         const subject = `Your LuminateLearn Account - Sign In Information`;
         const htmlContent = `
@@ -331,7 +353,7 @@ exports.sendPasswordSetupEmail = (0, firestore_1.onDocumentCreated)({
         }
         // Send email using the helper function
         const msg = {
-            to: studentEmail,
+            to: normalizedEmail,
             from: {
                 email: exports.SENDER_EMAIL.value().trim(),
                 name: "LuminateLearn"
