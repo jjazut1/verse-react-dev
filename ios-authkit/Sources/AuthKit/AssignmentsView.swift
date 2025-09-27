@@ -11,7 +11,11 @@ public struct AssignmentsView: View {
     @State private var presented: Assignment?
 
     private var onSelectTab: TabSelect?
-    public init(onSelectTab: TabSelect? = nil) { self.onSelectTab = onSelectTab }
+    private var onPendingCountChange: ((Int) -> Void)?
+    public init(onSelectTab: TabSelect? = nil, onPendingCountChange: ((Int) -> Void)? = nil) {
+        self.onSelectTab = onSelectTab
+        self.onPendingCountChange = onPendingCountChange
+    }
 
     @State private var greetingTitle: String = "Assignments"
     @Environment(\.verticalSizeClass) private var vSize
@@ -128,6 +132,8 @@ public struct AssignmentsView: View {
                         AnagramGameView(assignmentId: assignment.id, configRef: ref)
                     } else if assignment.gameType == "place-value-showdown", let ref = assignment.configRef {
                         PlaceValueShowdownGameView(assignmentId: assignment.id, configRef: ref)
+                    } else if assignment.gameType == "sentence-sense", let ref = assignment.configRef {
+                        SentenceSenseGameView(assignmentId: assignment.id, configRef: ref)
                     } else {
                         ComingSoonGameView(gameType: assignment.gameType)
                     }
@@ -163,6 +169,12 @@ public struct AssignmentsView: View {
         defer { isLoading = false }
         do { assignments = try await service.listForCurrentUser() }
         catch { self.error = error.localizedDescription }
+        reportPendingCount()
+    }
+
+    private func reportPendingCount() {
+        let count = visibleAssignments().count
+        onPendingCountChange?(count)
     }
 
     private func makeGreeting() -> String {

@@ -3,6 +3,7 @@ import FirebaseAuth
 
 public struct StudentDashboardView: View {
     @State private var selectedTab = 0
+    @State private var pendingAssignments = 0
     @Environment(\.verticalSizeClass) private var vSize
     public init() {}
     public var body: some View {
@@ -11,8 +12,14 @@ public struct StudentDashboardView: View {
                 StudentEmailSignInView(onSignedIn: {})
             } else {
                 TabView(selection: $selectedTab) {
-                    NavigationView { AssignmentsView() }
+                    NavigationView {
+                        AssignmentsView(onPendingCountChange: { count in
+                            pendingAssignments = count
+                            AppBadgeManager.setBadge(count)
+                        })
+                    }
                     .tabItem { Label("Assignments", systemImage: "list.bullet.rectangle") }
+                    .modifier(TabBadgeIfNeeded(count: pendingAssignments))
                     .tag(0)
                     NavigationView { PublicGamesView() }
                         .tabItem { Label("Explore", systemImage: "gamecontroller") }
@@ -23,6 +30,7 @@ public struct StudentDashboardView: View {
                     // Removed Account tab per revert
                 }
                 .onAppear { configureTabBarAppearance() }
+                .task { AppBadgeManager.requestAuthorizationIfNeeded() }
                 // Keep default safe-area behavior
                 .modifier(TabBarBackgroundVisible())
                 // Use only the system tab bar (remove custom bar and do not hide it)
@@ -96,6 +104,22 @@ private struct TabBarBackgroundVisible: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 16.0, *) {
             content.toolbarBackground(.visible, for: .tabBar)
+        } else {
+            content
+        }
+    }
+}
+
+// Conditionally apply a badge only when count > 0, without using nil literals
+private struct TabBadgeIfNeeded: ViewModifier {
+    let count: Int
+    func body(content: Content) -> some View {
+        if #available(iOS 15.0, *) {
+            if count > 0 {
+                content.badge(count)
+            } else {
+                content
+            }
         } else {
             content
         }

@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 // Minimal Swift anagram game based on userGameConfigs schema
 struct AnagramConfigModel {
@@ -52,8 +53,8 @@ public struct AnagramGameView: View {
 
     public var body: some View {
         ZStack {
-            // Light blue play surface
-            Color(red: 0.93, green: 0.96, blue: 1.0)
+            // Dynamic system background (supports dark mode)
+            Color(uiColor: .systemGroupedBackground)
                 .ignoresSafeArea()
 
             ScrollView {
@@ -187,8 +188,11 @@ public struct AnagramGameView: View {
                 Text(isEmpty ? " " : ch)
                     .font(.system(size: tile * 0.42, weight: .bold))
                     .frame(width: tile, height: tile)
-                    .background(isEmpty ? Color.gray.opacity(0.15) : Color.white)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(fromScrambled ? Color.blue.opacity(0.6) : Color.green.opacity(0.6), lineWidth: 2))
+                    .background(isEmpty ? Color.secondary.opacity(0.15) : Color(uiColor: .secondarySystemBackground))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(fromScrambled ? Color.accentColor.opacity(0.6) : Color.green.opacity(0.6), lineWidth: 2)
+                    )
                     .cornerRadius(10)
                     .onTapGesture { tapLetter(index: idx, fromScrambled: fromScrambled) }
             }
