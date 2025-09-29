@@ -441,8 +441,15 @@ public struct AssignmentDetailView: View {
 
     private func saveResult() async {
         do {
-            let result = GameResult(assignmentId: assignment.id, gameType: assignment.gameType, score: Int.random(in: 50...100), stats: ["sample": true])
-            try await resultsService.saveWithRetry(result)
+            // Dev helper: write results-only payload (no client progress mutations)
+            let payload = GameResult(
+                assignmentId: assignment.id,
+                gameType: assignment.gameType,
+                misses: nil,
+                score: nil,
+                stats: ["sample": true]
+            )
+            try await resultsService.saveWithRetry(payload)
             message = "Result saved."
         } catch { message = error.localizedDescription }
     }
