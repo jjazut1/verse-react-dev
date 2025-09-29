@@ -202,6 +202,68 @@ Assignment completion for all native apps is handled on the server by a single F
 - Seeing 2× increments: ensure the client only writes a single `results` doc per repetition and that no `attempts` write is performed. The ledger prevents reprocessing of the same result event id.
 - No increment: confirm the `results` write path is correct, the trigger is deployed, and the top-level assignment can be resolved by doc id or `linkToken`.
 
+## Security Rules Summary
+
+- `highScores`: public read, server-only write (service account). See `firestore.rules` → `match /highScores/{id}`.
+- `users/{uid}/results/{assignmentId}`: students can `create` and `read` their own results; only the service account may `update`/`delete`.
+
+Snippets (for reference):
+
+```
+match /highScores/{highScoreId} {
+  allow read: if true;
+  allow write: if isServiceAccount();
+}
+
+match /users/{userId}/results/{assignmentId} {
+  allow create: if isAuthenticated() && request.auth.uid == userId;
+  allow read: if isAuthenticated() && request.auth.uid == userId;
+  allow update, delete: if isServiceAccount();
+}
+```
+
+## Results Write Contract (Client → Server)
+
+Minimum recommended payload written by iOS on repetition completion:
+
+```json
+{
+  "gameType": "sentence-sense",
+  "misses": 2,
+  "stats": { "moves": 12, "durationMs": 43000 }
+}
+```
+
+Path: `users/{uid}/results/{assignmentId}` (where `assignmentId` is the top-level id or link token; function resolves canonical id).
+
+## Ops Runbook
+
+- Deploy only rules:
+```bash
+firebase deploy --only firestore:rules
+```
+- Deploy only indexes:
+```bash
+firebase deploy --only firestore:indexes
+```
+- Deploy only Gen2 functions:
+```bash
+firebase deploy --only functions:gen2
+```
+- Tail logs for progress updates:
+```bash
+firebase functions:log --only gen2:updateAssignmentOnResult
+```
+
+## Data Model Map
+
+- `assignments/{id}`: authoritative assignment doc; transactionally updated by function.
+- `users/{uid}/assignments/{id}`: mirrored fields for student UI.
+- `users/{uid}/results/{assignmentId}`: client writes here; trigger source for progress + high scores.
+- `highScores/{id}`: per-game leaderboard docs (Sentence Sense uses `ss:{configId}:{userId}` and `bestMisses`).
+- `assignmentProgressLedger/{id}`: idempotency ledger keyed per result event.
+- `attempts`: deprecated for progress; keep `deleteAttemptsOnAssignmentDelete` for cascade cleanup.
+
 ## Dependencies
 
 - firebase-functions: v6.x (2nd generation)

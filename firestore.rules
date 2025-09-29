@@ -98,38 +98,10 @@ service cloud.firestore {
               get(/databases/$(database)/documents/assignmentFolders/$(data.parentId)).data.userId == data.userId);
     }
     
-    // Allow anyone to read high scores
+    // High scores – public read, server-only writes to prevent tampering
     match /highScores/{highScoreId} {
       allow read: if true;
-      allow create: if 
-        // Basic field validation
-        request.resource.data.playerName is string &&
-        request.resource.data.playerName.size() >= 3 &&
-        request.resource.data.playerName.size() <= 12 &&
-        request.resource.data.playerName.matches('^[A-Za-z0-9\\s]+$') &&
-        
-        // Profanity check (case-insensitive)
-        !request.resource.data.playerName.lower().matches('.*\\b(ass|fuck|shit|damn|bitch|crap|piss|dick|cock|pussy|whore|slut|bastard)\\b.*') &&
-        
-        // Score validation
-        request.resource.data.score is number &&
-        request.resource.data.score >= 0 &&
-        request.resource.data.score <= 1000 &&
-        request.resource.data.configId is string &&
-        request.resource.data.createdAt is timestamp &&
-        request.resource.data.gameType is string &&
-        
-        // Game config validation - only check that config exists and type matches
-        exists(/databases/$(database)/documents/userGameConfigs/$(request.resource.data.configId)) &&
-        (
-          // Config type matches the game type
-            get(/databases/$(database)/documents/userGameConfigs/$(request.resource.data.configId)).data.type == request.resource.data.gameType
-          ||
-          // Or it's a public demo config
-            request.resource.data.configId in ['xOoA0q7ILtrdqdJt1ki5', 'Ua17C8DK6ZFsujj9Z1ZC']
-        ) &&
-        // Validate game type is one of the supported types
-        request.resource.data.gameType in ['sort-categories-egg', 'whack-a-mole', 'spinner-wheel', 'anagram', 'sentence-sense', 'place-value-showdown', 'word-volley', 'name-it'];
+      allow write: if isServiceAccount();
     }
 
     
@@ -385,6 +357,14 @@ service cloud.firestore {
          request.resource.data.role == 'student' &&
          resource.data.teacherId == request.auth.uid &&
          request.resource.data.teacherId == request.auth.uid);
+    }
+
+    // Per-user results – allow students to write their own result docs; server reads/updates
+    match /users/{userId}/results/{assignmentId} {
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      // Prevent client updates/deletes; server can update via service account if needed
+      allow update, delete: if isServiceAccount();
     }
 
     // Per-user assignments (student-facing list and status updates)
