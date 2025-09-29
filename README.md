@@ -2639,7 +2639,14 @@ Firestore indexes (optional but recommended):
   - Field 1: `share` Ascending (for equality filter)
   - Field 2: `updatedAt` Descending (for order)
 - High Scores top list: Collection `highScores`
-  - Field 1: `gameType` Ascending
-  - Field 2: `score` Descending
+  - For legacy score-based games: `gameType` Ascending, `score` Descending
+  - For Sentence Sense (misses-based): `gameType` Ascending, `bestMisses` Ascending
 
 Note: The iOS app gracefully falls back to unsorted public games if the `userGameConfigs` index is not present.
+
+### Assignment Progress E2E (Native iOS)
+
+1) Client writes result: `users/{uid}/results/{assignmentId}` with `{ gameType, misses, stats }`.
+2) Function `updateAssignmentOnResult` resolves canonical assignment id, updates top-level `assignments/{id}` transactionally, mirrors to `users/{uid}/assignments/{id}`.
+3) High score upsert (Sentence Sense): per `(configId,userId)` with `bestMisses` (lower is better).
+4) iOS refresh: `AssignmentsView` reloads on fullScreenCover dismiss and shows a toast if progress changed.
