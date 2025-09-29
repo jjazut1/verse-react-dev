@@ -31,3 +31,12 @@ AuthRootView(options: AuthUIOptions(
 
 ## Notes
 - Emails are stored in Firebase Authentication; Firestore `users` is optional profile data.
+
+## High Scores – Sentence Sense (iOS UI)
+
+- The High Scores tab uses `HighScoresMiniView`.
+- For "sentence-sense" it calls `HighScoreService.sentenceSenseTop()` which:
+  - Loads leaderboard entries ordered by `bestMisses` ascending.
+  - Joins `userGameConfigs` to show the config title.
+  - Joins `users` to show the student's display name.
+- Display shows: `configTitle` (game name), `displayName` (student), and `Best Misses`.

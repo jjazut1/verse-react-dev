@@ -24,10 +24,8 @@ public final class AssignmentService: @unchecked Sendable {
         let uid = user.uid
         let email = user.email
 
-        // Strategy: union of subcollection (users/{uid}/assignments) and top-level assignments where studentId==uid or studentEmail==email
-        var result: [String: Assignment] = [:]
-
-        // 1) Subcollection (new structure)
+        // Strategy: prefer top-level assignments for deduping; fall back to subcollection if none found
+        var subAssignments: [Assignment] = []
         do {
             let snap = try await db.collection("users").document(uid).collection("assignments").getDocuments()
             for doc in snap.documents {
@@ -42,11 +40,9 @@ public final class AssignmentService: @unchecked Sendable {
                     completedCount: (doc["completedCount"] as? Int) ?? (doc["completedCount"] as? NSNumber)?.intValue,
                     timesRequired: (doc["timesRequired"] as? Int) ?? (doc["timesRequired"] as? NSNumber)?.intValue
                 )
-                result[a.id] = a
+                subAssignments.append(a)
             }
-        } catch {
-            // ignore and try top-level fallback
-        }
+        } catch { /* ignore */ }
 
         // 2) Top-level assignments (current prod)
         var topLevelDocs: [QueryDocumentSnapshot] = []
@@ -63,22 +59,26 @@ public final class AssignmentService: @unchecked Sendable {
             } catch {}
         }
 
-        for doc in topLevelDocs {
-            let id = doc.documentID
-            let title = (doc["title"] as? String) ?? (doc["gameName"] as? String) ?? "Assignment"
-            let gameType = (doc["gameType"] as? String) ?? ""
-            let gameId = doc["gameId"] as? String
-            let configRef = gameId != nil ? "userGameConfigs/\(gameId!)" : nil
-            let dueAt = (doc["deadline"] as? Timestamp)?.dateValue()
-            let status = doc["status"] as? String
-            let token = doc["token"] as? String
-            let completedCount = (doc["completedCount"] as? Int) ?? (doc["completedCount"] as? NSNumber)?.intValue
-            let timesRequired = (doc["timesRequired"] as? Int) ?? (doc["timesRequired"] as? NSNumber)?.intValue
-            let a = Assignment(id: id, title: title, gameType: gameType, configRef: configRef, token: token, status: status, dueAt: dueAt, completedCount: completedCount, timesRequired: timesRequired)
-            result[id] = a
+        if !topLevelDocs.isEmpty {
+            var result: [Assignment] = []
+            for doc in topLevelDocs {
+                let id = doc.documentID
+                let title = (doc["title"] as? String) ?? (doc["gameName"] as? String) ?? "Assignment"
+                let gameType = (doc["gameType"] as? String) ?? ""
+                let gameId = doc["gameId"] as? String
+                let configRef = gameId != nil ? "userGameConfigs/\(gameId!)" : nil
+                let dueAt = (doc["deadline"] as? Timestamp)?.dateValue()
+                let status = doc["status"] as? String
+                let token = doc["token"] as? String
+                let completedCount = (doc["completedCount"] as? Int) ?? (doc["completedCount"] as? NSNumber)?.intValue
+                let timesRequired = (doc["timesRequired"] as? Int) ?? (doc["timesRequired"] as? NSNumber)?.intValue
+                result.append(Assignment(id: id, title: title, gameType: gameType, configRef: configRef, token: token, status: status, dueAt: dueAt, completedCount: completedCount, timesRequired: timesRequired))
+            }
+            return result.sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
         }
 
-        return Array(result.values).sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
+        // Fallback to subcollection only
+        return subAssignments.sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
     }
 
     public func loadConfig(configRef: String) async throws -> [String: Any] {

@@ -4,6 +4,14 @@
       "collectionGroup": "highScores",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "gameType", "order": "ASCENDING" },
+        { "fieldPath": "bestMisses", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "highScores",
+      "queryScope": "COLLECTION",
+      "fields": [
         {
           "fieldPath": "configId",
           "order": "ASCENDING"

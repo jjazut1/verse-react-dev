@@ -116,6 +116,49 @@ cd ..
 firebase deploy --only functions:gen2
 ```
 
+## Sentence Sense – High Scores (Misses-Based)
+
+### Overview
+For Sentence Sense, a user's high score is the lowest number of misses achieved for a given `userGameConfigs/{configId}`. The backend records this in a single, idempotent document per `(configId, userId)` upon result writes.
+
+### Trigger Path
+- `users/{userId}/results/{assignmentId}` (handled by `updateAssignmentOnResult`)
+
+### Document Key
+- `highScores/ss:{configId}:{userId}`
+
+### Schema (fields)
+- `userId: string`
+- `configId: string` (the `userGameConfigs` id)
+- `gameType: "sentence-sense"`
+- `bestMisses: number` (lower is better; updated when user achieves a better run)
+- `lastMisses: number` (misses from the most recent processed run)
+- `attempts: number` (total processed attempts for this pair)
+- `assignmentId: string` (denormalized convenience)
+- `title: string | null` (denormalized config title)
+- `studentEmail: string | undefined` (when available)
+- `createdAt: Timestamp`
+- `updatedAt: Timestamp`
+- `bestAt: Timestamp` (set when bestMisses improves)
+
+### Firestore Index
+Required composite index for leaderboard queries:
+
+```
+collection: highScores
+fields: gameType ASC, bestMisses ASC
+```
+
+This index has been added to `firestore.indexes.json`. Deploy with:
+
+```bash
+firebase deploy --only firestore:indexes
+```
+
+### Notes
+- The function is idempotent per result document using an internal ledger and only updates the high score if the new misses value is better.
+- The same function also updates assignment progress transactionally and mirrors into the user-scoped assignment document.
+
 ## Dependencies
 
 - firebase-functions: v6.x (2nd generation)
