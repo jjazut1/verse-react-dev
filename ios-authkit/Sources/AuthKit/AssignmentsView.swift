@@ -255,8 +255,10 @@ public struct AssignmentsView: View {
     }
 
     private func formatted(_ date: Date) -> String {
+        // Treat stored deadlines as date-only (UTC midnight) to avoid off-by-one day in local time zones
         let df = DateFormatter()
         df.dateStyle = .medium
+        df.timeZone = TimeZone(secondsFromGMT: 0)
         return df.string(from: date)
     }
 
@@ -343,7 +345,12 @@ public struct AssignmentsView: View {
 
     private func isOverdue(_ a: Assignment) -> Bool {
         guard let due = a.dueAt else { return false }
-        return due < Date()
+        // Compare by UTC calendar days to avoid time-zone skew
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 0)!
+        let dueDay = cal.startOfDay(for: due)
+        let todayDay = cal.startOfDay(for: Date())
+        return todayDay > dueDay
     }
 
     private func cardFill(for a: Assignment) -> Color {

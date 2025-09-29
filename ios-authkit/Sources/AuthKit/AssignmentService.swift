@@ -67,6 +67,7 @@ public final class AssignmentService: @unchecked Sendable {
                 let gameType = (doc["gameType"] as? String) ?? ""
                 let gameId = doc["gameId"] as? String
                 let configRef = gameId != nil ? "userGameConfigs/\(gameId!)" : nil
+                // Treat deadlines as UTC date-only to avoid off-by-one due dates from local TZ
                 let dueAt = (doc["deadline"] as? Timestamp)?.dateValue()
                 let status = doc["status"] as? String
                 let token = doc["token"] as? String
