@@ -159,6 +159,49 @@ firebase deploy --only firestore:indexes
 - The function is idempotent per result document using an internal ledger and only updates the high score if the new misses value is better.
 - The same function also updates assignment progress transactionally and mirrors into the user-scoped assignment document.
 
+## Assignment Progress – Server Authoritative Flow
+
+### Overview
+Assignment completion for all native apps is handled on the server by a single Firestore-triggered function. The client writes a result document; the server increments progress exactly once using an idempotency ledger and mirrors display fields.
+
+### Trigger Path
+- `users/{userId}/results/{assignmentId}`
+- Trigger: `onDocumentWritten` (captures both creates and updates)
+
+### Client Write (iOS)
+- After a successful repetition, the app writes a document under the path above. Minimal payload is enough; recommended fields:
+  - `gameType` (e.g. `"sentence-sense"`)
+  - `misses` (for high score and analytics)
+  - `stats` (optional structured details)
+  - `assignmentId` (optional; when path param is a link token)
+
+### Function: `updateAssignmentOnResult`
+1. Resolves the canonical top-level assignment doc (`assignments/{topId}`) by either the path id or `linkToken`.
+2. Writes an idempotency record in `assignmentProgressLedger` keyed by the result event id: `result:{userId}:{event.id}` to prevent double increments.
+3. Runs a Firestore transaction on the top-level assignment:
+   - Increments `completedCount` by 1 up to `timesRequired`.
+   - Recomputes `attemptsRemaining = max(0, timesRequired - completedCount)`.
+   - Sets `status = 'completed'` when finished.
+   - Updates `updatedAt`.
+4. Mirrors the computed fields to `users/{userId}/assignments/{topId}` and seeds display fields (`gameTitle`, `gameType`, `deadline`, etc.) if missing.
+5. High Scores (Sentence Sense): upserts per `(configId,userId)` high score doc with `bestMisses` (lowest wins); see section above.
+
+### Important: Attempts Trigger Removed
+- The previous progress path via `attempts` has been deprecated to eliminate double-counting.
+- Function `updateAssignmentOnAttempt` is disabled and should not be relied upon.
+- Keep `deleteAttemptsOnAssignmentDelete` for cascade cleanup of legacy data when an assignment is deleted.
+
+### Testing Checklist
+1. Create an assignment with `timesRequired` > 1.
+2. From the app, complete one repetition → verify top-level `assignments/{id}` shows `completedCount = 1`, `attemptsRemaining` decremented by 1.
+3. Verify mirror at `users/{uid}/assignments/{id}` matches.
+4. Complete another repetition → `completedCount` increments exactly by 1.
+5. For Sentence Sense, check `highScores/ss:{configId}:{userId}` updated with `attempts`, `lastMisses`, and improved `bestMisses` when applicable.
+
+### Troubleshooting
+- Seeing 2× increments: ensure the client only writes a single `results` doc per repetition and that no `attempts` write is performed. The ledger prevents reprocessing of the same result event id.
+- No increment: confirm the `results` write path is correct, the trigger is deployed, and the top-level assignment can be resolved by doc id or `linkToken`.
+
 ## Dependencies
 
 - firebase-functions: v6.x (2nd generation)
