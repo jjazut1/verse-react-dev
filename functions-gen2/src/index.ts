@@ -1,4 +1,4 @@
-import { onDocumentCreated, onDocumentDeleted } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentDeleted, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
@@ -844,6 +844,145 @@ export const deleteHighScoresOnConfigDelete = onDocumentDeleted({
     logger.error('deleteHighScoresOnConfigDelete error', e);
   }
 });
+
+// Increment assignment progress when a result is saved (create or update)
+export const updateAssignmentOnResult = onDocumentWritten({
+  document: 'users/{userId}/results/{assignmentId}'
+}, async (event) => {
+  const db = admin.firestore();
+  const userId = event.params.userId;
+  const idParam = event.params.assignmentId;
+  const resultData = (event.data?.after?.data() || event.data?.before?.data() || {}) as any;
+  const passedIdOrToken = String(idParam || resultData.assignmentId || '');
+  if (!passedIdOrToken) {
+    logger.warn('updateAssignmentOnResult: missing assignment id param');
+    return;
+  }
+  // We'll write to the ledger after we resolve the canonical assignment id (topRef.id)
+
+  // Resolve canonical top-level assignment doc
+  const resolveTop = async (): Promise<FirebaseFirestore.DocumentReference | null> => {
+    try {
+      const byId = await db.collection('assignments').doc(passedIdOrToken).get();
+      if (byId.exists) return byId.ref;
+    } catch {}
+    try {
+      const qs = await db.collection('assignments').where('linkToken', '==', passedIdOrToken).limit(1).get();
+      if (!qs.empty) return qs.docs[0].ref;
+    } catch {}
+    return null;
+  };
+
+  const topRef = await resolveTop();
+  if (!topRef) {
+    logger.warn('updateAssignmentOnResult: could not resolve top-level assignment', { passedIdOrToken });
+    return;
+  }
+
+  // Idempotency ledger: ensure we only process this specific result once
+  try {
+    const ledgerKey = `result:${userId}:${topRef.id}:${event.id}`;
+    const ledgerRef = db.collection('assignmentProgressLedger').doc(ledgerKey);
+    const existing = await ledgerRef.get();
+    if (existing.exists) {
+      logger.info('Skipping duplicate result increment (already processed)', { userId, assignmentId: topRef.id, resultId: event.id });
+      return;
+    }
+    await ledgerRef.set({ source: 'result', userId, assignmentKey: topRef.id, resultId: event.id, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  } catch (e) { logger.warn('ledger write failed (result path), continuing', e); }
+
+  // Transactionally increment completedCount and derive attemptsRemaining/status on the top-level doc
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(topRef);
+    const data = (snap.exists ? snap.data() : {}) as any;
+    const timesRequired: number = Number(data?.timesRequired ?? data?.requiredAttempts ?? 1) || 1;
+    const prevCompleted: number = Number(data?.completedCount ?? 0) || 0;
+    const newCompleted = Math.min(timesRequired, prevCompleted + 1);
+    const attemptsRemaining = Math.max(0, timesRequired - newCompleted);
+    const updates: any = {
+      completedCount: newCompleted,
+      attemptsRemaining,
+      timesRequired,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (newCompleted >= timesRequired) updates.status = 'completed';
+    tx.set(topRef, updates, { merge: true });
+  });
+
+  // Mirror to user-scoped doc users/{uid}/assignments/{topId}
+  try {
+    const topSnap = await topRef.get();
+    const topId = topRef.id;
+    const subRef = db.collection('users').doc(userId).collection('assignments').doc(topId);
+    const top = topSnap.data() || {} as any;
+    const subSnap = await subRef.get();
+    const sub = subSnap.data() || {} as any;
+    const timesRequired: number = Number(sub?.timesRequired ?? top?.timesRequired ?? top?.requiredAttempts ?? 1) || 1;
+    const prevCompleted: number = Number(sub?.completedCount ?? 0) || 0;
+    const newCompleted = Math.min(timesRequired, prevCompleted + 1);
+    const attemptsRemaining = Math.max(0, timesRequired - newCompleted);
+    const updates: any = {
+      completedCount: newCompleted,
+      attemptsRemaining,
+      timesRequired,
+      status: newCompleted >= timesRequired ? 'completed' : (sub?.status ?? 'assigned'),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    // Seed display fields if missing
+    for (const k of ['gameName','gameTitle','gameType','deadline','teacherEmail','studentEmail']) {
+      if (sub[k] === undefined && top[k] !== undefined) updates[k] = top[k];
+    }
+    await subRef.set(updates, { merge: true });
+  } catch (e) {
+    logger.error('updateAssignmentOnResult mirror error', e);
+  }
+
+  // High score upsert (per-config per-user) – lower misses is better for sentence-sense
+  try {
+    const topSnap2 = await topRef.get();
+    const assignment = topSnap2.data() || {} as any;
+    const gameType = String(resultData.gameType || assignment.gameType || '');
+    const configId = String(assignment.gameId || assignment.configId || '');
+    if (gameType === 'sentence-sense' && configId) {
+      const misses = (typeof resultData.misses === 'number') ? resultData.misses
+        : (typeof resultData.score === 'number' ? resultData.score : null);
+      if (misses !== null) {
+        const hsId = `ss:${configId}:${userId}`;
+        const hsRef = db.collection('highScores').doc(hsId);
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(hsRef);
+          const cur = (snap.exists ? snap.data() : {}) as any;
+          const attempts = Number(cur?.attempts || 0) + 1;
+          const prevBest = (typeof cur?.bestMisses === 'number') ? cur.bestMisses : null;
+          const better = (prevBest === null) || (misses < prevBest);
+          const update: any = {
+            userId,
+            configId,
+            gameType,
+            attempts,
+            lastMisses: misses,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          };
+          if (better) {
+            update.bestMisses = misses;
+            update.bestAt = admin.firestore.FieldValue.serverTimestamp();
+          }
+          if (!snap.exists) {
+            update.createdAt = admin.firestore.FieldValue.serverTimestamp();
+          }
+          // helpful denorm fields
+          update.assignmentId = topRef.id;
+          update.title = assignment.gameTitle || assignment.gameName || null;
+          update.studentEmail = (await admin.auth().getUser(userId).catch(() => null))?.email || undefined;
+          tx.set(hsRef, update, { merge: true });
+        });
+      }
+    }
+  } catch (e) { logger.warn('highScores sentence-sense upsert failed', e); }
+});
+
+// Backup path: increment when a new attempt is written to top-level attempts
+// Removed attempts trigger to avoid double-counting; results trigger is authoritative.
 
 // Text-to-Speech function using Amazon Polly - Firestore Trigger (No CORS issues)
 export const processTTSRequest = onDocumentCreated({
