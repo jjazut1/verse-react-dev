@@ -914,8 +914,14 @@ public struct SentenceSenseGameView: View {
 
     private func saveAndFinish() async {
         do {
-            // Save user-scoped result only
-            let result = GameResult(assignmentId: assignmentId, gameType: "sentence-sense", score: misses, stats: ["sentences": config?.sentences.count ?? 0])
+            // Save user-scoped result only (server handles progress + high scores)
+            let result = GameResult(
+                assignmentId: assignmentId,
+                gameType: "sentence-sense",
+                misses: misses,
+                score: nil,
+                stats: ["sentences": config?.sentences.count ?? 0]
+            )
             try await resultsService.saveWithRetry(result)
         } catch { self.error = error.localizedDescription }
     }

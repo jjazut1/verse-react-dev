@@ -5,7 +5,8 @@ import FirebaseFirestore
 public struct GameResult: @unchecked Sendable {
     public var assignmentId: String
     public var gameType: String
-    public var score: Int
+    public var misses: Int?
+    public var score: Int?
     public var stats: [String: Any]
 }
 
@@ -20,16 +21,13 @@ public final class ResultsService: @unchecked Sendable {
         var data: [String: Any] = [
             "assignmentId": result.assignmentId,
             "gameType": result.gameType,
-            "score": result.score,
             "stats": result.stats,
             "updatedAt": FieldValue.serverTimestamp(),
             "createdAt": FieldValue.serverTimestamp()
         ]
+        if let misses = result.misses { data["misses"] = misses }
+        if let score = result.score { data["score"] = score }
         try await ref.setData(data, merge: true)
-
-        // Parity writes with web app
-        try? await writeAttempt(assignmentId: result.assignmentId, gameType: result.gameType, score: result.score)
-        try? await updateAssignments(assignmentId: result.assignmentId)
     }
 
     // Basic retry wrapper
@@ -46,43 +44,6 @@ public final class ResultsService: @unchecked Sendable {
             }
         }
         if let lastError { throw lastError }
-    }
-
-    // MARK: - Parity helpers
-    private func writeAttempt(assignmentId: String, gameType: String, score: Int) async throws {
-        let user = Auth.auth().currentUser
-        var payload: [String: Any] = [
-            "assignmentId": assignmentId,
-            "gameType": gameType,
-            "score": score,
-            "createdAt": FieldValue.serverTimestamp(),
-            // Web app expects 'timestamp' for attempt rows
-            "timestamp": FieldValue.serverTimestamp()
-        ]
-        if let uid = user?.uid { payload["userId"] = uid }
-        if let email = user?.email { payload["studentEmail"] = email }
-        try await db.collection("attempts").addDocument(data: payload)
-    }
-
-    private func updateAssignments(assignmentId: String) async throws {
-        let user = Auth.auth().currentUser
-        guard let uid = user?.uid else { return }
-        // Top-level assignment
-        let topRef = db.collection("assignments").document(assignmentId)
-        try? await topRef.setData([
-            "status": "completed",
-            "lastCompletedAt": FieldValue.serverTimestamp(),
-            "completedCount": FieldValue.increment(Int64(1)),
-            "studentId": uid
-        ], merge: true)
-
-        // Per-user subcollection if exists
-        let subRef = db.collection("users").document(uid).collection("assignments").document(assignmentId)
-        try? await subRef.setData([
-            "status": "completed",
-            "lastCompletedAt": FieldValue.serverTimestamp(),
-            "completedCount": FieldValue.increment(Int64(1))
-        ], merge: true)
     }
 }
 
