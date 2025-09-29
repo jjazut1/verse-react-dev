@@ -11,6 +11,19 @@ LuminateLearn is a comprehensive educational platform designed for K-12 teachers
 
 **Tagline:** Create Efficiently. Spark Curiosity. Shape Minds.
 
+### iOS native app layout and repo structure (pre-move note)
+- **Canonical Xcode project**: `~/GitHub/iosGit/Luminate/Luminate.xcodeproj` (bundle ID `com.luminatelearn.student`). This is the shipping iOS app.
+- **AuthKit Swift Package**: `~/GitHub/verse-react-dev/ios-authkit/` added to the Xcode project as a local package via relative path `../../verse-react-dev/ios-authkit`.
+- **Legacy folders to archive after this commit**: `~/GitHub/verse-react-dev/Luminate/` and `~/GitHub/verse-react-dev/ios/` (old Capacitor wrapper). These will be moved to `~/GitHub/verse-react-dev/_archive/` to reduce confusion.
+- **Do not duplicate** `GoogleService-Info.plist`; keep a single copy in the `Luminate` app target.
+- **Assets** such as `BrandLogo` and `GoogleGlyph` live in the app’s `Assets.xcassets` in `iosGit/Luminate`.
+
+- **Pre‑move checklist**:
+  - Close Xcode.
+  - Move the two legacy folders into `_archive` without touching `iosGit/Luminate`.
+  - Reopen `Luminate.xcodeproj` and re-add the local package if Xcode marks it missing.
+  - Clean build folder and build; verify the app runs and TestFlight bundle ID remains unchanged.
+
 ## ✨ Key Features
 
 ### 🎓 For Teachers
