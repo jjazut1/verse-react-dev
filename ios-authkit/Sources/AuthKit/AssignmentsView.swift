@@ -191,6 +191,8 @@ public struct AssignmentsView: View {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) { showSavedToast = true }
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
                             withAnimation(.easeInOut(duration: 0.25)) { showSavedToast = false }
+                            // Extra refresh after toast to ensure any eventual consistency is reflected
+                            Task { await load() }
                         }
                     }
                 }
