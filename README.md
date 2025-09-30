@@ -13,7 +13,7 @@ LuminateLearn is a comprehensive educational platform designed for K-12 teachers
 
 ### iOS native app layout and repo structure (pre-move note)
 - **Canonical Xcode project**: `~/GitHub/iosGit/Luminate/Luminate.xcodeproj` (bundle ID `com.luminatelearn.student`). This is the shipping iOS app.
-- **AuthKit Swift Package**: `~/GitHub/verse-react-dev/ios-authkit/` added to the Xcode project as a local package via relative path `../../verse-react-dev/ios-authkit`.
+- **AuthKit Swift Package**: now located at `~/GitHub/iosGit/Luminate/ios-authkit/` and added to Xcode as a local package via path `ios-authkit` (from the iOS project root).
 - **Legacy folders to archive after this commit**: `~/GitHub/verse-react-dev/Luminate/` and `~/GitHub/verse-react-dev/ios/` (old Capacitor wrapper). These will be moved to `~/GitHub/verse-react-dev/_archive/` to reduce confusion.
 - **Do not duplicate** `GoogleService-Info.plist`; keep a single copy in the `Luminate` app target.
 - **Assets** such as `BrandLogo` and `GoogleGlyph` live in the app’s `Assets.xcassets` in `iosGit/Luminate`.
@@ -23,6 +23,60 @@ LuminateLearn is a comprehensive educational platform designed for K-12 teachers
   - Move the two legacy folders into `_archive` without touching `iosGit/Luminate`.
   - Reopen `Luminate.xcodeproj` and re-add the local package if Xcode marks it missing.
   - Clean build folder and build; verify the app runs and TestFlight bundle ID remains unchanged.
+
+#### Troubleshooting: Xcode says the project was modified by another application
+
+When Xcode shows “The file ‘Luminate.xcodeproj’ has been modified by another application,” it means something outside Xcode changed the project file (e.g., `git pull`, a script, or `pod install`). The actual file is `Luminate.xcodeproj/project.pbxproj`.
+
+- Recommended: click **Use Version on Disk** (reloads external changes). Use **Keep Xcode Version** only if you just changed settings in Xcode and want to keep those edits.
+- To see what changed before deciding:
+
+```bash
+cd "/Users/jamesalspaugh/Documents/GitHub/iosGit/Luminate"
+git status
+git diff -- Luminate.xcodeproj/project.pbxproj | cat
+```
+
+If the prompt keeps reappearing, close the project, ensure your Git state is clean, then reopen in Xcode.
+
+### Directory organization optimization (2025-09)
+
+To reduce confusion between the web app and the native iOS app, we finalized a clean two-repo layout with a single source of truth for each platform.
+
+- **Repos & boundaries**
+  - Web app lives in this repo: `~/GitHub/verse-react-dev/`
+  - Native iOS app lives in a sibling repo: `~/GitHub/iosGit/Luminate/`
+  - Do not place a second copy of the Xcode project inside `verse-react-dev`.
+
+- **Bridging components**
+  - The Swift package is no longer in this repo; it was moved to `iosGit/Luminate/ios-authkit/` to remove cross-repo paths.
+  - In Xcode, add it by selecting `ios-authkit/Package.swift` inside the iOS repo.
+
+- **Legacy directories**
+  - Old Capacitor/iOS wrappers inside this repo were moved to `_archive/` to avoid duplicates: `~/GitHub/verse-react-dev/_archive/...`
+  - Do not modify archived folders; use `iosGit/Luminate` for all active iOS work.
+
+- **Single configuration sources**
+  - Keep a single `GoogleService-Info.plist` in the `Luminate` app target (no duplicates in this repo).
+  - App assets (e.g., `Assets.xcassets`) belong to the iOS repo.
+
+- **Typical layout**
+
+```text
+~/GitHub/
+  iosGit/
+    Luminate/
+      Luminate.xcodeproj
+      Luminate/     # app target, Assets.xcassets, Info.plist, etc.
+      ios-authkit/  # moved here; add to Xcode as a local SPM package
+  verse-react-dev/
+    _archive/       # legacy iOS/Capacitor folders retained for history only
+```
+
+- **Setup checklist on a new machine**
+  1. Clone both repos side-by-side into `~/GitHub/`.
+  2. Open `Luminate.xcodeproj`; if the `ios-authkit` package shows missing, remove and re-add it by selecting `ios-authkit/Package.swift` inside the iOS repo.
+  3. Build and run. If Xcode reports the project was modified externally, prefer **Use Version on Disk** unless you intentionally have unsaved IDE changes.
 
 ## ✨ Key Features
 
