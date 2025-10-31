@@ -2686,6 +2686,15 @@ All saved game configurations now include `schemaVersion: "v1"` (backfilled acro
 
 ### Release Notes
 
+- 2025-10-31: Footer, Policy Pages & Assignment System Enhancements
+  - **Footer & Legal Compliance**: Added comprehensive footer with support links, contact info, and policy navigation. Created complete policy suite: Privacy Policy, Terms of Service, Data Deletion, and Cookie Settings pages with GDPR/CCPA compliance
+  - **Cookie Consent**: Implemented GDPR-compliant cookie consent banner with localStorage persistence and customizable settings
+  - **PublicLayout Component**: Created unified layout wrapper for public pages (Home, Login, Policy pages) with consistent navbar and footer while keeping authenticated dashboards clean
+  - **Assignment Query Improvements**: Enhanced assignment loading to support both `teacherId` (new) and `teacherEmail` (legacy) fields for backward compatibility with existing assignments. Dual query system prevents data loss during field migration
+  - **Auth Race Condition Fixes**: Resolved initialization timing issues where folder/assignment queries would execute with empty `userId` during auth loading, causing permission errors. Added proper guards to prevent premature queries
+  - **Firestore Security Rules**: Deployed updated security rules with removed unused `isTeacher()` function. All folder and assignment collections properly secured with role-based access control
+  - **Code Quality & Production Readiness**: Removed debug logging (emoji console messages), cleaned up temporary state variables, simplified error handling, and improved variable scoping across assignment management components
+
 - 2025-09-17: Mobile readiness
   - Added `schemaVersion: "v1"` to all game schemas and backfilled existing configs
   - Introduced `getAssignmentManifest` callable for mobile (stable v1 contract)

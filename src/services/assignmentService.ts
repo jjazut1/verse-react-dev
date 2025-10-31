@@ -4,7 +4,7 @@ import { Assignment, Attempt } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 // Get all assignments for a specific teacher
-export const getTeacherAssignments = async (teacherId: string): Promise<Assignment[]> => {
+export const getTeacherAssignments = async (teacherId: string, teacherEmail?: string): Promise<Assignment[]> => {
   try {
     const assignmentsRef = collection(db, 'assignments');
     const q = query(assignmentsRef, where('teacherId', '==', teacherId));
@@ -19,6 +19,24 @@ export const getTeacherAssignments = async (teacherId: string): Promise<Assignme
         ...data,
       } as Assignment);
     });
+    
+    // Also query by teacherEmail for legacy assignments (created before teacherId field was added)
+    if (teacherEmail) {
+      const emailQuery = query(assignmentsRef, where('teacherEmail', '==', teacherEmail));
+      const emailSnapshot = await getDocs(emailQuery);
+      
+      // Only add assignments that aren't already in the list (avoid duplicates)
+      const existingIds = new Set(assignments.map(a => a.id));
+      emailSnapshot.forEach((doc) => {
+        if (!existingIds.has(doc.id)) {
+          const data = doc.data();
+          assignments.push({
+            id: doc.id,
+            ...data,
+          } as Assignment);
+        }
+      });
+    }
     
     return assignments;
   } catch (error) {
@@ -219,7 +237,7 @@ export const createAssignmentWithEmailLink = async (assignmentData: Omit<Assignm
 };
 
 // Get all assignments for a specific teacher with folder information
-export const getTeacherAssignmentsWithFolders = async (teacherId: string): Promise<Assignment[]> => {
+export const getTeacherAssignmentsWithFolders = async (teacherId: string, teacherEmail?: string): Promise<Assignment[]> => {
   try {
     // First get all assignments for the teacher
     const assignmentsRef = collection(db, 'assignments');
@@ -234,6 +252,26 @@ export const getTeacherAssignmentsWithFolders = async (teacherId: string): Promi
         ...data,
       } as Assignment);
     });
+
+    // Also query by teacherEmail for legacy assignments (created before teacherId field was added)
+    let emailCount = 0;
+    if (teacherEmail) {
+      const emailQuery = query(assignmentsRef, where('teacherEmail', '==', teacherEmail));
+      const emailSnapshot = await getDocs(emailQuery);
+      emailCount = emailSnapshot.size;
+      
+      // Only add assignments that aren't already in the list (avoid duplicates)
+      const existingIds = new Set(assignments.map(a => a.id));
+      emailSnapshot.forEach((doc) => {
+        if (!existingIds.has(doc.id)) {
+          const data = doc.data();
+          assignments.push({
+            id: doc.id,
+            ...data,
+          } as Assignment);
+        }
+      });
+    }
 
     // Then get all folder assignments for this teacher
     const folderAssignmentsRef = collection(db, 'assignmentFolderAssignments');
@@ -255,6 +293,8 @@ export const getTeacherAssignmentsWithFolders = async (teacherId: string): Promi
 
     console.log('Loaded assignments with folder info:', {
       totalAssignments: enrichedAssignments.length,
+      byTeacherId: assignmentsSnapshot.size,
+      byTeacherEmail: emailCount,
       assignmentsInFolders: enrichedAssignments.filter(a => a.folderId).length,
       unorganizedAssignments: enrichedAssignments.filter(a => !a.folderId).length
     });

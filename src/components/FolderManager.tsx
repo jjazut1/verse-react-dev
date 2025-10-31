@@ -160,9 +160,7 @@ export const useFolderManager = ({
   }, [folders, games]);
 
   const fetchFolders = useCallback(async () => {
-    if (!userId) {
-      return;
-    }
+    if (!userId || userId === '') return;
     
     setIsLoading(true);
     setError(null);
@@ -199,9 +197,11 @@ export const useFolderManager = ({
     }
   }, [userId, onShowToast]);
 
-  // Fetch folders on component mount
+  // Fetch folders on component mount and when userId changes
   useEffect(() => {
-    if (userId) {
+    if (userId && userId !== '') {
+      // Clear any previous errors when we have a valid userId
+      setError(null);
       fetchFolders();
     }
   }, [userId, fetchFolders]);

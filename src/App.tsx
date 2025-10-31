@@ -32,6 +32,11 @@ import SmartRouter from './pages/SmartRouter'
 import EmailLinkRouter from './pages/EmailLinkRouter'
 import PasswordSetup from './pages/PasswordSetup'
 import PasswordChange from './pages/PasswordChange'
+import CookieConsent from './components/CookieConsent'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
+import DataDeletion from './pages/DataDeletion'
+import CookieSettings from './pages/CookieSettings'
 import { useEffect } from 'react'
 import { usePWANavigation } from './hooks/usePWANavigation'
 
@@ -122,6 +127,23 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       {children}
       <Footer />
     </>
+  );
+};
+
+// Create a public layout component that includes both Navbar and Footer with proper spacing
+const PublicLayout = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      minHeight: '100vh'
+    }}>
+      <Navbar />
+      <div style={{ flex: '1' }}>
+        {children}
+      </div>
+      <Footer />
+    </div>
   );
 };
 
@@ -398,12 +420,12 @@ function ErrorBoundary() {
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Layout><Home /></Layout>,
+    element: <PublicLayout><Home /></PublicLayout>,
     errorElement: <ErrorBoundary />,
   },
   {
     path: "/login",
-    element: <Layout><Login /></Layout>,
+    element: <PublicLayout><Login /></PublicLayout>,
     errorElement: <ErrorBoundary />,
   },
   {
@@ -418,7 +440,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/forgot-password",
-    element: <Layout><ForgotPassword /></Layout>,
+    element: <PublicLayout><ForgotPassword /></PublicLayout>,
     errorElement: <ErrorBoundary />,
   },
   {
@@ -571,6 +593,27 @@ const router = createBrowserRouter([
     element: <EmailLinkRouter />,
     errorElement: <ErrorBoundary />,
   },
+  // Policy pages
+  {
+    path: "/privacy-policy",
+    element: <PublicLayout><PrivacyPolicy /></PublicLayout>,
+    errorElement: <ErrorBoundary />,
+  },
+  {
+    path: "/terms-of-service",
+    element: <PublicLayout><TermsOfService /></PublicLayout>,
+    errorElement: <ErrorBoundary />,
+  },
+  {
+    path: "/data-deletion",
+    element: <PublicLayout><DataDeletion /></PublicLayout>,
+    errorElement: <ErrorBoundary />,
+  },
+  {
+    path: "/cookie-settings",
+    element: <PublicLayout><CookieSettings /></PublicLayout>,
+    errorElement: <ErrorBoundary />,
+  },
   // Add a catch-all route that will handle any undefined paths
   {
     path: "*",
@@ -592,6 +635,7 @@ function App() {
           <LoadingProvider>
             <RouterProvider router={router} />
             <GlobalModals />
+            <CookieConsent />
           </LoadingProvider>
         </ModalProvider>
       </UnsavedChangesProvider>

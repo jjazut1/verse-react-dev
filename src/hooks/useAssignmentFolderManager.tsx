@@ -67,19 +67,15 @@ export const useAssignmentFolderManager = ({
 
   // Fetch folders and assignments
   const fetchFolders = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || userId === '') return;
     
     setIsLoading(true);
     setError(null);
     try {
-      console.log('📋 Loading assignment folders for user:', userId);
       const [foldersData, assignmentsData] = await Promise.all([
         getUserAssignmentFolders(userId),
         getAssignmentFolderAssignments(userId)
       ]);
-      
-      console.log('📋 Retrieved assignment folders:', foldersData);
-      console.log('📋 Retrieved assignment folder assignments:', assignmentsData);
       
       setFolders(foldersData);
       setFolderAssignments(assignmentsData);
@@ -108,9 +104,11 @@ export const useAssignmentFolderManager = ({
     }
   }, [userId, onShowToast]);
 
-  // Fetch folders on component mount
+  // Fetch folders on component mount and when userId changes
   useEffect(() => {
-    if (userId) {
+    if (userId && userId !== '') {
+      // Clear any previous errors when we have a valid userId
+      setError(null);
       fetchFolders();
     }
   }, [userId, fetchFolders]);

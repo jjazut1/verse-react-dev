@@ -454,8 +454,9 @@ const AssignmentFolderManagement: React.FC<AssignmentFolderManagementProps> = ({
     );
   }
 
-  // Show error state
-  if (assignmentFolderManager.error) {
+  // Show error state only if we have a valid currentUser
+  // (prevents showing error during initial auth load)
+  if (assignmentFolderManager.error && currentUser?.uid) {
     return (
       <div style={{ 
         marginBottom: '12px', 

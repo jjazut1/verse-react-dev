@@ -273,9 +273,7 @@ export const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
       if (!currentUser) return;
       
       try {
-        console.log('Fetching assignments for user:', currentUser.uid);
-        const fetchedAssignments = await getTeacherAssignmentsWithFolders(currentUser.uid);
-        console.log('Fetched assignments:', fetchedAssignments);
+        const fetchedAssignments = await getTeacherAssignmentsWithFolders(currentUser.uid, currentUser.email);
         setAssignments(fetchedAssignments);
       } catch (error) {
         console.error('Error fetching assignments:', error);
